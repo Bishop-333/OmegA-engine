@@ -102,77 +102,6 @@ void GLimp_LogComment( const char *comment )
 }
 
 
-static int FindNearestDisplay( int *x, int *y, int w, int h )
-{
-	const int cx = *x + w / 2;
-	const int cy = *y + h / 2;
-	int i, index, numDisplays;
-	SDL_Rect *list, *m;
-
-	index = -1; // selected display index
-
-	numDisplays = SDL_GetNumVideoDisplays();
-	if ( numDisplays <= 0 )
-		return -1;
-
-	glw_state.monitorCount = numDisplays;
-
-	list = Z_Malloc( numDisplays * sizeof( list[0] ) );
-
-	for ( i = 0; i < numDisplays; i++ )
-	{
-		SDL_GetDisplayBounds( i, list + i );
-		//Com_Printf( "[%i]: x=%i, y=%i, w=%i, h=%i\n", i, list[i].x, list[i].y, list[i].w, list[i].h );
-	}
-
-	// select display by window center intersection
-	for ( i = 0; i < numDisplays; i++ )
-	{
-		m = list + i;
-		if ( cx >= m->x && cx < (m->x + m->w) && cy >= m->y && cy < (m->y + m->h) )
-		{
-			index = i;
-			break;
-		}
-	}
-
-	// select display by nearest distance between window center and display center
-	if ( index == -1 )
-	{
-		unsigned long nearest, dist;
-		int dx, dy;
-		nearest = ~0UL;
-		for ( i = 0; i < numDisplays; i++ )
-		{
-			m = list + i;
-			dx = (m->x + m->w/2) - cx;
-			dy = (m->y + m->h/2) - cy;
-			dist = ( dx * dx ) + ( dy * dy );
-			if ( dist < nearest )
-			{
-				nearest = dist;
-				index = i;
-			}
-		}
-	}
-
-	// adjust x and y coordinates if needed
-	if ( index >= 0 )
-	{
-		m = list + index;
-		if ( *x < m->x )
-			*x = m->x;
-
-		if ( *y < m->y )
-			*y = m->y;
-	}
-
-	Z_Free( list );
-
-	return index;
-}
-
-
 static SDL_HitTestResult SDL_HitTestFunc( SDL_Window *win, const SDL_Point *area, void *data )
 {
 	if ( Key_GetCatcher() & KEYCATCH_CONSOLE && keys[ K_ALT ].down )
@@ -352,17 +281,6 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 			Com_DPrintf( "SDL_GetDisplayForWindow() failed: %s\n", SDL_GetError() );
 		}
 	}
-	else
-	{
-		x = vid_xpos->integer;
-		y = vid_ypos->integer;
-
-		// find out to which display our window belongs to
-		// according to previously stored \vid_xpos and \vid_ypos coordinates
-		display = FindNearestDisplay( &x, &y, 640, 480 );
-
-		//Com_Printf("Selected display: %i\n", display );
-	}
 
 	pdesktopMode = SDL_GetDesktopDisplayMode( display );
 
@@ -381,7 +299,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 	config->isFullscreen = fullscreen;
 	glw_state.isFullscreen = fullscreen;
 
-	if( SDL_GetDesktopDisplayMode( display, &desktopMode ) == 0 )
+	if( SDL_GetDesktopDisplayMode( display ) == 0 )
 	{
 		displayAspect = (float)desktopMode.w / (float)desktopMode.h;
 
@@ -424,18 +342,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 
 	if ( fullscreen )
 	{
-#ifdef MACOS_X
-		if ( r_mode->integer == -2 || r_modeFullscreen->integer == -2 )
-		{
-			flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
-		}
-		else
-		{
 		flags |= SDL_WINDOW_FULLSCREEN;
-		}
-#else
-		flags |= SDL_WINDOW_FULLSCREEN;
-#endif
 	}
 	else if ( r_noborder->integer )
 	{
@@ -592,7 +499,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 				continue;
 			}
 
-			if ( SDL_GetWindowDisplayMode( SDL_window, &mode ) >= 0 )
+			if ( SDL_GetWindowFullscreenMode( SDL_window ) >= 0 )
 			{
 				config->displayFrequency = mode.refresh_rate;
 				config->vidWidth = mode.w;
@@ -662,13 +569,6 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 
 	if ( !fullscreen && r_noborder->integer )
 		SDL_SetWindowHitTest( SDL_window, SDL_HitTestFunc, NULL );
-
-#ifdef USE_VULKAN_API
-	if ( vulkan )
-		SDL_Vulkan_GetDrawableSize( SDL_window, &config->vidWidth, &config->vidHeight );
-	else
-#endif
-		SDL_GL_GetDrawableSize( SDL_window, &config->vidWidth, &config->vidHeight );
 
 	// save render dimensions as renderer may change it in advance
 	glw_state.window_width = config->vidWidth;
@@ -876,7 +776,7 @@ void VKimp_Init( glconfig_t *config )
 		}
 	}
 
-	qvkGetInstanceProcAddr = SDL_Vulkan_GetVkGetInstanceProcAddr();
+	qvkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr) SDL_Vulkan_GetVkGetInstanceProcAddr();
 
 	if ( qvkGetInstanceProcAddr == NULL )
 	{
@@ -915,7 +815,7 @@ VK_CreateSurface
 */
 qboolean VK_CreateSurface( VkInstance instance, VkSurfaceKHR *surface )
 {
-	if ( SDL_Vulkan_CreateSurface( SDL_window, instance, surface ) == SDL_TRUE )
+	if ( SDL_Vulkan_CreateSurface( SDL_window, instance, NULL, surface ) == true )
 		return qtrue;
 	else
 		return qfalse;

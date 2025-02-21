@@ -390,7 +390,7 @@ static void IN_GobbleMouseEvents( void )
 	SDL_PumpEvents();
 
 	while( ( val = SDL_PeepEvents( dummy, ARRAY_LEN( dummy ), SDL_GETEVENT,
-		SDL_EVENT_MOUSE_MOTION, SDL_MOUSEWHEEL ) ) > 0 ) { }
+		SDL_EVENT_MOUSE_MOTION, SDL_EVENT_MOUSE_WHEEL ) ) > 0 ) { }
 
 	if ( val < 0 )
 		Com_Printf( "%s failed: %s\n", __func__, SDL_GetError() );
@@ -433,7 +433,7 @@ static void IN_ActivateMouse( void )
 			if ( in_nograb->integer ) {
 				SDL_SetWindowRelativeMouseMode( SDL_window, false );
 			} else {
-				SDL_SetWindowRelativeMouseMode( SDL_window, true )
+				SDL_SetWindowRelativeMouseMode( SDL_window, true );
 			}
 
 			in_nograb->modified = qfalse;
@@ -1259,68 +1259,59 @@ void HandleEvents( void )
 				Cbuf_ExecuteText( EXEC_NOW, "quit Closed window\n" );
 				break;
 
-			case SDL_WINDOWEVENT:
-#ifdef DEBUG_EVENTS
-				Com_Printf( "%4i %s\n", e.window.timestamp, eventName( e.window.event ) );
-#endif
-				switch ( e.window.event )
+			case SDL_EVENT_WINDOW_RESIZED:
+			{
+				int width, height;
+
+				width = e.window.data1;
+				height = e.window.data2;
+
+				// ignore this event on fullscreen
+				if( glw_state.isFullscreen )
 				{
-					case SDL_WINDOWEVENT_RESIZED:
-					{
-						int width, height;
-
-						width = e.window.data1;
-						height = e.window.data2;
-
-						// ignore this event on fullscreen
-						if( glw_state.isFullscreen )
-						{
-							break;
-						}
-
-						// check if size actually changed
-						if( cls.glconfig.vidWidth == width && cls.glconfig.vidHeight == height )
-						{
-							break;
-						}
-
-						Cvar_SetValue( "r_customwidth", width );
-						Cvar_SetValue( "r_customheight", height );
-						Cvar_Set( "r_mode", "-1" );
-
-						// Wait until user stops dragging for 1 second, so
-						// we aren't constantly recreating the GL context while
-						// he tries to drag...
-						vidRestartTime = Sys_Milliseconds( ) + 1000;
-					}
 					break;
-					case SDL_WINDOWEVENT_MOVED:
-						if ( gw_active && !gw_minimized && !glw_state.isFullscreen ) {
-							Cvar_SetIntegerValue( "vid_xpos", e.window.data1 );
-							Cvar_SetIntegerValue( "vid_ypos", e.window.data2 );
-						}
-						break;
+				}
+
+				// check if size actually changed
+				if( cls.glconfig.vidWidth == width && cls.glconfig.vidHeight == height )
+				{
+					break;
+				}
+
+				Cvar_SetValue( "r_customwidth", width );
+				Cvar_SetValue( "r_customheight", height );
+				Cvar_Set( "r_mode", "-1" );
+
+				// Wait until user stops dragging for 1 second, so
+				// we aren't constantly recreating the GL context while
+				// he tries to drag...
+				vidRestartTime = Sys_Milliseconds( ) + 1000;
+			}
+			break;
+			case SDL_EVENT_WINDOW_MOVED:
+				if ( gw_active && !gw_minimized && !glw_state.isFullscreen ) {
+					Cvar_SetIntegerValue( "vid_xpos", e.window.data1 );
+					Cvar_SetIntegerValue( "vid_ypos", e.window.data2 );
+				}
+				break;
 					// window states:
-					case SDL_WINDOWEVENT_HIDDEN:
-					case SDL_WINDOWEVENT_MINIMIZED:		gw_active = qfalse; gw_minimized = qtrue; break;
-					case SDL_WINDOWEVENT_SHOWN:
-					case SDL_WINDOWEVENT_RESTORED:
-					case SDL_WINDOWEVENT_MAXIMIZED:		gw_minimized = qfalse; break;
+					case SDL_EVENT_WINDOW_HIDDEN:
+					case SDL_EVENT_WINDOW_MINIMIZED:		gw_active = qfalse; gw_minimized = qtrue; break;
+					case SDL_EVENT_WINDOW_SHOWN:
+					case SDL_EVENT_WINDOW_RESTORED:
+					case SDL_EVENT_WINDOW_MAXIMIZED:		gw_minimized = qfalse; break;
 					// keyboard focus:
-					case SDL_WINDOWEVENT_FOCUS_LOST:	lastKeyDown = 0; Key_ClearStates(); gw_active = qfalse; break;
-					case SDL_WINDOWEVENT_FOCUS_GAINED:	lastKeyDown = 0; Key_ClearStates(); gw_active = qtrue; gw_minimized = qfalse;
+					case SDL_EVENT_WINDOW_FOCUS_LOST:	lastKeyDown = 0; Key_ClearStates(); gw_active = qfalse; break;
+					case SDL_EVENT_WINDOW_FOCUS_GAINED:	lastKeyDown = 0; Key_ClearStates(); gw_active = qtrue; gw_minimized = qfalse;
 														if ( re.SetColorMappings ) {
 															re.SetColorMappings();
 														}
 														break;
-					// mouse focus:
-					case SDL_WINDOWEVENT_ENTER: mouse_focus = qtrue; break;
-					case SDL_WINDOWEVENT_LEAVE: if ( glw_state.isFullscreen ) mouse_focus = qfalse; break;
-				}
-				break;
-			default:
-				break;
+		// mouse focus:
+		case SDL_EVENT_WINDOW_MOUSE_ENTER: mouse_focus = qtrue; break;
+		case SDL_EVENT_WINDOW_MOUSE_LEAVE: if ( glw_state.isFullscreen ) mouse_focus = qfalse; break;
 		}
+		break;
 	}
 }
 

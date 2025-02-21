@@ -20,6 +20,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 
+#include <stdlib.h>
+#include <stdio.h>
+
 #ifdef USE_LOCAL_HEADERS
 #	include "SDL3/SDL.h"
 #else
@@ -32,8 +35,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 qboolean snd_inited = qfalse;
 
-extern cvar_t *s_khz;
 cvar_t *s_sdlBits;
+cvar_t *s_sdlSpeed;
 cvar_t *s_sdlChannels;
 cvar_t *s_sdlDevSamps;
 cvar_t *s_sdlMixSamps;
@@ -42,14 +45,12 @@ cvar_t *s_sdlMixSamps;
 static int dmapos = 0;
 static int dmasize = 0;
 
-static SDL_AudioDeviceID sdlPlaybackDevice;
+static SDL_AudioStream *sdlPlaybackStream = NULL;
 
-#if defined USE_VOIP && SDL_VERSION_ATLEAST( 2, 0, 5 )
+#if defined USE_VOIP
 #define USE_SDL_AUDIO_CAPTURE
-
-static SDL_AudioDeviceID sdlCaptureDevice;
+static SDL_AudioStream *sdlCaptureStream = NULL;
 static cvar_t *s_sdlCapture;
-static float sdlMasterGain = 1.0f;
 #endif
 
 
@@ -58,7 +59,7 @@ static float sdlMasterGain = 1.0f;
 SNDDMA_AudioCallback
 ===============
 */
-static void SNDDMA_AudioCallback(void *userdata, Uint8 *stream, int len)
+static void SDLCALL SNDDMA_AudioCallback(void *userdata, SDL_AudioStream *stream, int additional_amount, int total_amount)
 {
 	int pos = (dmapos * (dma.samplebits/8));
 	if (pos >= dmasize)
@@ -66,11 +67,11 @@ static void SNDDMA_AudioCallback(void *userdata, Uint8 *stream, int len)
 
 	if (!snd_inited)  /* shouldn't happen, but just in case... */
 	{
-		memset(stream, '\0', len);
 		return;
 	}
 	else
 	{
+        const int len = additional_amount;
 		int tobufend = dmasize - pos;  /* bytes to buffer's end. */
 		int len1 = len;
 		int len2 = 0;
@@ -80,68 +81,32 @@ static void SNDDMA_AudioCallback(void *userdata, Uint8 *stream, int len)
 			len1 = tobufend;
 			len2 = len - len1;
 		}
-		memcpy(stream, dma.buffer + pos, len1);
+		SDL_PutAudioStreamData(stream, dma.buffer + pos, len1);
 		if (len2 <= 0)
 			dmapos += (len1 / (dma.samplebits/8));
 		else  /* wraparound? */
 		{
-			memcpy(stream+len1, dma.buffer, len2);
+			SDL_PutAudioStreamData(stream, dma.buffer, len2);
 			dmapos = (len2 / (dma.samplebits/8));
 		}
 	}
 
 	if (dmapos >= dmasize)
 		dmapos = 0;
-
-#ifdef USE_SDL_AUDIO_CAPTURE
-	if (sdlMasterGain != 1.0f)
-	{
-		int i;
-		if (dma.isfloat && (dma.samplebits == 32))
-		{
-			float *ptr = (float *) stream;
-			len /= sizeof (*ptr);
-			for (i = 0; i < len; i++, ptr++)
-			{
-				*ptr *= sdlMasterGain;
-			}
-		}
-		else if (dma.samplebits == 16)
-		{
-			Sint16 *ptr = (Sint16 *) stream;
-			len /= sizeof (*ptr);
-			for (i = 0; i < len; i++, ptr++)
-			{
-				*ptr = (Sint16) (((float) *ptr) * sdlMasterGain);
-			}
-		}
-		else if (dma.samplebits == 8)
-		{
-			Uint8 *ptr = (Uint8 *) stream;
-			len /= sizeof (*ptr);
-			for (i = 0; i < len; i++, ptr++)
-			{
-				*ptr = (Uint8) (((float) *ptr) * sdlMasterGain);
-			}
-		}
-	}
-#endif
 }
 
-static const struct
+static struct
 {
-	uint16_t	enumFormat;
-	const char	*stringFormat;
+	Uint16	enumFormat;
+	char		*stringFormat;
 } formatToStringTable[ ] =
 {
-	{ AUDIO_U8,     "AUDIO_U8" },
-	{ AUDIO_S8,     "AUDIO_S8" },
-	{ AUDIO_U16LSB, "AUDIO_U16LSB" },
-	{ AUDIO_S16LSB, "AUDIO_S16LSB" },
-	{ AUDIO_U16MSB, "AUDIO_U16MSB" },
-	{ AUDIO_S16MSB, "AUDIO_S16MSB" },
-	{ AUDIO_F32LSB, "AUDIO_F32LSB" },
-	{ AUDIO_F32MSB, "AUDIO_F32MSB" }
+	{ SDL_AUDIO_U8,     "AUDIO_U8" },
+	{ SDL_AUDIO_S8,     "AUDIO_S8" },
+	{ SDL_AUDIO_S16LE, "AUDIO_S16LSB" },
+	{ SDL_AUDIO_S16BE, "AUDIO_S16MSB" },
+	{ SDL_AUDIO_F32LE, "AUDIO_F32LSB" },
+	{ SDL_AUDIO_F32BE, "AUDIO_F32MSB" }
 };
 
 static int formatToStringTableSize = ARRAY_LEN( formatToStringTable );
@@ -153,127 +118,84 @@ SNDDMA_PrintAudiospec
 */
 static void SNDDMA_PrintAudiospec(const char *str, const SDL_AudioSpec *spec)
 {
-	const char *fmt = NULL;
-	int i;
+	int		i;
+	char	*fmt = NULL;
 
-	Com_Printf( "%s:\n", str );
+	Com_Printf("%s:\n", str);
 
-	for ( i = 0; i < formatToStringTableSize; i++ ) {
+	for( i = 0; i < formatToStringTableSize; i++ ) {
 		if( spec->format == formatToStringTable[ i ].enumFormat ) {
 			fmt = formatToStringTable[ i ].stringFormat;
 		}
 	}
 
-	if ( fmt ) {
+	if( fmt ) {
 		Com_Printf( "  Format:   %s\n", fmt );
 	} else {
 		Com_Printf( "  Format:   " S_COLOR_RED "UNKNOWN\n");
 	}
 
 	Com_Printf( "  Freq:     %d\n", (int) spec->freq );
-	Com_Printf( "  Samples:  %d\n", (int) spec->samples );
 	Com_Printf( "  Channels: %d\n", (int) spec->channels );
 }
-
-
-static int SNDDMA_KHzToHz( int khz )
-{
-	switch ( khz )
-	{
-		default:
-		case 22: return 22050;
-		case 48: return 48000;
-		case 44: return 44100;
-		case 11: return 11025;
-		case  8: return  8000;
-	}
-}
-
 
 /*
 ===============
 SNDDMA_Init
 ===============
 */
-qboolean SNDDMA_Init( void )
+qboolean SNDDMA_Init(void)
 {
 	SDL_AudioSpec desired;
 	SDL_AudioSpec obtained;
 	int tmp;
 
-	if ( snd_inited )
+	if (snd_inited)
 		return qtrue;
 
-	//if ( !s_sdlBits )
-	{
-		s_sdlBits = Cvar_Get( "s_sdlBits", "16", CVAR_ARCHIVE_ND | CVAR_LATCH );
-		Cvar_CheckRange( s_sdlBits, "8", "16", CV_INTEGER );
-		Cvar_SetDescription( s_sdlBits, "Bits per-sample to request for SDL audio output (possible options: 8 or 16). When set to 0 it uses 16." );
-
-		s_sdlChannels = Cvar_Get( "s_sdlChannels", "2", CVAR_ARCHIVE_ND | CVAR_LATCH );
-		Cvar_CheckRange( s_sdlChannels, "1", "2", CV_INTEGER );
-		Cvar_SetDescription( s_sdlChannels, "Number of audio channels to request for SDL audio output. The Quake 3 audio mixer only supports mono and stereo. Additional channels are silent." );
-
-		s_sdlDevSamps = Cvar_Get( "s_sdlDevSamps", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
-		Cvar_SetDescription( s_sdlDevSamps, "Number of audio samples to provide to the SDL audio output device. When set to 0 it picks a value based on s_sdlSpeed." );
-		s_sdlMixSamps = Cvar_Get( "s_sdlMixSamps", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
-		Cvar_SetDescription( s_sdlMixSamps, "Number of audio samples for Quake 3's audio mixer when using SDL audio output." );
+	if (!s_sdlBits) {
+		s_sdlBits = Cvar_Get("s_sdlBits", "16", CVAR_ARCHIVE);
+		s_sdlSpeed = Cvar_Get("s_sdlSpeed", "0", CVAR_ARCHIVE);
+		s_sdlChannels = Cvar_Get("s_sdlChannels", "2", CVAR_ARCHIVE);
+		s_sdlDevSamps = Cvar_Get("s_sdlDevSamps", "0", CVAR_ARCHIVE);
+		s_sdlMixSamps = Cvar_Get("s_sdlMixSamps", "0", CVAR_ARCHIVE);
 	}
 
 	Com_Printf( "SDL_Init( SDL_INIT_AUDIO )... " );
 
-	if ( SDL_Init( SDL_INIT_AUDIO ) != 0 )
+	if (!SDL_Init(SDL_INIT_AUDIO))
 	{
-		Com_Printf( "FAILED (%s)\n", SDL_GetError() );
+		Com_Printf( "FAILED (%s)\n", SDL_GetError( ) );
 		return qfalse;
 	}
 
 	Com_Printf( "OK\n" );
 
-	Com_Printf( "SDL audio driver is \"%s\".\n", SDL_GetCurrentAudioDriver() );
+	Com_Printf( "SDL audio driver is \"%s\".\n", SDL_GetCurrentAudioDriver( ) );
 
-	memset( &desired, '\0', sizeof (desired) );
-	memset( &obtained, '\0', sizeof (obtained) );
+	memset(&desired, '\0', sizeof (desired));
+	memset(&obtained, '\0', sizeof (obtained));
 
-	desired.freq = SNDDMA_KHzToHz( s_khz->integer );
-	if ( desired.freq == 0 )
-		desired.freq = 22050;
+	tmp = ((int) s_sdlBits->value);
+	if ((tmp != 16) && (tmp != 8))
+		tmp = 16;
 
-	tmp = s_sdlBits->integer;
-	if ( tmp < 16 )
-		tmp = 8;
+	desired.freq = (int) s_sdlSpeed->value;
+	if(!desired.freq) desired.freq = 22050;
+	desired.format = ((tmp == 16) ? SDL_AUDIO_S16 : SDL_AUDIO_U8);
+	desired.channels = (int) s_sdlChannels->value;
 
-	desired.format = ((tmp == 16) ? AUDIO_S16SYS : AUDIO_U8);
-
-	// I dunno if this is the best idea, but I'll give it a try...
-	//  should probably check a cvar for this...
-	if ( s_sdlDevSamps->integer )
-		desired.samples = s_sdlDevSamps->value;
-	else
+	sdlPlaybackStream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &desired, SNDDMA_AudioCallback, NULL);
+	if (sdlPlaybackStream == NULL)
 	{
-		// just pick a sane default.
-		if (desired.freq <= 11025)
-			desired.samples = 256;
-		else if (desired.freq <= 22050)
-			desired.samples = 512;
-		else if (desired.freq <= 44100)
-			desired.samples = 1024;
-		else
-			desired.samples = 2048;  // (*shrug*)
-	}
-
-	desired.channels = s_sdlChannels->integer;
-	desired.callback = SNDDMA_AudioCallback;
-
-	sdlPlaybackDevice = SDL_OpenAudioDevice( NULL, SDL_FALSE, &desired, &obtained, SDL_AUDIO_ALLOW_ANY_CHANGE );
-	if ( sdlPlaybackDevice == 0 )
-	{
-		Com_Printf( "SDL_OpenAudioDevice() failed: %s\n", SDL_GetError() );
-		SDL_QuitSubSystem( SDL_INIT_AUDIO );
+		Com_Printf("SDL_OpenAudioDeviceStream() failed: %s\n", SDL_GetError());
+		SDL_QuitSubSystem(SDL_INIT_AUDIO);
 		return qfalse;
 	}
 
-	SNDDMA_PrintAudiospec( "SDL_AudioSpec", &obtained );
+    SDL_copyp(&obtained, &desired);
+
+	SNDDMA_PrintAudiospec("SDL_AudioSpec", &obtained);
 
 	// dma.samples needs to be big, or id's mixer will just refuse to
 	//  work at all; we need to keep it significantly bigger than the
@@ -282,18 +204,16 @@ qboolean SNDDMA_Init( void )
 	// 32768 is what the OSS driver filled in here on my system. I don't
 	//  know if it's a good value overall, but at least we know it's
 	//  reasonable...this is why I let the user override.
-	tmp = s_sdlMixSamps->integer;
-	if ( !tmp )
-		tmp = (obtained.samples * obtained.channels) * 10;
+	tmp = s_sdlMixSamps->value;
+	if (!tmp)
+		tmp = (2048 * obtained.channels) * 10;
 
 	// samples must be divisible by number of channels
 	tmp -= tmp % obtained.channels;
-	// round up to next power of 2
-	tmp = log2pad( tmp, 1 );
 
 	dmapos = 0;
-	dma.samplebits = SDL_AUDIO_BITSIZE( obtained.format );
-	dma.isfloat = SDL_AUDIO_ISFLOAT( obtained.format );
+	dma.samplebits = SDL_AUDIO_BITSIZE(obtained.format);
+	dma.isfloat = SDL_AUDIO_ISFLOAT(obtained.format);
 	dma.channels = obtained.channels;
 	dma.samples = tmp;
 	dma.fullsamples = dma.samples / dma.channels;
@@ -305,13 +225,7 @@ qboolean SNDDMA_Init( void )
 #ifdef USE_SDL_AUDIO_CAPTURE
 	// !!! FIXME: some of these SDL_OpenAudioDevice() values should be cvars.
 	s_sdlCapture = Cvar_Get( "s_sdlCapture", "1", CVAR_ARCHIVE | CVAR_LATCH );
-	Cvar_SetDescription( s_sdlCapture, "Set to 1 to enable SDL audio capture." );
-	// !!! FIXME: pulseaudio capture records audio the entire time the program is running. https://bugzilla.libsdl.org/show_bug.cgi?id=4087
-	if (Q_stricmp(SDL_GetCurrentAudioDriver(), "pulseaudio") == 0)
-	{
-		Com_Printf("SDL audio capture support disabled for pulseaudio (https://bugzilla.libsdl.org/show_bug.cgi?id=4087)\n");
-	}
-	else if (!s_sdlCapture->integer)
+	if (!s_sdlCapture->integer)
 	{
 		Com_Printf("SDL audio capture support disabled by user ('+set s_sdlCapture 1' to enable)\n");
 	}
@@ -327,19 +241,16 @@ qboolean SNDDMA_Init( void )
 		SDL_AudioSpec spec;
 		SDL_zero(spec);
 		spec.freq = 48000;
-		spec.format = AUDIO_S16SYS;
+		spec.format = SDL_AUDIO_S16;
 		spec.channels = 1;
-		spec.samples = VOIP_MAX_PACKET_SAMPLES * 4;
-		sdlCaptureDevice = SDL_OpenAudioDevice(NULL, SDL_TRUE, &spec, NULL, 0);
+		sdlCaptureStream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_RECORDING, &spec, NULL, NULL);
 		Com_Printf( "SDL capture device %s.\n",
-				    (sdlCaptureDevice == 0) ? "failed to open" : "opened");
+				    (sdlCaptureStream == NULL) ? "failed to open" : "opened");
 	}
-
-	sdlMasterGain = 1.0f;
 #endif
 
 	Com_Printf("Starting SDL audio callback...\n");
-	SDL_PauseAudioDevice(sdlPlaybackDevice, 0);  // start callback.
+	SDL_ResumeAudioStreamDevice(sdlPlaybackStream);  // start callback.
 	// don't unpause the capture device; we'll do that in StartCapture.
 
 	Com_Printf("SDL audio initialized.\n");
@@ -347,40 +258,38 @@ qboolean SNDDMA_Init( void )
 	return qtrue;
 }
 
-
 /*
 ===============
 SNDDMA_GetDMAPos
 ===============
 */
-int SNDDMA_GetDMAPos( void )
+int SNDDMA_GetDMAPos(void)
 {
 	return dmapos;
 }
-
 
 /*
 ===============
 SNDDMA_Shutdown
 ===============
 */
-void SNDDMA_Shutdown( void )
+void SNDDMA_Shutdown(void)
 {
-	if (sdlPlaybackDevice != 0)
+	if (sdlPlaybackStream)
 	{
 		Com_Printf("Closing SDL audio playback device...\n");
-		SDL_CloseAudioDevice(sdlPlaybackDevice);
+		SDL_DestroyAudioStream(sdlPlaybackStream);
 		Com_Printf("SDL audio playback device closed.\n");
-		sdlPlaybackDevice = 0;
+		sdlPlaybackStream = NULL;
 	}
 
 #ifdef USE_SDL_AUDIO_CAPTURE
-	if (sdlCaptureDevice)
+	if (sdlCaptureStream)
 	{
 		Com_Printf("Closing SDL audio capture device...\n");
-		SDL_CloseAudioDevice(sdlCaptureDevice);
+		SDL_DestroyAudioStream(sdlCaptureStream);
 		Com_Printf("SDL audio capture device closed.\n");
-		sdlCaptureDevice = 0;
+		sdlCaptureStream = NULL;
 	}
 #endif
 
@@ -392,7 +301,6 @@ void SNDDMA_Shutdown( void )
 	Com_Printf("SDL audio shut down.\n");
 }
 
-
 /*
 ===============
 SNDDMA_Submit
@@ -400,20 +308,19 @@ SNDDMA_Submit
 Send sound to device if buffer isn't really the dma buffer
 ===============
 */
-void SNDDMA_Submit( void )
+void SNDDMA_Submit(void)
 {
-	SDL_UnlockAudioDevice( sdlPlaybackDevice );
+	SDL_UnlockAudioStream(sdlPlaybackStream);
 }
-
 
 /*
 ===============
 SNDDMA_BeginPainting
 ===============
 */
-void SNDDMA_BeginPainting( void )
+void SNDDMA_BeginPainting (void)
 {
-	SDL_LockAudioDevice( sdlPlaybackDevice );
+	SDL_LockAudioStream(sdlPlaybackStream);
 }
 
 
@@ -421,33 +328,31 @@ void SNDDMA_BeginPainting( void )
 void SNDDMA_StartCapture(void)
 {
 #ifdef USE_SDL_AUDIO_CAPTURE
-	if (sdlCaptureDevice)
+	if (sdlCaptureStream)
 	{
-		SDL_ClearQueuedAudio(sdlCaptureDevice);
-		SDL_PauseAudioDevice(sdlCaptureDevice, 0);
+		SDL_ClearAudioStream(sdlCaptureStream);
+		SDL_ResumeAudioStreamDevice(sdlCaptureStream);
 	}
 #endif
 }
-
 
 int SNDDMA_AvailableCaptureSamples(void)
 {
 #ifdef USE_SDL_AUDIO_CAPTURE
 	// divided by 2 to convert from bytes to (mono16) samples.
-	return sdlCaptureDevice ? (SDL_GetQueuedAudioSize(sdlCaptureDevice) / 2) : 0;
+	return sdlCaptureStream ? (SDL_GetAudioStreamAvailable(sdlCaptureStream) / 2) : 0;
 #else
 	return 0;
 #endif
 }
 
-
 void SNDDMA_Capture(int samples, byte *data)
 {
 #ifdef USE_SDL_AUDIO_CAPTURE
 	// multiplied by 2 to convert from (mono16) samples to bytes.
-	if (sdlCaptureDevice)
+	if (sdlCaptureStream)
 	{
-		SDL_DequeueAudio(sdlCaptureDevice, data, samples * 2);
+		SDL_GetAudioStreamData(sdlCaptureStream, data, samples * 2);
 	}
 	else
 #endif
@@ -459,9 +364,9 @@ void SNDDMA_Capture(int samples, byte *data)
 void SNDDMA_StopCapture(void)
 {
 #ifdef USE_SDL_AUDIO_CAPTURE
-	if (sdlCaptureDevice)
+	if (sdlCaptureStream)
 	{
-		SDL_PauseAudioDevice(sdlCaptureDevice, 1);
+		SDL_PauseAudioStreamDevice(sdlCaptureStream);
 	}
 #endif
 }
@@ -469,7 +374,7 @@ void SNDDMA_StopCapture(void)
 void SNDDMA_MasterGain( float val )
 {
 #ifdef USE_SDL_AUDIO_CAPTURE
-	sdlMasterGain = val;
+    SDL_SetAudioStreamGain( sdlCaptureStream, val );
 #endif
 }
 #endif

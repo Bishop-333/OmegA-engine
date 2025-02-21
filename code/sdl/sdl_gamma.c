@@ -33,16 +33,6 @@ static Uint16 r[256];
 static Uint16 g[256];
 static Uint16 b[256];
 
-void GLimp_InitGamma( glconfig_t *config )
-{
-	config->deviceSupportsGamma = qfalse;
-
-	if ( SDL_GetWindowGammaRamp( SDL_window, r, g, b ) == 0 )
-	{
-		config->deviceSupportsGamma = SDL_SetWindowBrightness( SDL_window, 1.0f ) >= 0 ? qtrue : qfalse;
-	}
-}
-
 
 /*
 =================
