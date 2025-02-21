@@ -3414,7 +3414,7 @@ static void CL_InitRef( void ) {
 		}
 	}
 
-	GetRefAPI = Sys_LoadFunction( rendererLib, "GetRefAPI" );
+	GetRefAPI = (GetRefAPI_t) Sys_LoadFunction(rendererLib, "GetRefAPI");
 	if( !GetRefAPI )
 	{
 		Com_Error( ERR_FATAL, "Can't load symbol GetRefAPI" );

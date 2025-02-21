@@ -21,9 +21,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #ifdef USE_LOCAL_HEADERS
-#	include "SDL.h"
+#	include "SDL3/SDL.h"
 #else
-#	include <SDL.h>
+#	include <SDL3/SDL.h>
 #endif
 
 #include "../client/client.h"
@@ -33,7 +33,7 @@ static cvar_t *in_keyboardDebug;
 static cvar_t *in_forceCharset;
 
 #ifdef USE_JOYSTICK
-static SDL_GameController *gamepad;
+static SDL_Gamepad *gamepad;
 static SDL_Joystick *stick = NULL;
 #endif
 
@@ -76,7 +76,7 @@ static qboolean mouse_focus;
 IN_PrintKey
 ===============
 */
-static void IN_PrintKey( const SDL_Keysym *keysym, keyNum_t key, qboolean down )
+static void IN_PrintKey( const SDL_KeyboardEvent *event, keyNum_t key, qboolean down )
 {
 	if( down )
 		Com_Printf( "+ " );
@@ -84,21 +84,21 @@ static void IN_PrintKey( const SDL_Keysym *keysym, keyNum_t key, qboolean down )
 		Com_Printf( "  " );
 
 	Com_Printf( "Scancode: 0x%02x(%s) Sym: 0x%02x(%s)",
-			keysym->scancode, SDL_GetScancodeName( keysym->scancode ),
-			keysym->sym, SDL_GetKeyName( keysym->sym ) );
+			event->scancode, SDL_GetScancodeName( event->scancode ),
+			event->key, SDL_GetKeyName( event->key ) );
 
-	if( keysym->mod & KMOD_LSHIFT )   Com_Printf( " KMOD_LSHIFT" );
-	if( keysym->mod & KMOD_RSHIFT )   Com_Printf( " KMOD_RSHIFT" );
-	if( keysym->mod & KMOD_LCTRL )    Com_Printf( " KMOD_LCTRL" );
-	if( keysym->mod & KMOD_RCTRL )    Com_Printf( " KMOD_RCTRL" );
-	if( keysym->mod & KMOD_LALT )     Com_Printf( " KMOD_LALT" );
-	if( keysym->mod & KMOD_RALT )     Com_Printf( " KMOD_RALT" );
-	if( keysym->mod & KMOD_LGUI )     Com_Printf( " KMOD_LGUI" );
-	if( keysym->mod & KMOD_RGUI )     Com_Printf( " KMOD_RGUI" );
-	if( keysym->mod & KMOD_NUM )      Com_Printf( " KMOD_NUM" );
-	if( keysym->mod & KMOD_CAPS )     Com_Printf( " KMOD_CAPS" );
-	if( keysym->mod & KMOD_MODE )     Com_Printf( " KMOD_MODE" );
-	if( keysym->mod & KMOD_RESERVED ) Com_Printf( " KMOD_RESERVED" );
+	if( event->mod & SDL_KMOD_LSHIFT )   Com_Printf( " KMOD_LSHIFT" );
+	if( event->mod & SDL_KMOD_RSHIFT )   Com_Printf( " KMOD_RSHIFT" );
+	if( event->mod & SDL_KMOD_LCTRL )    Com_Printf( " KMOD_LCTRL" );
+	if( event->mod & SDL_KMOD_RCTRL )    Com_Printf( " KMOD_RCTRL" );
+	if( event->mod & SDL_KMOD_LALT )     Com_Printf( " KMOD_LALT" );
+	if( event->mod & SDL_KMOD_RALT )     Com_Printf( " KMOD_RALT" );
+	if( event->mod & SDL_KMOD_LGUI )     Com_Printf( " KMOD_LGUI" );
+	if( event->mod & SDL_KMOD_RGUI )     Com_Printf( " KMOD_RGUI" );
+	if( event->mod & SDL_KMOD_NUM )      Com_Printf( " KMOD_NUM" );
+	if( event->mod & SDL_KMOD_CAPS )     Com_Printf( " KMOD_CAPS" );
+	if( event->mod & SDL_KMOD_MODE )     Com_Printf( " KMOD_MODE" );
+	if( event->mod & SDL_KMOD_SCROLL )   Com_Printf( " KMOD_SCROLL" );
 
 	Com_Printf( " Q:0x%02x(%s)\n", key, Key_KeynumToString( key ) );
 }

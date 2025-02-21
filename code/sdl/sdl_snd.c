@@ -21,9 +21,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #ifdef USE_LOCAL_HEADERS
-#	include "SDL.h"
+#	include "SDL3/SDL.h"
 #else
-#	include <SDL.h>
+#	include <SDL3/SDL.h>
 #endif
 
 #include "../qcommon/q_shared.h"
