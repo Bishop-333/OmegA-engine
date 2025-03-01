@@ -3993,11 +3993,12 @@ void CL_Init( void ) {
 	cl_dlURL = Cvar_Get( "cl_dlURL", "http://ws.q3df.org/maps/download/%1", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( cl_dlURL, "Cvar must point to download location." );
 
-	cl_dlDirectory = Cvar_Get( "cl_dlDirectory", "1", CVAR_ARCHIVE_ND );
-	Cvar_CheckRange( cl_dlDirectory, "0", "1", CV_INTEGER );
+	cl_dlDirectory = Cvar_Get( "cl_dlDirectory", "2", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( cl_dlDirectory, "0", "2", CV_INTEGER );
 	s = va( "Save downloads initiated by \\dlmap and \\download commands in:\n"
 		" 0 - current game directory\n"
-		" 1 - basegame (%s) directory\n", FS_GetBaseGameDir() );
+		" 1 - basegame (%s) directory\n"
+		" 2 - addons (%s) directory\n", FS_GetBaseGameDir(), FS_GetAddonsGameDir() );
 	Cvar_SetDescription( cl_dlDirectory, s );
 
 	cl_reconnectArgs = Cvar_Get( "cl_reconnectArgs", "", CVAR_ARCHIVE_ND | CVAR_NOTABCOMPLETE );

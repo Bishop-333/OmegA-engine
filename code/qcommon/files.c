@@ -4688,7 +4688,7 @@ static void FS_Startup( void ) {
 	fs_basegame = Cvar_Get( "fs_basegame", BASEGAME, CVAR_INIT | CVAR_PROTECTED );
 	Cvar_SetDescription( fs_basegame, "Write-protected CVAR specifying the path to the base game(s) folder(s), separated by '/'." );
 	fs_addons = Cvar_Get( "fs_addons", BASEGAME "/addons", CVAR_INIT | CVAR_PROTECTED );
-	Cvar_SetDescription( fs_addons, "Write-protected CVAR specifying the path to an optional map folder." );
+	Cvar_SetDescription( fs_addons, "Write-protected CVAR specifying the path to the addons folder." );
 	fs_steampath = Cvar_Get( "fs_steampath", Sys_SteamPath(), CVAR_INIT | CVAR_PROTECTED | CVAR_PRIVATE );
 
 	/* parse fs_basegame cvar */
@@ -4787,10 +4787,11 @@ static void FS_Startup( void ) {
 			FS_AddGameDirectory( fs_steampath->string, fs_gamedirvar->string );
 		}
 		if ( fs_basepath->string[0] != '\0' ) {
-			FS_AddGameDirectory( fs_basepath->string, fs_gamedirvar->string );
 			FS_AddGameDirectory( fs_basepath->string, fs_addons->string );
+			FS_AddGameDirectory( fs_basepath->string, fs_gamedirvar->string );
 		}
 		if ( fs_homepath->string[0] != '\0' && Q_stricmp( fs_homepath->string, fs_basepath->string ) ) {
+			FS_AddGameDirectory( fs_homepath->string, fs_addons->string );
 			FS_AddGameDirectory( fs_homepath->string, fs_gamedirvar->string );
 		}
 	}
@@ -5561,6 +5562,15 @@ void FS_VM_CloseFiles( handleOwner_t owner )
 			FS_OwnerName( owner ), i, fsh[i].name );
 		FS_FCloseFile( i );
 	}
+}
+
+
+const char *FS_GetAddonsGameDir( void )
+{
+	if ( fs_addons->string[0] != '\0' )
+		return fs_addons->string;
+
+	return basegame; // last basegame
 }
 
 

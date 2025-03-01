@@ -294,6 +294,7 @@ static void CL_cURL_CloseDownload( void )
 void CL_cURL_BeginDownload( const char *localName, const char *remoteURL )
 {
 	CURLMcode result;
+	const char *gameDir;
 
 	clc.cURLUsed = qtrue;
 	Com_Printf("URL: %s\n", remoteURL);
@@ -303,7 +304,21 @@ void CL_cURL_BeginDownload( const char *localName, const char *remoteURL )
 		"****************************\n", localName, remoteURL);
 	CL_cURL_Cleanup();
 	Q_strncpyz(clc.downloadURL, remoteURL, sizeof(clc.downloadURL));
-	Q_strncpyz(clc.downloadName, localName, sizeof(clc.downloadName));
+
+	if ( cl_dlDirectory->integer == 2 ) {
+		gameDir = FS_GetAddonsGameDir();
+	} else if ( cl_dlDirectory->integer ) {
+		gameDir = FS_GetBaseGameDir();
+	} else {
+		gameDir = FS_GetCurrentGameDir();
+	}
+
+	if ( strncmp( localName, BASEGAME, strlen(BASEGAME) ) == 0 ) {
+    		Com_sprintf(clc.downloadName, sizeof(clc.downloadName), "%s/%s", gameDir, localName + strlen(BASEGAME) + 1);
+	} else {
+		Q_strncpyz(clc.downloadName, localName, sizeof(clc.downloadName));
+	}
+
 	Com_sprintf(clc.downloadTempName, sizeof(clc.downloadTempName),
 		"%s.tmp", localName);
 
@@ -960,7 +975,9 @@ qboolean Com_DL_Begin( download_t *dl, const char *localName, const char *remote
 
 	Com_Printf( "URL: %s\n", dl->URL );
 
-	if ( cl_dlDirectory->integer ) {
+	if ( cl_dlDirectory->integer == 2 ) {
+		Q_strncpyz( dl->gameDir, FS_GetAddonsGameDir(), sizeof( dl->gameDir ) );
+	} else if ( cl_dlDirectory->integer ) {
 		Q_strncpyz( dl->gameDir, FS_GetBaseGameDir(), sizeof( dl->gameDir ) );
 	} else {
 		Q_strncpyz( dl->gameDir, FS_GetCurrentGameDir(), sizeof( dl->gameDir ) );
