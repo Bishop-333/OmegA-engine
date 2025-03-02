@@ -90,6 +90,28 @@ void COM_StripExtension( const char *in, char *out, int destsize )
 
 /*
 ============
+COM_StripTGAExtension
+============
+*/
+void COM_StripTGAExtension(const char *in, char *out, int destsize)
+{
+	const char *dot = strrchr(in, '.'), *slash;
+
+	if (dot && !Q_stricmp(dot, ".tga") && !strstr(in, ".blend") &&
+	    ((slash = strrchr(in, '/')) == NULL || slash < dot))
+	{
+		destsize = (destsize < dot - in + 1) ? destsize : dot - in + 1;
+	}
+
+	if (in == out && destsize > 1)
+		out[destsize - 1] = '\0';
+	else
+		Q_strncpyz(out, in, destsize);
+}
+
+
+/*
+============
 COM_CompareExtension
 
 string compare the end of the strings and return qtrue if strings match

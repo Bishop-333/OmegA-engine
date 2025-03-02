@@ -578,6 +578,7 @@ ParseStage
 static qboolean ParseStage( shaderStage_t *stage, const char **text )
 {
 	const char *token;
+	char strippedToken[MAX_QPATH];
 	int i, depthMaskBits = GLS_DEPTHMASK_TRUE, blendSrcBits = 0, blendDstBits = 0, atestBits = 0, depthFuncBits = 0;
 	qboolean depthMaskExplicit = qfalse;
 
@@ -602,6 +603,7 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 		else if ( !Q_stricmp( token, "map" ) )
 		{
 			token = COM_ParseExt( text, qfalse );
+			COM_StripTGAExtension(token, strippedToken, sizeof(strippedToken));
 			if ( !token[0] )
 			{
 				ri.Printf( PRINT_WARNING, "WARNING: missing parameter for 'map' keyword in shader '%s'\n", shader.name );
@@ -647,7 +649,7 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 				if (shader.noLightScale)
 					flags |= IMGFLAG_NOLIGHTSCALE;
 
-				stage->bundle[0].image[0] = R_FindImageFile( token, flags );
+				stage->bundle[0].image[0] = R_FindImageFile( strippedToken, flags );
 
 				if ( !stage->bundle[0].image[0] )
 				{
@@ -674,6 +676,7 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			}
 
 			token = COM_ParseExt( text, qfalse );
+			COM_StripTGAExtension(token, strippedToken, sizeof(strippedToken));
 			if ( !token[0] )
 			{
 				ri.Printf( PRINT_WARNING, "WARNING: missing parameter for '%s' keyword in shader '%s'\n",
@@ -690,7 +693,7 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			if (shader.noLightScale)
 				flags |= IMGFLAG_NOLIGHTSCALE;
 
-			stage->bundle[0].image[0] = R_FindImageFile( token, flags );
+			stage->bundle[0].image[0] = R_FindImageFile( strippedToken, flags );
 			if ( !stage->bundle[0].image[0] )
 			{
 				ri.Printf( PRINT_WARNING, "WARNING: R_FindImageFile could not find '%s' in shader '%s'\n", token, shader.name );
@@ -718,6 +721,7 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 				int num;
 
 				token = COM_ParseExt( text, qfalse );
+				COM_StripTGAExtension(token, strippedToken, sizeof(strippedToken));
 				if ( !token[0] ) {
 					break;
 				}
@@ -734,7 +738,7 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 					if (shader.noLightScale)
 						flags |= IMGFLAG_NOLIGHTSCALE;
 
-					stage->bundle[0].image[num] = R_FindImageFile( token, flags );
+					stage->bundle[0].image[num] = R_FindImageFile( strippedToken, flags );
 					if ( !stage->bundle[0].image[num] )
 					{
 						ri.Printf( PRINT_WARNING, "WARNING: R_FindImageFile could not find '%s' in shader '%s'\n", token, shader.name );
@@ -3798,7 +3802,7 @@ shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 			flags |= IMGFLAG_CLAMPTOEDGE;
 		}
 
-		image = R_FindImageFile( name, flags );
+		image = R_FindImageFile( strippedName, flags );
 		if ( !image ) {
 			ri.Printf( PRINT_DEVELOPER, "Couldn't find image file for shader %s\n", name );
 			shader.defaultShader = qtrue;
