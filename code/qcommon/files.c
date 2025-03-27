@@ -4767,7 +4767,9 @@ static void FS_Startup( void ) {
 		// handle multiple basegames:
 		for ( i = 0; i < basegame_cnt; i++ ) {
 			FS_AddGameDirectory( fs_apppath->string, basegames[i] );
+#ifndef QUAKE3
 			FS_AddGameDirectory( fs_apppath->string, DEFAULT_GAME );
+#endif
 		}
 	}
 #endif
