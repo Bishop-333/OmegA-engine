@@ -418,6 +418,42 @@ static void SV_AddEntitiesVisibleFromPoint( const vec3_t origin, clientSnapshot_
 			}
 		}
 
+		// wallhack protection from SourceTech
+		if ( sv_antiWallhack->integer ) {
+			trace_t trace;
+			vec3_t target, eyeOrigin;
+			qboolean visible = qfalse;
+			int i;
+			const float offsets[] = { 54.0f, 32.0f, 4.0f };
+
+			VectorCopy(origin, eyeOrigin);
+			eyeOrigin[2] += 24.0f;
+
+			for ( i = 0; i < 3; i++ ) {
+				VectorCopy(ent->r.currentOrigin, target);
+				target[2] += offsets[i];
+
+				SV_Trace( &trace, eyeOrigin, NULL, NULL, target, frame->ps.clientNum, CONTENTS_SOLID, qfalse );
+				if ( trace.fraction == 1.0f || trace.entityNum == ent->s.number || (trace.contents & CONTENTS_TRANSLUCENT) ) {
+					visible = qtrue;
+					break;
+				}
+			}
+			if ( sv_antiWallhack->integer == 1 ) {
+				if ( !visible && ent->s.eType == ET_PLAYER ) {
+					continue;
+				}
+			} else if ( sv_antiWallhack->integer == 2 ) {
+				if ( !visible && ent->s.eType != ET_PLAYER ) {
+					continue;
+				}
+			} else {
+				if ( !visible ) {
+					continue;
+				}
+			}
+		}
+
 		// add it
 		SV_AddIndexToSnapshot( svEnt, e, eNums );
 
