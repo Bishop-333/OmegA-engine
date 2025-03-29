@@ -421,19 +421,17 @@ static void SV_AddEntitiesVisibleFromPoint( const vec3_t origin, clientSnapshot_
 		// wallhack protection from SourceTech
 		if ( sv_antiWallhack->integer ) {
 			trace_t trace;
-			vec3_t target, eyeOrigin;
+			vec3_t corners;
 			qboolean visible = qfalse;
 			int i;
-			const float offsets[] = { 54.0f, 32.0f, 4.0f };
 
-			VectorCopy(origin, eyeOrigin);
-			eyeOrigin[2] += 24.0f;
+			for ( i = 0; i < 8; i++ ) {
+				corners[0] = ent->r.currentOrigin[0] + ((i & 1) ? ent->r.maxs[0] : ent->r.mins[0]);
+				corners[1] = ent->r.currentOrigin[1] + ((i & 2) ? ent->r.maxs[1] : ent->r.mins[1]);
+				corners[2] = ent->r.currentOrigin[2] + ((i & 4) ? ent->r.maxs[2] : ent->r.mins[2]);
 
-			for ( i = 0; i < 3; i++ ) {
-				VectorCopy(ent->r.currentOrigin, target);
-				target[2] += offsets[i];
+				SV_Trace( &trace, origin, NULL, NULL, corners, frame->ps.clientNum, CONTENTS_SOLID, qfalse );
 
-				SV_Trace( &trace, eyeOrigin, NULL, NULL, target, frame->ps.clientNum, CONTENTS_SOLID, qfalse );
 				if ( trace.fraction == 1.0f || trace.entityNum == ent->s.number || (trace.contents & CONTENTS_TRANSLUCENT) ) {
 					visible = qtrue;
 					break;
@@ -441,10 +439,6 @@ static void SV_AddEntitiesVisibleFromPoint( const vec3_t origin, clientSnapshot_
 			}
 			if ( sv_antiWallhack->integer == 1 ) {
 				if ( !visible && ent->s.eType == ET_PLAYER ) {
-					continue;
-				}
-			} else if ( sv_antiWallhack->integer == 2 ) {
-				if ( !visible && ent->s.eType != ET_PLAYER ) {
 					continue;
 				}
 			} else {
