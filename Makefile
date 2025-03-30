@@ -111,12 +111,6 @@ ifeq ($(PLATFORM),mingw64)
   endif
 endif
 
-ifeq ($(COMPILE_PLATFORM),linux)
-  ifneq ($(MINGW),1)
-    USE_SYSTEM_JPEG=1
-  endif
-endif
-
 ifeq ($(COMPILE_ARCH),i86pc)
   COMPILE_ARCH=x86
 endif
