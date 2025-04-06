@@ -1431,11 +1431,10 @@ static void VarInfo( void )
 	} else if ( glConfig.hardwareType == GLHW_RIVA128 ) {
 		ri.Printf( PRINT_ALL, "HACK: riva128 approximations\n" );
 	}
-
+#endif
 	if ( r_finish->integer ) {
 		ri.Printf( PRINT_ALL, "Forcing glFinish\n" );
 	}
-#endif
 }
 
 
