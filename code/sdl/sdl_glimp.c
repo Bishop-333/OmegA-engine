@@ -211,6 +211,24 @@ static int GLimp_CompareModes( const void *a, const void *b )
 
 /*
 ===============
+GLimp_CompareAspects
+===============
+*/
+static qboolean GLimp_CompareAspects(const SDL_Rect *mode)
+{
+	const float ASPECT_EPSILON = 0.001f;
+	float aspect = (float)mode->w / (float)mode->h;
+	float aspectDiff = fabs( aspect - displayAspect );
+
+	if( aspectDiff < ASPECT_EPSILON )
+		return qtrue;
+	else
+		return qfalse;
+}
+
+
+/*
+===============
 GLimp_DetectAvailableModes
 ===============
 */
@@ -281,6 +299,9 @@ static void GLimp_DetectAvailableModes(void)
 
 	for( i = 0; i < numModes; i++ )
 	{
+		if ( !GLimp_CompareAspects( &modes[i] ) )
+			continue;
+
 		const char *newModeString = va( "%ux%u ", modes[ i ].w, modes[ i ].h );
 
 		if( strlen( newModeString ) < (int)sizeof( buf ) - strlen( buf ) )
