@@ -1609,8 +1609,8 @@ static void R_Register( void )
 	r_bloom_threshold_mode = ri.Cvar_Get( "r_bloom_threshold_mode", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_bloom_threshold_mode, "Color extraction mode:\n 0: (r|g|b) >= threshold\n 1: (r + g + b ) / 3 >= threshold\n 2: luma(r, g, b) >= threshold" );
 	ri.Cvar_SetGroup( r_bloom_threshold_mode, CVG_RENDERER );
-	r_bloom_intensity = ri.Cvar_Get( "r_bloom_intensity", "0.2", CVAR_ARCHIVE_ND );
-	ri.Cvar_SetDescription( r_bloom_intensity, "Final bloom blend factor, default is 0.5." );
+	r_bloom_intensity = ri.Cvar_Get( "r_bloom_intensity", "0.3", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_bloom_intensity, "Final bloom blend factor, default is 0.3." );
 	r_bloom_passes = ri.Cvar_Get( "r_bloom_passes", "5", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_bloom_passes, "3", XSTRING( MAX_BLUR_PASSES ), CV_INTEGER );
 	ri.Cvar_SetDescription( r_bloom_passes, "Count of downsampled passes (framebuffers) to blend on final bloom image, default is 5." );

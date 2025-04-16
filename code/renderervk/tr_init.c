@@ -1740,8 +1740,8 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_bloom_threshold_mode, "Color extraction mode:\n 0: (r|g|b) >= threshold\n 1: (r + g + b ) / 3 >= threshold\n 2: luma(r, g, b) >= threshold" );
 	ri.Cvar_SetGroup( r_bloom_threshold_mode, CVG_RENDERER );
 
-	r_bloom_intensity = ri.Cvar_Get( "r_bloom_intensity", "0.2", CVAR_ARCHIVE_ND );
-	ri.Cvar_SetDescription( r_bloom_intensity, "Final bloom blend factor, default is 0.5." );
+	r_bloom_intensity = ri.Cvar_Get( "r_bloom_intensity", "0.3", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_bloom_intensity, "Final bloom blend factor, default is 0.3." );
 	ri.Cvar_SetGroup( r_bloom_intensity, CVG_RENDERER );
 
 	r_bloom_modulate = ri.Cvar_Get( "r_bloom_modulate", "0", CVAR_ARCHIVE_ND );
