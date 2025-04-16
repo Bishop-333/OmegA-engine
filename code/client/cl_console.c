@@ -862,8 +862,49 @@ void CL_ConsolePrint( const char *txt ) {
 		con[j].notify = qtrue;
 	}
 
-	CL_OutputToConsole( &con[j], txt, skipnotify );
-	CL_OutputToConsole( &con[CON_ALL], txt, skipnotify );
+	char buf[ CON_TEXTSIZE ];
+	int out = 0;
+	const unsigned char *in = (const unsigned char *)txt;
+
+	while ( *in && out < sizeof( buf ) - 1 ) {
+		if ( *in < 0x80 ) {
+			buf[out++] = *in++;
+		} else if ( *in == 0xC3 ) {
+			in++;
+			switch ( *in ) {
+				case 0xA0: case 0xA1: case 0xA2: case 0xA3: case 0xA4: case 0xA5:
+				buf[out++] = 'a'; break; // à á â ã ä å
+
+			case 0xA7:
+				buf[out++] = 'c'; break; // ç
+
+			case 0xA8: case 0xA9: case 0xAA: case 0xAB:
+				buf[out++] = 'e'; break; // è é ê ë
+
+			case 0xAC: case 0xAD: case 0xAE: case 0xAF:
+				buf[out++] = 'i'; break; // ì í î ï
+
+			case 0xB2: case 0xB3: case 0xB4: case 0xB5: case 0xB6: case 0xB7:
+				buf[out++] = 'o'; break; // ò ó ô õ ö
+
+			case 0xB9: case 0xBA: case 0xBB: case 0xBC: case 0xBD:
+				buf[out++] = 'u'; break; // ù ú û ü
+
+			case 0xBF:
+				buf[out++] = 'y'; break; // ÿ
+
+			default:
+				break;
+			}
+		} else {
+			in++;
+		}
+	}
+
+	buf[out] = '\0';
+
+	CL_OutputToConsole( &con[j], buf, skipnotify );
+	CL_OutputToConsole( &con[CON_ALL], buf, skipnotify );
 }
 
 
