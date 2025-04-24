@@ -287,8 +287,6 @@ PLIST="<?xml version=\"1.0\" encoding=\"UTF-8\"?>
     <string>${PRODUCT_NAME}</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
-    <key>LSApplicationCategoryType</key>
-    <string>public.app-category.games</string>
     <key>CFBundleShortVersionString</key>
     <string>${OMG_VERSION}</string>
     <key>CFBundleSignature</key>
