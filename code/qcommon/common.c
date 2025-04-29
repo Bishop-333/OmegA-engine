@@ -4028,6 +4028,8 @@ void Com_Init( char *commandLine ) {
 		// if the user didn't give any commands, run default action
 		if ( !com_dedicated->integer ) {
 #ifndef DEDICATED
+			if ( !com_skipIdLogo || !com_skipIdLogo->integer )
+				Cbuf_AddText( "cinematic idlogo.RoQ\n" );
 			if( !com_introPlayed->integer ) {
 				Cvar_Set( com_introPlayed->name, "1" );
 				Cvar_Set( "nextmap", "cinematic intro.RoQ" );
