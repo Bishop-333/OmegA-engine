@@ -1035,6 +1035,7 @@ extern	cvar_t	*com_cameraMode;
 extern	cvar_t	*com_protocol;
 extern	qboolean com_protocolCompat;
 extern	cvar_t	*com_homepath;
+extern	cvar_t	*com_loadQ3assets;
 
 // both client and server must agree to pause
 extern	cvar_t	*sv_paused;

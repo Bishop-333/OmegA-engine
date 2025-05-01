@@ -4647,6 +4647,26 @@ static void FS_LoadedPakPureChecksums( void )
 	}
 }
 
+/*
+================
+Q_strreplace
+================
+*/
+void Q_strreplace(char *src, const char *find, const char *replace) {
+	char buffer[MAX_OSPATH];
+	char *p;
+
+	p = strstr(src, find);
+	if (p == NULL) return;
+
+	strncpy(buffer, src, p - src);
+	buffer[p - src] = '\0';
+
+	strcat(buffer, replace);
+	strcat(buffer, p + strlen(find));
+
+	strncpy(src, buffer, MAX_OSPATH);
+}
 
 /*
 ================
@@ -4782,6 +4802,20 @@ static void FS_Startup( void ) {
 			FS_AddGameDirectory( fs_homepath->string, basegames[i] );
 		}
 	}
+
+#ifndef QUAKE3
+	// check for Quake3 folder
+	if ( com_loadQ3assets->integer ) {
+		char quake3Path[MAX_OSPATH];
+		const char *home = Sys_DefaultHomePath();
+#if defined(_WIN32) || defined(__APPLE__)
+		Com_sprintf(quake3Path, sizeof(quake3Path), "%s/../Quake3", home);
+#else
+		Com_sprintf(quake3Path, sizeof(quake3Path), "%s/../.q3a", home);
+#endif
+		FS_AddGameDirectory( quake3Path, "baseq3" );
+	}
+#endif
 
 	// check for additional game folder for mods
 	if ( fs_gamedirvar->string[0] != '\0' && !FS_IsBaseGame( fs_gamedirvar->string ) ) {

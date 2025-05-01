@@ -105,6 +105,8 @@ cvar_t	*com_cameraMode;
 cvar_t	*com_noErrorInterrupt;
 #endif
 
+cvar_t	*com_loadQ3assets;
+
 // com_speeds times
 int		time_game;
 int		time_frontend;		// renderer frontend time
@@ -3817,6 +3819,12 @@ void Com_Init( char *commandLine ) {
 
 	com_warnings = Cvar_Get( "warnings", "0", CVAR_TEMP );
 	Cvar_CheckRange( com_warnings, NULL, NULL, CV_INTEGER );
+
+#ifndef QUAKE3
+	com_loadQ3assets = Cvar_Get( "loadQ3assets", "1", CVAR_INIT );
+	Cvar_CheckRange( com_loadQ3assets, NULL, NULL, CV_INTEGER );
+	Cvar_SetDescription( com_loadQ3assets, "When enabled, load Quake3 assets." );
+#endif
 
 	Com_StartupVariable( "vm_rtChecks" );
 	vm_rtChecks = Cvar_Get( "vm_rtChecks", "7", CVAR_INIT | CVAR_PROTECTED );
