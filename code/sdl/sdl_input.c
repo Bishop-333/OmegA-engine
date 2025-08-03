@@ -21,9 +21,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #ifdef USE_LOCAL_HEADERS
-#	include "SDL.h"
+#	include "SDL3/SDL.h"
 #else
-#	include <SDL.h>
+#	include <SDL3/SDL.h>
 #endif
 
 #include "../client/client.h"
@@ -76,29 +76,29 @@ static qboolean mouse_focus;
 IN_PrintKey
 ===============
 */
-static void IN_PrintKey( const SDL_Keysym *keysym, keyNum_t key, qboolean down )
+static void IN_PrintKey( const SDL_KeyboardEvent *keyEvent, keyNum_t key, qboolean down )
 {
 	if( down )
 		Com_Printf( "+ " );
 	else
 		Com_Printf( "  " );
 
-	Com_Printf( "Scancode: 0x%02x(%s) Sym: 0x%02x(%s)",
-			keysym->scancode, SDL_GetScancodeName( keysym->scancode ),
-			keysym->sym, SDL_GetKeyName( keysym->sym ) );
+	Com_Printf( "Scancode: 0x%02x(%s) Key: 0x%02x(%s)",
+			keyEvent->scancode, SDL_GetScancodeName( keyEvent->scancode ),
+			keyEvent->key, SDL_GetKeyName( keyEvent->key ) );
 
-	if( keysym->mod & KMOD_LSHIFT )   Com_Printf( " KMOD_LSHIFT" );
-	if( keysym->mod & KMOD_RSHIFT )   Com_Printf( " KMOD_RSHIFT" );
-	if( keysym->mod & KMOD_LCTRL )    Com_Printf( " KMOD_LCTRL" );
-	if( keysym->mod & KMOD_RCTRL )    Com_Printf( " KMOD_RCTRL" );
-	if( keysym->mod & KMOD_LALT )     Com_Printf( " KMOD_LALT" );
-	if( keysym->mod & KMOD_RALT )     Com_Printf( " KMOD_RALT" );
-	if( keysym->mod & KMOD_LGUI )     Com_Printf( " KMOD_LGUI" );
-	if( keysym->mod & KMOD_RGUI )     Com_Printf( " KMOD_RGUI" );
-	if( keysym->mod & KMOD_NUM )      Com_Printf( " KMOD_NUM" );
-	if( keysym->mod & KMOD_CAPS )     Com_Printf( " KMOD_CAPS" );
-	if( keysym->mod & KMOD_MODE )     Com_Printf( " KMOD_MODE" );
-	if( keysym->mod & KMOD_RESERVED ) Com_Printf( " KMOD_RESERVED" );
+	if( keyEvent->mod & SDL_KMOD_LSHIFT )   Com_Printf( " SDL_KMOD_LSHIFT" );
+	if( keyEvent->mod & SDL_KMOD_RSHIFT )   Com_Printf( " SDL_KMOD_RSHIFT" );
+	if( keyEvent->mod & SDL_KMOD_LCTRL )    Com_Printf( " SDL_KMOD_LCTRL" );
+	if( keyEvent->mod & SDL_KMOD_RCTRL )    Com_Printf( " SDL_KMOD_RCTRL" );
+	if( keyEvent->mod & SDL_KMOD_LALT )     Com_Printf( " SDL_KMOD_LALT" );
+	if( keyEvent->mod & SDL_KMOD_RALT )     Com_Printf( " SDL_KMOD_RALT" );
+	if( keyEvent->mod & SDL_KMOD_LGUI )     Com_Printf( " SDL_KMOD_LGUI" );
+	if( keyEvent->mod & SDL_KMOD_RGUI )     Com_Printf( " SDL_KMOD_RGUI" );
+	if( keyEvent->mod & SDL_KMOD_NUM )      Com_Printf( " SDL_KMOD_NUM" );
+	if( keyEvent->mod & SDL_KMOD_CAPS )     Com_Printf( " SDL_KMOD_CAPS" );
+	if( keyEvent->mod & SDL_KMOD_MODE )     Com_Printf( " SDL_KMOD_MODE" );
+	if( keyEvent->mod & SDL_KMOD_SCROLL )   Com_Printf( " SDL_KMOD_SCROLL" );
 
 	Com_Printf( " Q:0x%02x(%s)\n", key, Key_KeynumToString( key ) );
 }
@@ -205,30 +205,30 @@ static qboolean IN_IsConsoleKey( keyNum_t key, int character )
 IN_TranslateSDLToQ3Key
 ===============
 */
-static keyNum_t IN_TranslateSDLToQ3Key( SDL_Keysym *keysym, qboolean down )
+static keyNum_t IN_TranslateSDLToQ3Key( const SDL_KeyboardEvent *keyEvent, qboolean down )
 {
 	keyNum_t key = 0;
 
-	if ( keysym->scancode >= SDL_SCANCODE_1 && keysym->scancode <= SDL_SCANCODE_0 )
+	if( keyEvent->scancode >= SDL_SCANCODE_1 && keyEvent->scancode <= SDL_SCANCODE_0 )
 	{
 		// Always map the number keys as such even if they actually map
 		// to other characters (eg, "1" is "&" on an AZERTY keyboard).
 		// This is required for SDL before 2.0.6, except on Windows
 		// which already had this behavior.
-		if( keysym->scancode == SDL_SCANCODE_0 )
+		if( keyEvent->scancode == SDL_SCANCODE_0 )
 			key = '0';
 		else
-			key = '1' + keysym->scancode - SDL_SCANCODE_1;
+			key = '1' + keyEvent->scancode - SDL_SCANCODE_1;
 	}
 	else if ( in_forceCharset->integer > 0 )
 	{
-		if ( keysym->scancode >= SDL_SCANCODE_A && keysym->scancode <= SDL_SCANCODE_Z )
+		if ( keyEvent->scancode >= SDL_SCANCODE_A && keyEvent->scancode <= SDL_SCANCODE_Z )
 		{
-			key = 'a' + keysym->scancode - SDL_SCANCODE_A;
+			key = 'a' + keyEvent->scancode - SDL_SCANCODE_A;
 		}
 		else
 		{
-			switch ( keysym->scancode )
+			switch ( keyEvent->scancode )
 			{
 				case SDL_SCANCODE_MINUS:        key = '-';  break;
 				case SDL_SCANCODE_EQUALS:       key = '=';  break;
@@ -248,14 +248,14 @@ static keyNum_t IN_TranslateSDLToQ3Key( SDL_Keysym *keysym, qboolean down )
 		}
 	}
 
-	if( !key && keysym->sym >= SDLK_SPACE && keysym->sym < SDLK_DELETE )
+	if( !key && keyEvent->key >= SDLK_SPACE && keyEvent->key < SDLK_DELETE )
 	{
 		// These happen to match the ASCII chars
-		key = (int)keysym->sym;
+		key = (int)keyEvent->key;
 	}
 	else if( !key )
 	{
-		switch( keysym->sym )
+		switch( keyEvent->key )
 		{
 			case SDLK_PAGEUP:       key = K_PGUP;          break;
 			case SDLK_KP_9:         key = K_KP_PGUP;       break;
@@ -339,14 +339,14 @@ static keyNum_t IN_TranslateSDLToQ3Key( SDL_Keysym *keysym, qboolean down )
 #if 1
 				key = 0;
 #else
-				if( !( keysym->sym & SDLK_SCANCODE_MASK ) && keysym->scancode <= 95 )
+				if( !( keyEvent->key & SDLK_SCANCODE_MASK ) && keyEvent->scancode <= 95 )
 				{
 					// Map Unicode characters to 95 world keys using the key's scan code.
 					// FIXME: There aren't enough world keys to cover all the scancodes.
 					// Maybe create a map of scancode to quake key at start up and on
 					// key map change; allocate world key numbers as needed similar
 					// to SDL 1.2.
-					key = K_WORLD_0 + (int)keysym->scancode;
+					key = K_WORLD_0 + (int)keyEvent->scancode;
 				}
 #endif
 				break;
@@ -354,7 +354,7 @@ static keyNum_t IN_TranslateSDLToQ3Key( SDL_Keysym *keysym, qboolean down )
 	}
 
 	if ( in_keyboardDebug->integer )
-		IN_PrintKey( keysym, key, down );
+		IN_PrintKey( keyEvent, key, down );
 
 	if ( keysym->scancode == SDL_SCANCODE_GRAVE )
 	{
@@ -390,7 +390,7 @@ static void IN_GobbleMouseEvents( void )
 	SDL_PumpEvents();
 
 	while( ( val = SDL_PeepEvents( dummy, ARRAY_LEN( dummy ), SDL_GETEVENT,
-		SDL_MOUSEMOTION, SDL_MOUSEWHEEL ) ) > 0 ) { }
+		SDL_EVENT_MOUSE_MOTION, SDL_EVENT_MOUSE_MOTION ) ) > 0 ) { }
 
 	if ( val < 0 )
 		Com_Printf( "%s failed: %s\n", __func__, SDL_GetError() );
@@ -413,8 +413,7 @@ static void IN_ActivateMouse( void )
 	{
 		IN_GobbleMouseEvents();
 
-		SDL_SetRelativeMouseMode( in_mouse->integer == 1 ? SDL_TRUE : SDL_FALSE );
-		SDL_SetWindowGrab( SDL_window, SDL_TRUE );
+		SDL_SetWindowRelativeMouseMode( SDL_window, true );
 
 		if ( glw_state.isFullscreen )
 			SDL_ShowCursor( SDL_FALSE );
@@ -431,14 +430,7 @@ static void IN_ActivateMouse( void )
 	{
 		if ( in_nograb->modified || !mouseActive )
 		{
-			if ( in_nograb->integer ) {
-				SDL_SetRelativeMouseMode( SDL_FALSE );
-				SDL_SetWindowGrab( SDL_window, SDL_FALSE );
-			} else {
-				SDL_SetRelativeMouseMode( in_mouse->integer == 1 ? SDL_TRUE : SDL_FALSE );
-				SDL_SetWindowGrab( SDL_window, SDL_TRUE );
-			}
-
+			SDL_SetWindowRelativeMouseMode( SDL_window, in_nograb->integer ? false : true );
 			in_nograb->modified = qfalse;
 		}
 	}
@@ -465,16 +457,14 @@ static void IN_DeactivateMouse( void )
 		Com_Printf( "%4i %s\n", Sys_Milliseconds(), __func__ );
 #endif
 		IN_GobbleMouseEvents();
-
-		SDL_SetWindowGrab( SDL_window, SDL_FALSE );
-		SDL_SetRelativeMouseMode( SDL_FALSE );
+		SDL_SetWindowRelativeMouseMode( SDL_window, false );
 
 		if ( gw_active )
 			SDL_WarpMouseInWindow( SDL_window, glw_state.window_width / 2, glw_state.window_height / 2 );
 		else
 		{
 			if ( glw_state.isFullscreen )
-				SDL_ShowCursor( SDL_TRUE );
+				SDL_ShowCursor();
 
 			if ( drv && strcmp( drv, "x11" ) == 0 ) {
 				SDL_WarpMouseGlobal( glw_state.desktop_width / 2, glw_state.desktop_height / 2 );
@@ -520,7 +510,7 @@ static const int hat_keys[16] = {
 
 struct
 {
-	qboolean buttons[SDL_CONTROLLER_BUTTON_MAX + 1]; // +1 because old max was 16, current SDL_CONTROLLER_BUTTON_MAX is 15
+	qboolean buttons[SDL_GAMEPAD_BUTTON_COUNT];
 	unsigned int oldaxes;
 	int oldaaxes[MAX_JOYSTICK_AXIS];
 	unsigned int oldhats;
@@ -538,36 +528,23 @@ static void IN_InitJoystick( void )
 	int i = 0;
 	int total = 0;
 	char buf[16384] = "";
+	SDL_JoystickID *joysticks = NULL;
+	const char *joystickName = NULL;
 
 	if (gamepad)
-		SDL_GameControllerClose(gamepad);
+		SDL_CloseGamepad(gamepad);
 
 	if (stick != NULL)
-		SDL_JoystickClose(stick);
+		SDL_CloseJoystick(stick);
 
 	stick = NULL;
 	gamepad = NULL;
 	memset(&stick_state, '\0', sizeof (stick_state));
 
-	// SDL 2.0.4 requires SDL_INIT_JOYSTICK to be initialized separately from
-	// SDL_INIT_GAMECONTROLLER for SDL_JoystickOpen() to work correctly,
-	// despite https://wiki.libsdl.org/SDL_Init (retrieved 2016-08-16)
-	// indicating SDL_INIT_JOYSTICK should be initialized automatically.
-	if (!SDL_WasInit(SDL_INIT_JOYSTICK))
-	{
-		Com_DPrintf("Calling SDL_Init(SDL_INIT_JOYSTICK)...\n");
-		if (SDL_Init(SDL_INIT_JOYSTICK) != 0)
-		{
-			Com_DPrintf("SDL_Init(SDL_INIT_JOYSTICK) failed: %s\n", SDL_GetError());
-			return;
-		}
-		Com_DPrintf("SDL_Init(SDL_INIT_JOYSTICK) passed.\n");
-	}
-
-	if (!SDL_WasInit(SDL_INIT_GAMECONTROLLER))
+	if (!SDL_WasInit(SDL_INIT_GAMEPAD))
 	{
 		Com_DPrintf("Calling SDL_Init(SDL_INIT_GAMECONTROLLER)...\n");
-		if (SDL_Init(SDL_INIT_GAMECONTROLLER) != 0)
+		if (!SDL_Init(SDL_INIT_GAMEPAD))
 		{
 			Com_DPrintf("SDL_Init(SDL_INIT_GAMECONTROLLER) failed: %s\n", SDL_GetError());
 			return;
@@ -575,22 +552,26 @@ static void IN_InitJoystick( void )
 		Com_DPrintf("SDL_Init(SDL_INIT_GAMECONTROLLER) passed.\n");
 	}
 
-	total = SDL_NumJoysticks();
+	joysticks = SDL_GetJoysticks(&total);
 	Com_DPrintf("%d possible joysticks\n", total);
 
 	// Print list and build cvar to allow ui to select joystick.
-	for (i = 0; i < total; i++)
+	while (joysticks[i] != 0)
 	{
-		Q_strcat(buf, sizeof(buf), SDL_JoystickNameForIndex(i));
+		const char *name = SDL_GetJoystickNameForID(joysticks[i]);
+		Q_strcat(buf, sizeof(buf), name ? name : "Unknown");
 		Q_strcat(buf, sizeof(buf), "\n");
+		i++;
 	}
+
+	SDL_free(joysticks);
 
 	cv = Cvar_Get( "in_availableJoysticks", buf, CVAR_ROM );
 	Cvar_SetDescription( cv, "List of available joysticks." );
 
 	if( !in_joystick->integer ) {
 		Com_DPrintf( "Joystick is not active.\n" );
-		SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
+		SDL_QuitSubSystem(SDL_INIT_GAMEPAD);
 		return;
 	}
 
@@ -602,27 +583,28 @@ static void IN_InitJoystick( void )
 	in_joystickUseAnalog = Cvar_Get( "in_joystickUseAnalog", "0", CVAR_ARCHIVE );
 	Cvar_SetDescription( in_joystickUseAnalog, "Do not translate joystick axis events to keyboard commands." );
 
-	stick = SDL_JoystickOpen( in_joystickNo->integer );
+	stick = SDL_OpenJoystick( in_joystickNo->integer );
 
 	if (stick == NULL) {
 		Com_DPrintf( "No joystick opened: %s\n", SDL_GetError() );
 		return;
 	}
 
-	if (SDL_IsGameController(in_joystickNo->integer))
-		gamepad = SDL_GameControllerOpen(in_joystickNo->integer);
+	if (SDL_IsGamepad(in_joystickNo->integer))
+		gamepad = SDL_OpenGamepad(in_joystickNo->integer);
 
+	joystickName = SDL_GetJoystickNameForID(in_joystickNo->integer);
 	Com_DPrintf( "Joystick %d opened\n", in_joystickNo->integer );
-	Com_DPrintf( "Name:       %s\n", SDL_JoystickNameForIndex(in_joystickNo->integer) );
-	Com_DPrintf( "Axes:       %d\n", SDL_JoystickNumAxes(stick) );
-	Com_DPrintf( "Hats:       %d\n", SDL_JoystickNumHats(stick) );
-	Com_DPrintf( "Buttons:    %d\n", SDL_JoystickNumButtons(stick) );
-	Com_DPrintf( "Balls:      %d\n", SDL_JoystickNumBalls(stick) );
+	Com_DPrintf( "Name:       %s\n", joystickName ? joystickName : "Unknown" );
+	Com_DPrintf( "Axes:       %d\n", SDL_GetNumJoystickAxes(stick) );
+	Com_DPrintf( "Hats:       %d\n", SDL_GetNumJoystickHats(stick) );
+	Com_DPrintf( "Buttons:    %d\n", SDL_GetNumJoystickButtons(stick) );
+	Com_DPrintf( "Balls:      %d\n", SDL_GetNumJoystickBalls(stick) );
 	Com_DPrintf( "Use Analog: %s\n", in_joystickUseAnalog->integer ? "Yes" : "No" );
 	Com_DPrintf( "Is gamepad: %s\n", gamepad ? "Yes" : "No" );
 
-	SDL_JoystickEventState(SDL_QUERY);
-	SDL_GameControllerEventState(SDL_QUERY);
+	SDL_SetJoystickEventsEnabled(true);
+	SDL_SetGamepadEventsEnabled(true);
 }
 
 
@@ -633,7 +615,7 @@ IN_ShutdownJoystick
 */
 static void IN_ShutdownJoystick( void )
 {
-	if ( !SDL_WasInit( SDL_INIT_GAMECONTROLLER ) )
+	if ( !SDL_WasInit( SDL_INIT_GAMEPAD ) )
 		return;
 
 	if ( !SDL_WasInit( SDL_INIT_JOYSTICK ) )
@@ -641,17 +623,17 @@ static void IN_ShutdownJoystick( void )
 
 	if (gamepad)
 	{
-		SDL_GameControllerClose(gamepad);
+		SDL_CloseGamepad(gamepad);
 		gamepad = NULL;
 	}
 
 	if (stick)
 	{
-		SDL_JoystickClose(stick);
+		SDL_CloseJoystick(stick);
 		stick = NULL;
 	}
 
-	SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
+	SDL_QuitSubSystem(SDL_INIT_GAMEPAD);
 	SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
 }
 
@@ -736,12 +718,12 @@ static void IN_GamepadMove( void )
 	int translatedAxes[MAX_JOYSTICK_AXIS];
 	qboolean translatedAxesSet[MAX_JOYSTICK_AXIS];
 
-	SDL_GameControllerUpdate();
+	SDL_UpdateGamepads();
 
 	// check buttons
-	for (i = 0; i < SDL_CONTROLLER_BUTTON_MAX; i++)
+	for (i = 0; i < SDL_GAMEPAD_BUTTON_COUNT; i++)
 	{
-		qboolean pressed = SDL_GameControllerGetButton(gamepad, SDL_CONTROLLER_BUTTON_A + i);
+		qboolean pressed = SDL_GetGamepadButton(gamepad, sdlButton);
 		if (pressed != stick_state.buttons[i])
 		{
 #if SDL_VERSION_ATLEAST( 2, 0, 14 )
@@ -768,9 +750,9 @@ static void IN_GamepadMove( void )
 	}
 
 	// check axes
-	for (i = 0; i < SDL_CONTROLLER_AXIS_MAX; i++)
+	for (i = 0; i < SDL_GAMEPAD_AXIS_COUNT; i++)
 	{
-		int axis = SDL_GameControllerGetAxis(gamepad, SDL_CONTROLLER_AXIS_LEFTX + i);
+		int axis = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_LEFTX + i);
 		int oldAxis = stick_state.oldaaxes[i];
 
 		// Smoothly ramp from dead zone to maximum value
@@ -783,8 +765,8 @@ static void IN_GamepadMove( void )
 
 		if (axis != oldAxis)
 		{
-			const int negMap[SDL_CONTROLLER_AXIS_MAX] = { K_PAD0_LEFTSTICK_LEFT,  K_PAD0_LEFTSTICK_UP,   K_PAD0_RIGHTSTICK_LEFT,  K_PAD0_RIGHTSTICK_UP, 0, 0 };
-			const int posMap[SDL_CONTROLLER_AXIS_MAX] = { K_PAD0_LEFTSTICK_RIGHT, K_PAD0_LEFTSTICK_DOWN, K_PAD0_RIGHTSTICK_RIGHT, K_PAD0_RIGHTSTICK_DOWN, K_PAD0_LEFTTRIGGER, K_PAD0_RIGHTTRIGGER };
+			const int negMap[SDL_GAMEPAD_AXIS_COUNT] = { K_PAD0_LEFTSTICK_LEFT,  K_PAD0_LEFTSTICK_UP,   K_PAD0_RIGHTSTICK_LEFT,  K_PAD0_RIGHTSTICK_UP, 0, 0 };
+			const int posMap[SDL_GAMEPAD_AXIS_COUNT] = { K_PAD0_LEFTSTICK_RIGHT, K_PAD0_LEFTSTICK_DOWN, K_PAD0_RIGHTSTICK_RIGHT, K_PAD0_RIGHTSTICK_DOWN, K_PAD0_LEFTTRIGGER, K_PAD0_RIGHTTRIGGER };
 
 			qboolean posAnalog = qfalse, negAnalog = qfalse;
 			int negKey = negMap[i];
@@ -884,10 +866,10 @@ static void IN_JoyMove( void )
 	if (!stick)
 		return;
 
-	SDL_JoystickUpdate();
+	SDL_UpdateJoysticks();
 
 	// update the ball state.
-	total = SDL_JoystickNumBalls(stick);
+	total = SDL_GetNumJoystickBalls(stick);
 	if (total > 0)
 	{
 		int balldx = 0;
@@ -896,7 +878,7 @@ static void IN_JoyMove( void )
 		{
 			int dx = 0;
 			int dy = 0;
-			SDL_JoystickGetBall(stick, i, &dx, &dy);
+			SDL_GetJoystickBall(stick, i, &dx, &dy);
 			balldx += dx;
 			balldy += dy;
 		}
@@ -913,14 +895,14 @@ static void IN_JoyMove( void )
 	}
 
 	// now query the stick buttons...
-	total = SDL_JoystickNumButtons(stick);
+	total = SDL_GetNumJoystickButtons(stick);
 	if (total > 0)
 	{
 		if (total > ARRAY_LEN(stick_state.buttons))
 			total = ARRAY_LEN(stick_state.buttons);
 		for (i = 0; i < total; i++)
 		{
-			qboolean pressed = (SDL_JoystickGetButton(stick, i) != 0);
+			qboolean pressed = SDL_GetJoystickButton(stick, i);
 			if (pressed != stick_state.buttons[i])
 			{
 				Com_QueueEvent( in_eventTime, SE_KEY, K_JOY1 + i, pressed, 0, NULL );
@@ -930,13 +912,13 @@ static void IN_JoyMove( void )
 	}
 
 	// look at the hats...
-	total = SDL_JoystickNumHats(stick);
+	total = SDL_GetNumJoystickHats(stick);
 	if (total > 0)
 	{
 		if (total > 4) total = 4;
 		for (i = 0; i < total; i++)
 		{
-			((Uint8 *)&hats)[i] = SDL_JoystickGetHat(stick, i);
+			((Uint8 *)&hats)[i] = SDL_GetJoystickHat(stick, i);
 		}
 	}
 
@@ -1019,7 +1001,7 @@ static void IN_JoyMove( void )
 	stick_state.oldhats = hats;
 
 	// finally, look at the axes...
-	total = SDL_JoystickNumAxes(stick);
+	total = SDL_GetNumJoystickAxes(stick);
 	if (total > 0)
 	{
 		if (in_joystickUseAnalog->integer)
@@ -1027,7 +1009,7 @@ static void IN_JoyMove( void )
 			if (total > MAX_JOYSTICK_AXIS) total = MAX_JOYSTICK_AXIS;
 			for (i = 0; i < total; i++)
 			{
-				Sint16 axis = SDL_JoystickGetAxis(stick, i);
+				Sint16 axis = SDL_GetJoystickAxis(stick, i);
 				float f = ( (float) abs(axis) ) / 32767.0f;
 				
 				if( f < in_joystickThreshold->value ) axis = 0;
@@ -1044,7 +1026,7 @@ static void IN_JoyMove( void )
 			if (total > 16) total = 16;
 			for (i = 0; i < total; i++)
 			{
-				Sint16 axis = SDL_JoystickGetAxis(stick, i);
+				Sint16 axis = SDL_GetJoystickAxis(stick, i);
 				float f = ( (float) axis ) / 32767.0f;
 				if( f < -in_joystickThreshold->value ) {
 					axes |= ( 1 << ( i * 2 ) );
@@ -1145,10 +1127,10 @@ void HandleEvents( void )
 	{
 		switch( e.type )
 		{
-			case SDL_KEYDOWN:
+			case SDL_EVENT_KEY_DOWN:
 				if ( e.key.repeat && Key_GetCatcher() == 0 )
 					break;
-				key = IN_TranslateSDLToQ3Key( &e.key.keysym, qtrue );
+				key = IN_TranslateSDLToQ3Key( &e.key, qtrue );
 
 				if ( key == K_ENTER && keys[K_ALT].down ) {
 					Cvar_SetIntegerValue( "r_fullscreen", glw_state.isFullscreen ? 0 : 1 );
@@ -1174,17 +1156,17 @@ void HandleEvents( void )
 				lastKeyDown = key;
 				break;
 
-			case SDL_KEYUP:
-				if( ( key = IN_TranslateSDLToQ3Key( &e.key.keysym, qfalse ) ) )
+			case SDL_EVENT_KEY_UP:
+				if( ( key = IN_TranslateSDLToQ3Key( &e.key, qfalse ) ) )
 					Com_QueueEvent( in_eventTime, SE_KEY, key, qfalse, 0, NULL );
 
 				lastKeyDown = 0;
 				break;
 
-			case SDL_TEXTINPUT:
+			case SDL_EVENT_TEXT_INPUT:
 				if( lastKeyDown != K_CONSOLE )
 				{
-					char *c = e.text.text;
+					const char *c = e.text.text;
 
 					// Quick and dirty UTF-8 to UTF-32 conversion
 					while ( *c )
@@ -1231,7 +1213,7 @@ void HandleEvents( void )
 				}
 				break;
 
-			case SDL_MOUSEMOTION:
+			case SDL_EVENT_MOUSE_MOTION:
 				if( mouseActive )
 				{
 					if( !e.motion.xrel && !e.motion.yrel )
@@ -1240,8 +1222,8 @@ void HandleEvents( void )
 				}
 				break;
 
-			case SDL_MOUSEBUTTONDOWN:
-			case SDL_MOUSEBUTTONUP:
+			case SDL_EVENT_MOUSE_BUTTON_DOWN:
+			case SDL_EVENT_MOUSE_BUTTON_UP:
 				{
 					int b;
 					switch( e.button.button )
@@ -1254,11 +1236,11 @@ void HandleEvents( void )
 						default:                b = K_AUX1 + ( e.button.button - SDL_BUTTON_X2 + 1 ) % 16; break;
 					}
 					Com_QueueEvent( in_eventTime, SE_KEY, b,
-						( e.type == SDL_MOUSEBUTTONDOWN ? qtrue : qfalse ), 0, NULL );
+						( e.type == SDL_EVENT_MOUSE_BUTTON_DOWN ? qtrue : qfalse ), 0, NULL );
 				}
 				break;
 
-			case SDL_MOUSEWHEEL:
+			case SDL_EVENT_MOUSE_WHEEL:
 				if( e.wheel.y > 0 )
 				{
 					Com_QueueEvent( in_eventTime, SE_KEY, K_MWHEELUP, qtrue, 0, NULL );
@@ -1272,10 +1254,69 @@ void HandleEvents( void )
 				break;
 
 #ifdef USE_JOYSTICK
-			case SDL_CONTROLLERDEVICEADDED:
-			case SDL_CONTROLLERDEVICEREMOVED:
-				if ( in_joystick->integer )
+			case SDL_EVENT_GAMEPAD_ADDED:
+			case SDL_EVENT_GAMEPAD_REMOVED:
+				if (in_joystick->integer)
 					IN_InitJoystick();
+				break;
+
+			case SDL_EVENT_QUIT:
+				Cbuf_ExecuteText(EXEC_NOW, "quit Closed window\n");
+				break;
+
+			case SDL_EVENT_WINDOW_RESIZED:
+				{
+					int width, height;
+
+					width = e.window.data1;
+					height = e.window.data2;
+
+					// ignore this event on fullscreen
+					if( cls.glconfig.isFullscreen )
+					{
+						break;
+					}
+
+					// check if size actually changed
+					if( cls.glconfig.vidWidth == width && cls.glconfig.vidHeight == height )
+					{
+						break;
+					}
+
+					Cvar_SetValue( "r_customwidth", width );
+					Cvar_SetValue( "r_customheight", height );
+					Cvar_Set( "r_mode", "-1" );
+
+					// Wait until user stops dragging for 1 second, so
+					// we aren't constantly recreating the GL context while
+					// they try to drag...
+					vidRestartTime = Sys_Milliseconds( ) + 1000;
+				}
+				break;
+
+			case SDL_EVENT_WINDOW_MINIMIZED:    Cvar_SetValue( "com_minimized", 1 ); break;
+			case SDL_EVENT_WINDOW_RESTORED:
+			case SDL_EVENT_WINDOW_MAXIMIZED:    Cvar_SetValue( "com_minimized", 0 ); break;
+			case SDL_EVENT_WINDOW_FOCUS_LOST:   Cvar_SetValue( "com_unfocused", 1 ); break;
+			case SDL_EVENT_WINDOW_FOCUS_GAINED: Cvar_SetValue( "com_unfocused", 0 ); break;
+
+#if defined(PROTOCOL_HANDLER) && defined(__APPLE__)
+			case SDL_EVENT_DROP_FILE:
+				{
+					const char *filename = e.drop.data;
+
+					// Handle macOS open URL event. URL protocol scheme must be set in Info.plist.
+					if( !Q_strncmp( filename, PROTOCOL_HANDLER ":", strlen( PROTOCOL_HANDLER ":" ) ) )
+					{
+						char *protocolCommand = Sys_ParseProtocolUri( filename );
+
+						if( protocolCommand )
+						{
+							Cbuf_ExecuteText( EXEC_APPEND, va( "%s\n", protocolCommand ) );
+							free( protocolCommand );
+						}
+					}
+				}
 				break;
 #endif
 
@@ -1486,7 +1527,7 @@ void IN_Init( void )
 
 	mouseAvailable = ( in_mouse->value != 0 ) ? qtrue : qfalse;
 
-	SDL_StartTextInput();
+	SDL_StartTextInput( SDL_window );
 
 	//IN_DeactivateMouse();
 
@@ -1509,7 +1550,7 @@ IN_Shutdown
 */
 void IN_Shutdown( void )
 {
-	SDL_StopTextInput();
+	SDL_StopTextInput( SDL_window );
 
 	IN_DeactivateMouse();
 
