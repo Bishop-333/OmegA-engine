@@ -12,8 +12,11 @@
 #define MAX_VK_SAMPLERS 32
 #define MAX_VK_PIPELINES ((1024 + 128)*2)
 
-#define VERTEX_BUFFER_SIZE (4 * 1024 * 1024)	/* by default */
-#define STAGING_BUFFER_SIZE (2 * 1024 * 1024)	/* by default */
+#define VERTEX_BUFFER_SIZE     (4 * 1024 * 1024)  /* by default */
+#define VERTEX_BUFFER_SIZE_HI  (8 * 1024 * 1024)
+
+#define STAGING_BUFFER_SIZE    (2 * 1024 * 1024)  /* by default */
+#define STAGING_BUFFER_SIZE_HI (24 * 1024 * 1024) /* enough for max.texture size upload with all mip levels at once */
 
 #define IMAGE_CHUNK_SIZE (32 * 1024 * 1024)
 #define MAX_IMAGE_CHUNKS 56
@@ -254,6 +257,8 @@ void vk_create_image( image_t *image, int width, int height, int mip_levels );
 void vk_upload_image_data( image_t *image, int x, int y, int width, int height, int miplevels, byte *pixels, int size, qboolean update );
 void vk_update_descriptor_set( image_t *image, qboolean mipmap );
 void vk_destroy_image_resources( VkImage *image, VkImageView *imageView );
+void vk_update_attachment_descriptors( void );
+void vk_destroy_samplers( void );
 
 uint32_t vk_find_pipeline_ext( uint32_t base, const Vk_Pipeline_Def *def, qboolean use );
 void vk_get_pipeline_def( uint32_t pipeline, Vk_Pipeline_Def *def );
@@ -311,7 +316,6 @@ typedef struct vk_tess_s {
 	VkSemaphore image_acquired;
 	uint32_t	swapchain_image_index;
 	qboolean	swapchain_image_acquired;
-	VkSemaphore rendering_finished;
 #ifdef USE_UPLOAD_QUEUE
 	VkSemaphore rendering_finished2;
 #endif
@@ -360,6 +364,7 @@ typedef struct {
 	uint32_t swapchain_image_count;
 	VkImage swapchain_images[MAX_SWAPCHAIN_IMAGES];
 	VkImageView swapchain_image_views[MAX_SWAPCHAIN_IMAGES];
+	VkSemaphore swapchain_rendering_finished[MAX_SWAPCHAIN_IMAGES];
 	//uint32_t swapchain_image_index;
 
 	VkCommandPool command_pool;
@@ -618,6 +623,29 @@ typedef struct {
 	qboolean aux_fence_wait;
 #endif
 
+	struct staging_buffer_s {
+		VkBuffer handle;
+		VkDeviceMemory memory;
+		VkDeviceSize size;
+		byte *ptr; // pointer to mapped staging buffer
+#ifdef USE_UPLOAD_QUEUE
+		VkDeviceSize offset;
+#endif
+	} staging_buffer;
+
+	struct samplers_s {
+		int count;
+		Vk_Sampler_Def def[MAX_VK_SAMPLERS];
+		VkSampler handle[MAX_VK_SAMPLERS];
+		int filter_min;
+		int filter_max;
+	} samplers;
+
+	struct defaults_t {
+		VkDeviceSize staging_size;
+		VkDeviceSize geometry_size;
+	} defaults;
+
 } Vk_Instance;
 
 typedef struct {
@@ -629,26 +657,10 @@ typedef struct {
 // It is reinitialized on a map change.
 typedef struct {
 	//
-	// Resources.
-	//
-	int num_samplers;
-	Vk_Sampler_Def sampler_defs[MAX_VK_SAMPLERS];
-	VkSampler samplers[MAX_VK_SAMPLERS];
-
-	//
 	// Memory allocations.
 	//
 	int num_image_chunks;
 	ImageChunk image_chunks[MAX_IMAGE_CHUNKS];
-
-	// Host visible memory used to copy image data to device local memory.
-	VkBuffer staging_buffer;
-	VkDeviceMemory staging_buffer_memory;
-	VkDeviceSize staging_buffer_size;
-	byte *staging_buffer_ptr; // pointer to mapped staging buffer
-#ifdef USE_UPLOAD_QUEUE
-	VkDeviceSize staging_buffer_offset;
-#endif
 
 	//
 	// State.
