@@ -85,10 +85,6 @@ endif
 #############################################################################
 -include Makefile.local
 
-ifeq ($(COMPILE_PLATFORM),darwin)
-  USE_RENDERER_DLOPEN=1
-endif
-
 ifeq ($(COMPILE_PLATFORM),cygwin)
   PLATFORM=mingw32
 endif
