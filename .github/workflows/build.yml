@@ -22,25 +22,16 @@ on:
 
 jobs:
   windows:
-    name: ${{ matrix.btype }} Windows ${{ matrix.arch }}
+    name: Release Windows ${{ matrix.arch }}
     runs-on: windows-2022
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86, x86_64]
-        cc: [gcc]
-        btype: [Release]
+        arch: [x86_64]
         include:
-          - arch: x86
-            msystem: mingw32
-            prefix: mingw-w64-i686
-
           - arch: x86_64
             msystem: mingw64
             prefix: mingw-w64-x86_64
-
-          - btype: Release
-            rule: install
 
     defaults:
       run:
@@ -50,7 +41,7 @@ jobs:
 
     - uses: msys2/setup-msys2@v2
       with:
-        install: base-devel ${{ matrix.prefix }}-binutils ${{ matrix.prefix }}-make ${{ matrix.prefix }}-${{ matrix.cc }}
+        install: base-devel ${{ matrix.prefix }}-binutils ${{ matrix.prefix }}-make ${{ matrix.prefix }}-gcc
         msystem: ${{ matrix.msystem }}
         path-type: minimal
         release: false
@@ -63,9 +54,9 @@ jobs:
     - name: Build
       run: |
         make clean ARCH=${{ matrix.arch }}
-        make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin RENDERER_DEFAULT=opengl QUAKE3=1
+        make install -j$(nproc) ARCH=${{ matrix.arch }} DESTDIR=bin RENDERER_DEFAULT=opengl
         make clean ARCH=${{ matrix.arch }}
-        make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin RENDERER_DEFAULT=vulkan QUAKE3=1
+        make install -j$(nproc) ARCH=${{ matrix.arch }} DESTDIR=bin RENDERER_DEFAULT=vulkan
 
     - uses: actions/upload-artifact@v4
       with:
@@ -75,36 +66,19 @@ jobs:
         retention-days: 5
         
   ubuntu:
-    name: ${{ matrix.btype }} Unix ${{ matrix.arch }}
+    name: Release Unix ${{ matrix.arch }}
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86, x86_64]
-        cc: [gcc]
-        btype: [Release]
-        include:
-          - btype: Release
-            rule: install
-
-          - arch: x86
-            use_sdl: USE_SDL=0
-
-          - arch: x86_64
-            use_sdl: USE_SDL=1
+        arch: [x86_64]
 
     steps:
 
     - name: Install tools
       run: |
-        if [ ${{ matrix.arch }} == "x86" ]; then
-          sudo dpkg --add-architecture i386
-          sudo apt-get -qq update
-          sudo apt-get -y install gcc-multilib libcurl4-openssl-dev:i386 mesa-common-dev:i386 libxxf86dga-dev:i386 libxrandr-dev:i386 libxxf86vm-dev:i386 libasound-dev:i386 libjpeg-dev:i386
-        else
-          sudo apt-get -qq update
-          sudo apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libjpeg-dev
-        fi
+        sudo apt-get -qq update
+        sudo apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libjpeg-dev
 
     - uses: actions/checkout@v4
       with:
@@ -112,9 +86,42 @@ jobs:
 
     - name: Build
       run: |
-        make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin ${{ matrix.use_sdl }} RENDERER_DEFAULT=opengl QUAKE3=1
+        make install -j$(nproc) ARCH=${{ matrix.arch }} DESTDIR=bin RENDERER_DEFAULT=opengl
         make clean ARCH=${{ matrix.arch }} 
-        make ${{ matrix.rule }} -j$(nproc) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin ${{ matrix.use_sdl }} RENDERER_DEFAULT=vulkan QUAKE3=1
+        make install -j$(nproc) ARCH=${{ matrix.arch }} DESTDIR=bin RENDERER_DEFAULT=vulkan
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: release-linux-${{ matrix.arch }}
+        path: bin
+        if-no-files-found: error
+        retention-days: 5
+
+  ubuntu-arm:
+    name: Release Unix ${{ matrix.arch }}
+    runs-on: ubuntu-22.04-arm
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64]
+
+    steps:
+
+    - name: Install tools
+      run: |
+        sudo apt-get -qq update
+        sudo apt-get install -y make gcc g++
+        sudo apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev
+
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Build
+      run: |
+        make install -j$(nproc) ARCH=${{ matrix.arch }} DESTDIR=bin RENDERER_DEFAULT=opengl
+        make clean ARCH=${{ matrix.arch }}
+        make install -j$(nproc) ARCH=${{ matrix.arch }} DESTDIR=bin RENDERER_DEFAULT=vulkan
 
     - uses: actions/upload-artifact@v4
       with:
@@ -124,16 +131,10 @@ jobs:
         retention-days: 5
 
   macos:
-    name: ${{ matrix.btype }} macOS universal2
+    name: Release macOS universal2
     runs-on: macos-14
     strategy:
       fail-fast: false
-      matrix:
-        cc: [gcc]
-        btype: [Release]
-        include:
-          - btype: Release
-            rule: install
 
     steps:
 
@@ -146,21 +147,21 @@ jobs:
 
     - name: Build
       run: |
-        make ${{ matrix.rule }} -j$(sysctl -n hw.logicalcpu) ARCH=x86_64 CC=${{ matrix.cc }} DESTDIR=bin INSTALL=ginstall STRIP=echo QUAKE3=1
-        make ${{ matrix.rule }} -j$(sysctl -n hw.logicalcpu) ARCH=arm64 CC=${{ matrix.cc }} DESTDIR=bin INSTALL=ginstall STRIP=echo QUAKE3=1
-        QUAKE3=1 ./make-macosx-app.sh release
-        hdiutil create -format UDZO -srcfolder build/release-darwin-universal2/OmegA.app build/OmegA.dmg
+        make install -j$(sysctl -n hw.logicalcpu) ARCH=x86_64 DESTDIR=bin INSTALL=ginstall STRIP=echo
+        make install -j$(sysctl -n hw.logicalcpu) ARCH=arm64 DESTDIR=bin INSTALL=ginstall STRIP=echo
+        ./make-macosx-app.sh release
+        hdiutil create -format UDZO -srcfolder build/release-darwin-universal2/OmegA.app build/omega-engine-macos-universal2.dmg
 
     - uses: actions/upload-artifact@v4
       with:
         name: release-darwin-universal2
-        path: build/OmegA.dmg
+        path: build/omega-engine-macos-universal2.dmg
         if-no-files-found: error
         retention-days: 5
 
   create-testing:
     if: github.ref == 'refs/heads/master' && github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    needs: [windows, ubuntu, macos]
+    needs: [windows, ubuntu, ubuntu-arm, macos]
     runs-on: ubuntu-24.04
     steps:
       - name: Download Artifacts
@@ -169,17 +170,17 @@ jobs:
       - name: Create binary archives
         run: |
           chmod -R +x *
-          7z a -r q3-omega-engine-linux-x86.zip         ./release-linux-x86
-          7z a -r q3-omega-engine-linux-x86_64.zip      ./release-linux-x86_64
-          7z a -r q3-omega-engine-windows-x86.zip       ./release-mingw64-x86
-          7z a -r q3-omega-engine-windows-x86_64.zip    ./release-mingw64-x86_64
-          7z a q3-omega-engine-macos-universal2.zip     ./release-darwin-universal2/OmegA.dmg
+          7z a -r omega-engine-linux-x86_64.zip      ./release-linux-x86_64
+          7z a -r omega-engine-linux-arm64.zip       ./release-linux-arm64
+          7z a -r omega-engine-windows-x86_64.zip    ./release-mingw64-x86_64
+          cp ./release-darwin-universal2/omega-engine-macos-universal2.dmg .
       - name: Create latest build
         uses: czietz/action-automatic-releases@latest
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          automatic_release_tag: "q3-omega"
+          automatic_release_tag: "development"
           prerelease: true
-          title: Development Build (Quake3 as default)
+          title: Development Build
           files: |
             *.zip
+            *.dmg
