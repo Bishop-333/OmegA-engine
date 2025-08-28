@@ -1926,6 +1926,8 @@ qboolean RE_CanMinimize( void );
 const glconfig_t *RE_GetConfig( void );
 void RE_VertexLighting( qboolean allowed );
 
+void R_BlurConsoleBackground( void );
+
 
 //Bloom Stuff
 

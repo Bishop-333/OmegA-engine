@@ -1566,6 +1566,11 @@ static const void *RB_SwapBuffers( const void *data ) {
 		backEnd.screenshotMask = 0;
 	}
 
+	if ( backEnd.drawConsole ) {
+		RB_SetGL2D();
+		R_BlurConsoleBackground();
+	}
+
 	ri.GLimp_EndFrame();
 
 #ifdef USE_FBO

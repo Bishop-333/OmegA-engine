@@ -2206,6 +2206,69 @@ void QGL_InitARB( void )
 	ri.Cvar_ResetGroup( CVG_RENDERER, qtrue );
 }
 
+void R_BlurConsoleBackground(void) {
+    if (!fboEnabled)
+        return;
+
+    frameBuffer_t *src = &frameBuffers[0];
+    frameBuffer_t *tmp = &frameBuffers[1];
+
+    int w = glConfig.vidWidth;
+    int h = glConfig.vidHeight;
+
+    // 1) Copier le backbuffer complet dans le FBO source
+    FBO_Bind(GL_READ_FRAMEBUFFER, 0);
+    FBO_Bind(GL_DRAW_FRAMEBUFFER, src->fbo);
+    qglBlitFramebuffer(0, 0, w, h, 0, 0, src->width, src->height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+    // Nombre de passes de blur
+    int passes = 5;
+
+    for (int i = 0; i < passes; i++) {
+        // 2) Appliquer le blur horizontal
+        FBO_Bind(GL_DRAW_FRAMEBUFFER, tmp->fbo);
+        GL_BindTexture(0, src->color);
+        ARB_ProgramEnable(DUMMY_VERTEX, BLUR2_FRAGMENT);
+        ARB_BlurParams(w, h, 6, qtrue);
+        RenderQuad(w, h);
+        ARB_ProgramDisable();
+
+        // 3) Appliquer le blur vertical
+        FBO_Bind(GL_DRAW_FRAMEBUFFER, src->fbo);
+        GL_BindTexture(0, tmp->color);
+        ARB_ProgramEnable(DUMMY_VERTEX, BLUR2_FRAGMENT);
+        ARB_BlurParams(w, h, 6, qfalse);
+        RenderQuad(w, h);
+        ARB_ProgramDisable();
+    }
+
+    // 4) Dessiner seulement la moitié supérieure
+    FBO_Bind(GL_FRAMEBUFFER, 0);
+    GL_BindTexture(0, src->color);
+
+    float quadHeight = h / 2;
+
+    static vec2_t t[4];
+    static vec3_t v[4];
+
+    t[0][0] = 0.0f; t[0][1] = 1.0f;
+    t[1][0] = 1.0f; t[1][1] = 1.0f;
+    t[2][0] = 0.0f; t[2][1] = 0.5f;
+    t[3][0] = 1.0f; t[3][1] = 0.5f;
+
+    v[0][0] = 0; v[0][1] = 0;          v[0][2] = 0;
+    v[1][0] = w; v[1][1] = 0;          v[1][2] = 0;
+    v[2][0] = 0; v[2][1] = quadHeight; v[2][2] = 0;
+    v[3][0] = w; v[3][1] = quadHeight; v[3][2] = 0;
+
+    GL_ClientState(0, CLS_TEXCOORD_ARRAY);
+    qglVertexPointer(3, GL_FLOAT, 0, v);
+    qglTexCoordPointer(2, GL_FLOAT, 0, t);
+    qglDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+    // 5) Restaurer le viewport complet
+    qglViewport(0, 0, w, h);
+}
 
 void QGL_DoneARB( void )
 {
