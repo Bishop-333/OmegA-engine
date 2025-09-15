@@ -1,5 +1,7 @@
 #include "../core/tr_local.h"
 #include "vk.h"
+#include "../postprocessing/tr_volumetric.h"
+#include "../postprocessing/tr_postprocess.h"
 #include <stdio.h>  // For file operations
 
 #if defined (_DEBUG)
@@ -9,7 +11,7 @@
 #endif
 #endif
 
-static int vkSamples = VK_SAMPLE_COUNT_1_BIT;
+int vkSamples = VK_SAMPLE_COUNT_1_BIT;
 static int vkMaxSamples = VK_SAMPLE_COUNT_1_BIT;
 
 static VkInstance vk_instance = VK_NULL_HANDLE;
@@ -45,80 +47,81 @@ static PFN_vkCreateDebugReportCallbackEXT				qvkCreateDebugReportCallbackEXT;
 static PFN_vkDestroyDebugReportCallbackEXT				qvkDestroyDebugReportCallbackEXT;
 #endif
 static PFN_vkAllocateCommandBuffers						qvkAllocateCommandBuffers;
-static PFN_vkAllocateDescriptorSets						qvkAllocateDescriptorSets;
-static PFN_vkAllocateMemory								qvkAllocateMemory;
+PFN_vkAllocateDescriptorSets						qvkAllocateDescriptorSets;
+PFN_vkAllocateMemory 							qvkAllocateMemory;
 static PFN_vkBeginCommandBuffer							qvkBeginCommandBuffer;
-static PFN_vkBindBufferMemory							qvkBindBufferMemory;
-static PFN_vkBindImageMemory							qvkBindImageMemory;
-static PFN_vkCmdBeginRenderPass							qvkCmdBeginRenderPass;
-static PFN_vkCmdBindDescriptorSets						qvkCmdBindDescriptorSets;
+PFN_vkBindBufferMemory 						qvkBindBufferMemory;
+PFN_vkBindImageMemory 						qvkBindImageMemory;
+PFN_vkCmdBeginRenderPass 						qvkCmdBeginRenderPass;
+PFN_vkCmdBindDescriptorSets 					qvkCmdBindDescriptorSets;
 static PFN_vkCmdBindIndexBuffer							qvkCmdBindIndexBuffer;
-static PFN_vkCmdBindPipeline							qvkCmdBindPipeline;
+PFN_vkCmdBindPipeline 						qvkCmdBindPipeline;
 static PFN_vkCmdBindVertexBuffers						qvkCmdBindVertexBuffers;
 static PFN_vkCmdBlitImage								qvkCmdBlitImage;
 static PFN_vkCmdClearAttachments						qvkCmdClearAttachments;
 static PFN_vkCmdCopyBuffer								qvkCmdCopyBuffer;
 static PFN_vkCmdCopyBufferToImage						qvkCmdCopyBufferToImage;
 static PFN_vkCmdCopyImage								qvkCmdCopyImage;
-static PFN_vkCmdDraw									qvkCmdDraw;
+PFN_vkCmdDraw 								qvkCmdDraw;
+PFN_vkCmdDispatch 							qvkCmdDispatch;
 static PFN_vkCmdDrawIndexed								qvkCmdDrawIndexed;
-static PFN_vkCmdEndRenderPass							qvkCmdEndRenderPass;
+PFN_vkCmdEndRenderPass 						qvkCmdEndRenderPass;
 static PFN_vkCmdNextSubpass								qvkCmdNextSubpass;
-static PFN_vkCmdPipelineBarrier							qvkCmdPipelineBarrier;
+PFN_vkCmdPipelineBarrier 						qvkCmdPipelineBarrier;
 static PFN_vkCmdPushConstants							qvkCmdPushConstants;
 static PFN_vkCmdSetDepthBias							qvkCmdSetDepthBias;
 static PFN_vkCmdSetScissor								qvkCmdSetScissor;
 static PFN_vkCmdSetViewport								qvkCmdSetViewport;
-static PFN_vkCreateBuffer								qvkCreateBuffer;
+PFN_vkCreateBuffer 							qvkCreateBuffer;
 static PFN_vkCreateCommandPool							qvkCreateCommandPool;
-static PFN_vkCreateDescriptorPool						qvkCreateDescriptorPool;
-static PFN_vkCreateDescriptorSetLayout					qvkCreateDescriptorSetLayout;
+PFN_vkCreateDescriptorPool						qvkCreateDescriptorPool;
+PFN_vkCreateDescriptorSetLayout					qvkCreateDescriptorSetLayout;
 static PFN_vkCreateFence								qvkCreateFence;
 static PFN_vkCreateFramebuffer							qvkCreateFramebuffer;
-static PFN_vkCreateGraphicsPipelines					qvkCreateGraphicsPipelines;
-static PFN_vkCreateImage								qvkCreateImage;
-static PFN_vkCreateImageView							qvkCreateImageView;
-static PFN_vkCreatePipelineLayout						qvkCreatePipelineLayout;
+PFN_vkCreateGraphicsPipelines					qvkCreateGraphicsPipelines;
+PFN_vkCreateImage 							qvkCreateImage;
+PFN_vkCreateImageView 						qvkCreateImageView;
+PFN_vkCreatePipelineLayout						qvkCreatePipelineLayout;
 static PFN_vkCreatePipelineCache						qvkCreatePipelineCache;
 static PFN_vkCreateRenderPass							qvkCreateRenderPass;
-static PFN_vkCreateSampler								qvkCreateSampler;
+PFN_vkCreateSampler								qvkCreateSampler;
 static PFN_vkCreateSemaphore							qvkCreateSemaphore;
-static PFN_vkCreateShaderModule							qvkCreateShaderModule;
-static PFN_vkDestroyBuffer								qvkDestroyBuffer;
+PFN_vkCreateShaderModule							qvkCreateShaderModule;
+PFN_vkDestroyBuffer 							qvkDestroyBuffer;
 static PFN_vkDestroyCommandPool							qvkDestroyCommandPool;
-static PFN_vkDestroyDescriptorPool						qvkDestroyDescriptorPool;
+PFN_vkDestroyDescriptorPool						qvkDestroyDescriptorPool;
 static PFN_vkDestroyDescriptorSetLayout					qvkDestroyDescriptorSetLayout;
 static PFN_vkDestroyDevice								qvkDestroyDevice;
 static PFN_vkDestroyFence								qvkDestroyFence;
 static PFN_vkDestroyFramebuffer							qvkDestroyFramebuffer;
-static PFN_vkDestroyImage								qvkDestroyImage;
-static PFN_vkDestroyImageView							qvkDestroyImageView;
-static PFN_vkDestroyPipeline							qvkDestroyPipeline;
+PFN_vkDestroyImage 							qvkDestroyImage;
+PFN_vkDestroyImageView 						qvkDestroyImageView;
+PFN_vkDestroyPipeline 						qvkDestroyPipeline;
 static PFN_vkDestroyPipelineCache						qvkDestroyPipelineCache;
-static PFN_vkDestroyPipelineLayout						qvkDestroyPipelineLayout;
+PFN_vkDestroyPipelineLayout						qvkDestroyPipelineLayout;
 static PFN_vkDestroyRenderPass							qvkDestroyRenderPass;
-static PFN_vkDestroySampler								qvkDestroySampler;
+PFN_vkDestroySampler								qvkDestroySampler;
 static PFN_vkDestroySemaphore							qvkDestroySemaphore;
-static PFN_vkDestroyShaderModule						qvkDestroyShaderModule;
+PFN_vkDestroyShaderModule						qvkDestroyShaderModule;
 static PFN_vkDeviceWaitIdle								qvkDeviceWaitIdle;
 static PFN_vkEndCommandBuffer							qvkEndCommandBuffer;
 static PFN_vkFlushMappedMemoryRanges					qvkFlushMappedMemoryRanges;
 static PFN_vkFreeCommandBuffers							qvkFreeCommandBuffers;
 static PFN_vkFreeDescriptorSets							qvkFreeDescriptorSets;
-static PFN_vkFreeMemory									qvkFreeMemory;
-static PFN_vkGetBufferMemoryRequirements				qvkGetBufferMemoryRequirements;
+PFN_vkFreeMemory 								qvkFreeMemory;
+PFN_vkGetBufferMemoryRequirements 			qvkGetBufferMemoryRequirements;
 static PFN_vkGetDeviceQueue								qvkGetDeviceQueue;
-static PFN_vkGetImageMemoryRequirements					qvkGetImageMemoryRequirements;
+PFN_vkGetImageMemoryRequirements 				qvkGetImageMemoryRequirements;
 static PFN_vkGetImageSubresourceLayout					qvkGetImageSubresourceLayout;
 static PFN_vkInvalidateMappedMemoryRanges				qvkInvalidateMappedMemoryRanges;
-static PFN_vkMapMemory									qvkMapMemory;
+PFN_vkMapMemory 								qvkMapMemory;
 static PFN_vkQueueSubmit								qvkQueueSubmit;
 static PFN_vkQueueWaitIdle								qvkQueueWaitIdle;
 static PFN_vkResetCommandBuffer							qvkResetCommandBuffer;
 static PFN_vkResetDescriptorPool						qvkResetDescriptorPool;
 static PFN_vkResetFences								qvkResetFences;
-static PFN_vkUnmapMemory								qvkUnmapMemory;
-static PFN_vkUpdateDescriptorSets						qvkUpdateDescriptorSets;
+PFN_vkUnmapMemory 							qvkUnmapMemory;
+PFN_vkUpdateDescriptorSets						qvkUpdateDescriptorSets;
 static PFN_vkWaitForFences								qvkWaitForFences;
 static PFN_vkAcquireNextImageKHR						qvkAcquireNextImageKHR;
 static PFN_vkCreateSwapchainKHR							qvkCreateSwapchainKHR;
@@ -370,6 +373,18 @@ static void end_command_buffer( VkCommandBuffer command_buffer, const char *loca
 	vk_queue_wait_idle();
 
 	qvkFreeCommandBuffers( vk.device, vk.command_pool, 1, cmdbuf );
+}
+
+
+VkCommandBuffer vk_begin_one_time_commands( void )
+{
+	return begin_command_buffer();
+}
+
+
+void vk_end_one_time_commands( VkCommandBuffer command_buffer )
+{
+	end_command_buffer( command_buffer, "one-time commands" );
 }
 
 
@@ -1212,7 +1227,7 @@ static void vk_alloc_staging_buffer( VkDeviceSize size )
 
 	qvkGetBufferMemoryRequirements( vk.device, vk.staging_buffer.handle, &memory_requirements );
 
-	memory_type = find_memory_type( memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+	memory_type = vk_find_memory_type( memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
 
 	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	alloc_info.pNext = NULL;
@@ -1386,9 +1401,9 @@ static void create_instance( void )
 	appInfo.pEngineName = NULL;
 	appInfo.engineVersion = 0x0;
 #ifdef _DEBUG
-	appInfo.apiVersion = VK_API_VERSION_1_1;
+	appInfo.apiVersion = VK_API_VERSION_1_2;
 #else
-	appInfo.apiVersion = VK_API_VERSION_1_0;
+	appInfo.apiVersion = VK_API_VERSION_1_2;
 #endif
 
 	// create instance
@@ -1945,11 +1960,15 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 				Com_Memset(&descriptor_indexing_features, 0, sizeof(descriptor_indexing_features));
 				descriptor_indexing_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
 				descriptor_indexing_features.pNext = NULL;
-				// Enable required features for ray tracing
+				// Enable required features for ray tracing and bindless resources
 				descriptor_indexing_features.shaderStorageBufferArrayNonUniformIndexing = VK_TRUE;
 				descriptor_indexing_features.runtimeDescriptorArray = VK_TRUE;
 				descriptor_indexing_features.descriptorBindingVariableDescriptorCount = VK_TRUE;
 				descriptor_indexing_features.descriptorBindingPartiallyBound = VK_TRUE;
+				descriptor_indexing_features.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
+				descriptor_indexing_features.descriptorBindingStorageImageUpdateAfterBind = VK_TRUE;
+				descriptor_indexing_features.descriptorBindingStorageBufferUpdateAfterBind = VK_TRUE;
+				descriptor_indexing_features.descriptorBindingUpdateUnusedWhilePending = VK_TRUE;
 				
 				*pNextPtr = &descriptor_indexing_features;
 				pNextPtr = (const void **)&descriptor_indexing_features.pNext;
@@ -2236,6 +2255,7 @@ static void init_vulkan_library( void )
 	INIT_DEVICE_FUNCTION(vkCmdCopyBufferToImage)
 	INIT_DEVICE_FUNCTION(vkCmdCopyImage)
 	INIT_DEVICE_FUNCTION(vkCmdDraw)
+	INIT_DEVICE_FUNCTION(vkCmdDispatch)
 	INIT_DEVICE_FUNCTION(vkCmdDrawIndexed)
 	INIT_DEVICE_FUNCTION(vkCmdEndRenderPass)
 	INIT_DEVICE_FUNCTION(vkCmdNextSubpass)
@@ -2366,6 +2386,7 @@ static void deinit_device_functions( void )
 	qvkCmdCopyBufferToImage						= NULL;
 	qvkCmdCopyImage								= NULL;
 	qvkCmdDraw									= NULL;
+	qvkCmdDispatch								= NULL;
 	qvkCmdDrawIndexed							= NULL;
 	qvkCmdEndRenderPass							= NULL;
 	qvkCmdNextSubpass							= NULL;
@@ -2798,7 +2819,7 @@ static void vk_create_geometry_buffers( VkDeviceSize size )
 	}
 
 	memory_type_bits = vb_memory_requirements.memoryTypeBits;
-	memory_type = find_memory_type( memory_type_bits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+	memory_type = vk_find_memory_type( memory_type_bits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
 
 	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	alloc_info.pNext = NULL;
@@ -2851,7 +2872,7 @@ static void vk_create_storage_buffer( uint32_t size )
 	qvkGetBufferMemoryRequirements( vk.device, vk.storage.buffer, &memory_requirements );
 
 	memory_type_bits = memory_requirements.memoryTypeBits;
-	memory_type = find_memory_type( memory_type_bits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+	memory_type = vk_find_memory_type( memory_type_bits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
 
 	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	alloc_info.pNext = NULL;
@@ -2919,7 +2940,7 @@ qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size )
 	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	alloc_info.pNext = NULL;
 	alloc_info.allocationSize = allocationSize;
-	alloc_info.memoryTypeIndex = find_memory_type( memory_type_bits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	alloc_info.memoryTypeIndex = vk_find_memory_type( memory_type_bits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &vk.vbo.buffer_memory ) );
 	qvkBindBufferMemory( vk.device, vk.vbo.vertex_buffer, vk.vbo.buffer_memory, vertex_buffer_offset );
 
@@ -3515,10 +3536,10 @@ static void vk_alloc_attachments( void )
 		// try lazy memory
 		memoryTypeIndex = find_memory_type2( memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT, NULL );
 		if ( memoryTypeIndex == ~0U ) {
-			memoryTypeIndex = find_memory_type( memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+			memoryTypeIndex = vk_find_memory_type( memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 		}
 	} else {
-		memoryTypeIndex = find_memory_type( memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+		memoryTypeIndex = vk_find_memory_type( memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 	}
 
 #ifdef _DEBUG
@@ -3688,6 +3709,9 @@ static void create_depth_attachment( uint32_t width, uint32_t height, VkSampleCo
 	create_desc.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 	if ( allowTransient ) {
 		create_desc.usage |= VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
+	} else {
+		// Only add sampled bit for non-transient attachments
+		create_desc.usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
 	}
 	create_desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	create_desc.queueFamilyIndexCount = 0;
@@ -3773,10 +3797,31 @@ static void vk_create_attachments( void )
 
 	//vk_alloc_attachments();
 
-	create_depth_attachment( glConfig.vidWidth, glConfig.vidHeight, vkSamples, &vk.depth_image, &vk.depth_image_view,
-		(vk.fboActive && r_bloom->integer) ? qfalse : qtrue );
+	// Main depth image must always be non-transient to allow sampling in shaders
+	create_depth_attachment( glConfig.vidWidth, glConfig.vidHeight, vkSamples, &vk.depth_image, &vk.depth_image_view, qfalse );
 
 	vk_alloc_attachments();
+
+	// Create depth-only image view for sampling in compute shaders
+	if ( vk.depth_image != VK_NULL_HANDLE ) {
+		VkImageViewCreateInfo view_desc;
+		view_desc.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		view_desc.pNext = NULL;
+		view_desc.flags = 0;
+		view_desc.image = vk.depth_image;
+		view_desc.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		view_desc.format = vk.depth_format;
+		view_desc.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		view_desc.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		view_desc.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		view_desc.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+		view_desc.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT; // Only depth aspect for shader sampling
+		view_desc.subresourceRange.baseMipLevel = 0;
+		view_desc.subresourceRange.levelCount = 1;
+		view_desc.subresourceRange.baseArrayLayer = 0;
+		view_desc.subresourceRange.layerCount = 1;
+		VK_CHECK( qvkCreateImageView( vk.device, &view_desc, NULL, &vk.depth_image_view_depth_only ) );
+	}
 
 	for ( i = 0; i < vk.image_memory_count; i++ )
 	{
@@ -3785,6 +3830,7 @@ static void vk_create_attachments( void )
 
 	SET_OBJECT_NAME( vk.depth_image, "depth attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
 	SET_OBJECT_NAME( vk.depth_image_view, "depth attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+	SET_OBJECT_NAME( vk.depth_image_view_depth_only, "depth attachment (depth-only)", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 
 	SET_OBJECT_NAME( vk.color_image, "color attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
 	SET_OBJECT_NAME( vk.color_image_view, "color attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
@@ -4562,6 +4608,17 @@ void vk_initialize( void )
 		vk_alloc_staging_buffer( vk.defaults.staging_size );
 	}
 
+	// Initialize volumetric rendering system
+	R_InitVolumetric();
+
+	// Initialize uber shader system if needed
+	// Note: Currently not using uber shader system, RTX has its own shaders
+	// VK_InitUberShaderSystem();
+
+	// Initialize RTX hardware raytracing
+	extern qboolean RTX_Init(void);
+	RTX_Init();
+
 	vk.active = qtrue;
 }
 
@@ -4603,8 +4660,12 @@ static void vk_destroy_attachments( void )
 
 	qvkDestroyImage( vk.device, vk.depth_image, NULL );
 	qvkDestroyImageView( vk.device, vk.depth_image_view, NULL );
+	if ( vk.depth_image_view_depth_only != VK_NULL_HANDLE ) {
+		qvkDestroyImageView( vk.device, vk.depth_image_view_depth_only, NULL );
+	}
 	vk.depth_image = VK_NULL_HANDLE;
 	vk.depth_image_view = VK_NULL_HANDLE;
+	vk.depth_image_view_depth_only = VK_NULL_HANDLE;
 
 	if ( vk.screenMap.color_image ) {
 		qvkDestroyImage( vk.device, vk.screenMap.color_image, NULL );
@@ -4867,6 +4928,10 @@ void vk_shutdown( refShutdownCode_t code )
 	qvkDestroyShaderModule(vk.device, vk.modules.gamma_fs, NULL);
 
 __cleanup:
+	// Shutdown RTX before destroying device
+	extern void RTX_Shutdown(void);
+	RTX_Shutdown();
+
 	if ( vk.device != VK_NULL_HANDLE ) {
 		qvkDestroyDevice( vk.device, NULL );
 	}
@@ -6011,6 +6076,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			vs_module = &vk.modules.dot_vs;
 			fs_module = &vk.modules.dot_fs;
 			break;
+
 
 		default:
 			ri.Error(ERR_DROP, "create_pipeline: unknown shader type %i\n", def->shader_type);
@@ -7293,6 +7359,11 @@ void vk_bind_descriptor_sets( void )
 
 	end = vk.cmd->descriptor_set.end;
 
+	// Validate the range doesn't exceed our descriptor set count
+	if ( end >= VK_DESC_COUNT ) {
+		end = VK_DESC_COUNT - 1;
+	}
+
 	offset_count = 0;
 	if ( /*start == VK_DESC_STORAGE || */ start == VK_DESC_UNIFORM ) { // uniform offset or storage offset
 		offsets[ offset_count++ ] = vk.cmd->descriptor_set.offset[ start ];
@@ -7300,8 +7371,8 @@ void vk_bind_descriptor_sets( void )
 
 	count = end - start + 1;
 
-	// fill NULL descriptor gaps
-	for ( i = start + 1; i < end; i++ ) {
+	// fill NULL descriptor gaps - include the end descriptor in the loop
+	for ( i = start; i <= end; i++ ) {
 		if ( vk.cmd->descriptor_set.current[i] == VK_NULL_HANDLE ) {
 			vk.cmd->descriptor_set.current[i] = tr.whiteImage->descriptor;
 		}
@@ -7353,6 +7424,28 @@ void vk_draw_geometry( Vk_Depth_Range depth_range, qboolean indexed ) {
 	if ( vk.geometry_buffer_size_new ) {
 		// geometry buffer overflow happened this frame
 		return;
+	}
+
+	// Validate and fix descriptor sets before binding
+	uint32_t start = vk.cmd->descriptor_set.start;
+	uint32_t end = vk.cmd->descriptor_set.end;
+	
+	// Always ensure all potentially required descriptor sets are bound
+	// This fixes issues with pipelines expecting descriptor sets that aren't explicitly set
+	if ( start != ~0U ) {
+		// Ensure we have valid descriptors for all sets up to VK_DESC_TEXTURE2 (set 3)
+		// Some pipelines may expect these even if not explicitly used
+		for ( uint32_t i = start; i <= VK_DESC_TEXTURE2; i++ ) {
+			if ( vk.cmd->descriptor_set.current[i] == VK_NULL_HANDLE ) {
+				// Use white image as a safe default for unbound texture descriptors
+				vk.cmd->descriptor_set.current[i] = tr.whiteImage->descriptor;
+			}
+		}
+		
+		// Extend the end range to include all potentially needed sets
+		if ( end < VK_DESC_TEXTURE2 ) {
+			vk.cmd->descriptor_set.end = VK_DESC_TEXTURE2;
+		}
 	}
 
 	vk_bind_descriptor_sets();
@@ -7687,7 +7780,7 @@ void vk_end_frame( void )
 	VkSemaphore waits[2], signals[2];
 	const VkPipelineStageFlags wait_dst_stage_mask[2] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
 #else
-	const VkPipelineStageFlags wait_dst_stage_mask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	const VkPipelineStageFlags wait_dst_stage_mask[1] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
 #endif
 	VkSubmitInfo submit_info;
 
@@ -7711,6 +7804,34 @@ void vk_end_frame( void )
 		if ( r_bloom->integer )
 		{
 			vk_bloom();
+		}
+		// Record RTX ray tracing commands if enabled
+		// This must happen after scene rendering but before post-processing
+		extern cvar_t *rtx_enable;
+		if ( rtx_enable && rtx_enable->integer )
+		{
+			extern void RTX_RecordCommands(VkCommandBuffer cmd);
+			RTX_RecordCommands(vk.cmd->command_buffer);
+		}
+
+		// Apply RTX debug overlay BEFORE post-processing
+		// This ensures the overlay is visible and not overwritten
+		extern cvar_t *rtx_debug;
+		if ( rtx_debug && rtx_debug->integer > 0 )
+		{
+			// The overlay should be applied here as a compute shader or full-screen pass
+			// For now, we'll ensure it's visible by applying it before post-processing
+			extern void RTX_ApplyDebugOverlayCompute(VkCommandBuffer cmd, VkImage colorImage);
+			RTX_ApplyDebugOverlayCompute(vk.cmd->command_buffer, vk.color_image);
+			// ri.Printf(PRINT_DEVELOPER, "RTX Debug Overlay Active (mode %d)\n", rtx_debug->integer);
+		}
+		
+		// Execute post-processing chain if enabled
+		if ( r_postProcess && r_postProcess->integer )
+		{
+			VkImage sourceImage = vk.color_image;
+			VkImage destImage = vk.color_image; // Will use ping-pong buffers internally
+			R_ExecutePostProcessChain( vk.cmd->command_buffer, sourceImage, destImage );
 		}
 
 		if ( backEnd.screenshotMask && vk.capture.image )
@@ -7800,7 +7921,13 @@ void vk_end_frame( void )
 		submit_info.pSignalSemaphores = NULL;
 	}
 
-	VK_CHECK( qvkQueueSubmit( vk.queue, 1, &submit_info, vk.cmd->rendering_finished_fence ) );
+	{
+		VkResult submit_res = qvkQueueSubmit( vk.queue, 1, &submit_info, vk.cmd->rendering_finished_fence );
+		if ( submit_res < 0 ) {
+			ri.Printf( PRINT_ERROR, "qvkQueueSubmit failed with error code: %d (0x%X)\n", submit_res, submit_res );
+			ri.Error( ERR_FATAL, "Vulkan: qvkQueueSubmit returned %s", vk_result_string( submit_res ) );
+		}
+	}
 	vk.cmd->waitForFence = qtrue;
 
 	// presentation may take undefined time to complete, we can't measure it in a reliable way
