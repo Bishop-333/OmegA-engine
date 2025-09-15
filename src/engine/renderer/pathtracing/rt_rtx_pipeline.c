@@ -172,36 +172,23 @@ Load compiled SPIR-V shader from disk
 ================
 */
 static VkShaderModule RTX_LoadShaderModule(VkDevice device, const char *filename) {
-    FILE *file;
-    size_t fileSize;
-    uint32_t *shaderCode;
+    byte *shaderCode;
+    int fileSize;
     VkShaderModule module = VK_NULL_HANDLE;
     
-    // Build full path
+    // Build full path (relative to game data)
     char fullPath[MAX_QPATH];
-    Com_sprintf(fullPath, sizeof(fullPath), "baseq3/shaders/rtx/%s", filename);
+    Com_sprintf(fullPath, sizeof(fullPath), "shaders/rtx/%s", filename);
     
-    // Open SPIR-V file
-    file = fopen(fullPath, "rb");
-    if (!file) {
-        ri.Printf(PRINT_WARNING, "RTX: Failed to open shader file: %s\n", fullPath);
+    // Use the Quake 3 filesystem to load the shader
+    ri.Printf(PRINT_ALL, "RTX: Attempting to load shader: %s\n", fullPath);
+    fileSize = ri.FS_ReadFile(fullPath, (void **)&shaderCode);
+    if (fileSize <= 0 || !shaderCode) {
+        ri.Printf(PRINT_WARNING, "RTX: Failed to open shader file: %s (fileSize=%d, shaderCode=%p)\n",
+                  fullPath, fileSize, shaderCode);
         return VK_NULL_HANDLE;
     }
-    
-    // Get file size
-    fseek(file, 0, SEEK_END);
-    fileSize = ftell(file);
-    fseek(file, 0, SEEK_SET);
-    
-    // Allocate and read shader code
-    shaderCode = Z_Malloc(fileSize);
-    if (fread(shaderCode, 1, fileSize, file) != fileSize) {
-        ri.Printf(PRINT_WARNING, "RTX: Failed to read shader file: %s\n", fullPath);
-        Z_Free(shaderCode);
-        fclose(file);
-        return VK_NULL_HANDLE;
-    }
-    fclose(file);
+    ri.Printf(PRINT_ALL, "RTX: Successfully read %d bytes from %s\n", fileSize, filename);
     
     // Create shader module
     VkShaderModuleCreateInfo createInfo = {
@@ -212,14 +199,15 @@ static VkShaderModule RTX_LoadShaderModule(VkDevice device, const char *filename
     
     VkResult result = vkCreateShaderModule(device, &createInfo, NULL, &module);
     if (result != VK_SUCCESS) {
-        ri.Printf(PRINT_WARNING, "RTX: Failed to create shader module from %s (result: %d)\n", 
-                  filename, result);
+        ri.Printf(PRINT_WARNING, "RTX: vkCreateShaderModule failed for %s (VkResult: %d, codeSize: %d)\n",
+                  filename, result, fileSize);
         module = VK_NULL_HANDLE;
     } else {
-        ri.Printf(PRINT_ALL, "RTX: Loaded shader module: %s (%zu bytes)\n", filename, fileSize);
+        ri.Printf(PRINT_ALL, "RTX: Successfully created shader module for %s (%d bytes, handle=%p)\n",
+                  filename, fileSize, (void*)module);
     }
     
-    Z_Free(shaderCode);
+    ri.FS_FreeFile(shaderCode);
     return module;
 }
 
@@ -336,6 +324,27 @@ static qboolean RTX_CreateDescriptorSetLayout(VkDevice device) {
             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
             .descriptorCount = 1,
             .stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR
+        },
+        // Binding 15: Direct light contribution image
+        {
+            .binding = 15,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+            .descriptorCount = 1,
+            .stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR
+        },
+        // Binding 16: Indirect light contribution image
+        {
+            .binding = 16,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+            .descriptorCount = 1,
+            .stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR
+        },
+        // Binding 17: Lightmap contribution image
+        {
+            .binding = 17,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+            .descriptorCount = 1,
+            .stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR
         }
     };
     
@@ -749,24 +758,47 @@ qboolean RTX_CreateRTPipeline(VkDevice device, VkPhysicalDevice physicalDevice) 
     }
     
     // Create ray tracing pipeline
+    int reqRecursion = rtx_gi_bounces ? rtx_gi_bounces->integer : 2;
+    if (reqRecursion < 1) reqRecursion = 1;
+    if (rtxPipeline.rtProperties.maxRayRecursionDepth > 0 && reqRecursion > (int)rtxPipeline.rtProperties.maxRayRecursionDepth)
+        reqRecursion = (int)rtxPipeline.rtProperties.maxRayRecursionDepth;
     VkRayTracingPipelineCreateInfoKHR pipelineInfo = {
         .sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR,
         .stageCount = ARRAY_LEN(shaderStages),
         .pStages = shaderStages,
         .groupCount = ARRAY_LEN(shaderGroups),
         .pGroups = shaderGroups,
-        .maxPipelineRayRecursionDepth = rtx_gi_bounces ? rtx_gi_bounces->integer : 2,
+        .maxPipelineRayRecursionDepth = (uint32_t)reqRecursion,
         .layout = rtxPipeline.pipeline.pipelineLayout
     };
     
-    result = qvkCreateRayTracingPipelinesKHR(device, VK_NULL_HANDLE, VK_NULL_HANDLE, 1, 
+    ri.Printf(PRINT_ALL, "RTX: Creating ray tracing pipeline with %d stages, %d groups, max recursion %d\n",
+              pipelineInfo.stageCount, pipelineInfo.groupCount, pipelineInfo.maxPipelineRayRecursionDepth);
+
+    result = qvkCreateRayTracingPipelinesKHR(device, VK_NULL_HANDLE, VK_NULL_HANDLE, 1,
                                              &pipelineInfo, NULL, &rtxPipeline.pipeline.pipeline);
     if (result != VK_SUCCESS) {
-        ri.Printf(PRINT_WARNING, "RTX: Failed to create ray tracing pipeline (result: %d)\n", result);
+        ri.Printf(PRINT_WARNING, "RTX: vkCreateRayTracingPipelinesKHR failed with VkResult %d\n", result);
+        // Add more detailed error info
+        switch(result) {
+            case VK_ERROR_OUT_OF_HOST_MEMORY:
+                ri.Printf(PRINT_WARNING, "RTX: Out of host memory\n");
+                break;
+            case VK_ERROR_OUT_OF_DEVICE_MEMORY:
+                ri.Printf(PRINT_WARNING, "RTX: Out of device memory\n");
+                break;
+            case VK_ERROR_INVALID_SHADER_NV:
+                ri.Printf(PRINT_WARNING, "RTX: Invalid shader\n");
+                break;
+            default:
+                ri.Printf(PRINT_WARNING, "RTX: Unknown error\n");
+                break;
+        }
         return qfalse;
     }
-    
-    ri.Printf(PRINT_ALL, "RTX: Ray tracing pipeline created successfully\n");
+
+    ri.Printf(PRINT_ALL, "RTX: Ray tracing pipeline created successfully (handle=%p)\n",
+              (void*)rtxPipeline.pipeline.pipeline);
     return qtrue;
 }
 
@@ -786,8 +818,15 @@ qboolean RTX_CreateShaderBindingTable(VkDevice device, VkPhysicalDevice physical
     uint32_t baseAlignment = rtxPipeline.rtProperties.shaderGroupBaseAlignment;
     
     rtxPipeline.sbt.handleSize = handleSize;
+    // Ensure handleSizeAligned is at least baseAlignment to maintain alignment for all regions
     rtxPipeline.sbt.handleSizeAligned = (handleSize + handleAlignment - 1) & ~(handleAlignment - 1);
+    if (rtxPipeline.sbt.handleSizeAligned < baseAlignment) {
+        rtxPipeline.sbt.handleSizeAligned = baseAlignment;
+    }
     rtxPipeline.sbt.groupCount = 4; // raygen, miss, shadow miss, hit
+    
+    ri.Printf(PRINT_ALL, "RTX: SBT Alignment - handleSize: %u, handleAlignment: %u, baseAlignment: %u, handleSizeAligned: %u\n",
+              handleSize, handleAlignment, baseAlignment, rtxPipeline.sbt.handleSizeAligned);
     
     // Calculate SBT buffer size
     uint32_t sbtSize = rtxPipeline.sbt.groupCount * rtxPipeline.sbt.handleSizeAligned;
@@ -817,10 +856,13 @@ qboolean RTX_CreateShaderBindingTable(VkDevice device, VkPhysicalDevice physical
         .flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT
     };
     
+    // Ensure allocation is large enough to allow alignment
+    VkDeviceSize alignedSize = memReqs.size + baseAlignment;
+    
     VkMemoryAllocateInfo allocInfo = {
         .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
         .pNext = &memoryAllocateFlagsInfo,
-        .allocationSize = memReqs.size,
+        .allocationSize = alignedSize,
         .memoryTypeIndex = vk_find_memory_type(memReqs.memoryTypeBits,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
     };
@@ -848,29 +890,28 @@ qboolean RTX_CreateShaderBindingTable(VkDevice device, VkPhysicalDevice physical
     
     // Map SBT memory and copy handles
     void *mapped;
-    result = vkMapMemory(device, rtxPipeline.sbt.memory, 0, sbtSize, 0, &mapped);
+    result = vkMapMemory(device, rtxPipeline.sbt.memory, 0, VK_WHOLE_SIZE, 0, &mapped);
     if (result != VK_SUCCESS) {
         ri.Printf(PRINT_WARNING, "RTX: Failed to map SBT memory (result: %d)\n", result);
         Z_Free(shaderHandles);
         return qfalse;
     }
     
+    // Copy shader handles with proper alignment
     uint8_t *pData = (uint8_t*)mapped;
     for (uint32_t i = 0; i < rtxPipeline.sbt.groupCount; i++) {
-        Com_Memcpy(pData, shaderHandles + i * handleSize, handleSize);
-        pData += rtxPipeline.sbt.handleSizeAligned;
+        Com_Memcpy(pData + i * rtxPipeline.sbt.handleSizeAligned, 
+                   shaderHandles + i * handleSize, handleSize);
     }
     
     vkUnmapMemory(device, rtxPipeline.sbt.memory);
     Z_Free(shaderHandles);
     
-    // Get SBT device address
-    VkBufferDeviceAddressInfo addressInfo = {
-        .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-        .buffer = rtxPipeline.sbt.buffer
-    };
-    // Use the RTX_GetBufferDeviceAddress helper from rt_rtx_impl.c
-    rtxPipeline.sbt.deviceAddress = RTX_GetBufferDeviceAddress(rtxPipeline.sbt.buffer);
+    // Get the buffer's device address
+    VkDeviceAddress rawAddress = RTX_GetBufferDeviceAddress(rtxPipeline.sbt.buffer);
+    
+    // Since the buffer is already sized and aligned properly, use the raw address directly
+    rtxPipeline.sbt.deviceAddress = rawAddress;
     
     // Setup strided device address regions
     rtxPipeline.sbt.raygenRegion = (VkStridedDeviceAddressRegionKHR){
@@ -891,6 +932,14 @@ qboolean RTX_CreateShaderBindingTable(VkDevice device, VkPhysicalDevice physical
         .size = rtxPipeline.sbt.handleSizeAligned
     };
     
+    ri.Printf(PRINT_ALL, "RTX: SBT Addresses - base: 0x%llx, raygen: 0x%llx, miss: 0x%llx, hit: 0x%llx\n",
+              (unsigned long long)rtxPipeline.sbt.deviceAddress,
+              (unsigned long long)rtxPipeline.sbt.raygenRegion.deviceAddress,
+              (unsigned long long)rtxPipeline.sbt.missRegion.deviceAddress,
+              (unsigned long long)rtxPipeline.sbt.hitRegion.deviceAddress);
+    ri.Printf(PRINT_ALL, "RTX: Miss address %% 64 = %llu\n", 
+              (unsigned long long)(rtxPipeline.sbt.missRegion.deviceAddress % 64));
+    
     rtxPipeline.sbt.callableRegion = (VkStridedDeviceAddressRegionKHR){0};
     
     ri.Printf(PRINT_ALL, "RTX: Shader binding table created (size: %u bytes)\n", sbtSize);
@@ -905,45 +954,74 @@ Initialize entire RT pipeline system
 ================
 */
 qboolean RTX_InitializePipeline(void) {
+    // Check if already initialized
+    if (rtxPipeline.pipeline.pipeline != VK_NULL_HANDLE) {
+        ri.Printf(PRINT_ALL, "RTX: Pipeline already initialized, skipping re-initialization\n");
+        return qtrue;
+    }
+
+    ri.Printf(PRINT_ALL, "RTX: Initializing RT pipeline for the first time\n");
+
     if (!vk.device || !vk.physical_device) {
         ri.Printf(PRINT_WARNING, "RTX: Vulkan device not initialized\n");
         return qfalse;
     }
-    
+
     // Create descriptor pool
+    ri.Printf(PRINT_ALL, "RTX: Creating descriptor pool...\n");
     if (!RTX_CreateDescriptorPool(vk.device)) {
+        ri.Printf(PRINT_WARNING, "RTX: Failed to create descriptor pool\n");
         return qfalse;
     }
-    
+    ri.Printf(PRINT_ALL, "RTX: Descriptor pool created successfully\n");
+
     // Create RT pipeline
+    ri.Printf(PRINT_ALL, "RTX: Creating RT pipeline...\n");
     if (!RTX_CreateRTPipeline(vk.device, vk.physical_device)) {
+        ri.Printf(PRINT_WARNING, "RTX: Failed to create RT pipeline\n");
         return qfalse;
     }
-    
+    ri.Printf(PRINT_ALL, "RTX: RT pipeline created successfully (handle=%p)\n", (void*)rtxPipeline.pipeline.pipeline);
+
     // Create shader binding table
+    ri.Printf(PRINT_ALL, "RTX: Creating shader binding table...\n");
     if (!RTX_CreateShaderBindingTable(vk.device, vk.physical_device)) {
+        ri.Printf(PRINT_WARNING, "RTX: Failed to create shader binding table\n");
         return qfalse;
     }
-    
+    ri.Printf(PRINT_ALL, "RTX: Shader binding table created successfully\n");
+
     // Allocate descriptor sets
+    ri.Printf(PRINT_ALL, "RTX: Allocating descriptor sets...\n");
     if (!RTX_AllocateDescriptorSets(vk.device)) {
+        ri.Printf(PRINT_WARNING, "RTX: Failed to allocate descriptor sets\n");
         return qfalse;
     }
-    
+    ri.Printf(PRINT_ALL, "RTX: Descriptor sets allocated successfully\n");
+
     // Create uniform buffers
+    ri.Printf(PRINT_ALL, "RTX: Creating uniform buffers...\n");
     if (!RTX_CreateUniformBuffers(vk.device, vk.physical_device)) {
+        ri.Printf(PRINT_WARNING, "RTX: Failed to create uniform buffers\n");
         return qfalse;
     }
-    
+    ri.Printf(PRINT_ALL, "RTX: Uniform buffers created successfully\n");
+
     // Create storage buffers
+    ri.Printf(PRINT_ALL, "RTX: Creating storage buffers...\n");
     if (!RTX_CreateStorageBuffers(vk.device, vk.physical_device)) {
+        ri.Printf(PRINT_WARNING, "RTX: Failed to create storage buffers\n");
         return qfalse;
     }
-    
+    ri.Printf(PRINT_ALL, "RTX: Storage buffers created successfully\n");
+
     // Create texture sampler
+    ri.Printf(PRINT_ALL, "RTX: Creating texture sampler...\n");
     if (!RTX_CreateTextureSampler(vk.device)) {
+        ri.Printf(PRINT_WARNING, "RTX: Failed to create texture sampler\n");
         return qfalse;
     }
+    ri.Printf(PRINT_ALL, "RTX: Texture sampler created successfully\n");
     
     ri.Printf(PRINT_ALL, "RTX: Pipeline system initialized successfully\n");
     return qtrue;
@@ -1073,6 +1151,136 @@ VkDescriptorSet RTX_GetDescriptorSet(void) {
 
 /*
 ================
+RTX_PrepareFrameData
+
+Update per-frame UBOs and GPU buffers (materials, lights, instance data)
+================
+*/
+void RTX_PrepareFrameData(VkCommandBuffer cmd)
+{
+    if (!vk.device) return;
+
+    // 1) Update CameraUBO
+    if (rtxPipeline.cameraUBOMemory) {
+        CameraUBO cam = {0};
+        // Build inverses from backend matrices if available
+        // Use backEnd.viewParms for camera basis
+        const viewParms_t *vp = &backEnd.viewParms;
+        // Fill simple camera data
+        VectorCopy(vp->or.origin, cam.position);
+        VectorCopy(vp->or.axis[0], cam.forward);
+        VectorCopy(vp->or.axis[1], cam.right);
+        VectorCopy(vp->or.axis[2], cam.up);
+        cam.nearPlane = vp->zNear;
+        cam.farPlane = vp->zFar;
+        cam.fov = backEnd.refdef.fov_x;
+        cam.frameCount = tr.frameCount;
+        cam.enablePathTracing = 1;
+        cam.maxBounces = (uint32_t)(rtx_gi_bounces ? rtx_gi_bounces->integer : 2);
+        cam.samplesPerPixel = 1;
+        void *p = NULL;
+        if (vkMapMemory(vk.device, rtxPipeline.cameraUBOMemory, 0, sizeof(cam), 0, &p) == VK_SUCCESS) {
+            Com_Memcpy(p, &cam, sizeof(cam));
+            vkUnmapMemory(vk.device, rtxPipeline.cameraUBOMemory);
+        }
+    }
+
+    // 2) Render settings
+    if (rtxPipeline.renderSettingsUBOMemory) {
+        RenderSettingsUBO rs = {0};
+        rs.enableShadows = 1;
+        rs.enableReflections = 1;
+        rs.enableGI = 1;
+        rs.enableAO = 1;
+        rs.shadowBias = 0.001f;
+        rs.reflectionRoughnessCutoff = 0.9f;
+        rs.giIntensity = 1.0f;
+        rs.aoRadius = 0.5f;
+        rs.debugMode = 0;
+        rs.enableDenoiser = (rtx_denoise && rtx_denoise->integer) ? 1 : 0;
+        rs.enableDLSS = (rtx_dlss && rtx_dlss->integer) ? 1 : 0;
+        rs.enableMotionBlur = 0;
+        void *p = NULL;
+        if (vkMapMemory(vk.device, rtxPipeline.renderSettingsUBOMemory, 0, sizeof(rs), 0, &p) == VK_SUCCESS) {
+            Com_Memcpy(p, &rs, sizeof(rs));
+            vkUnmapMemory(vk.device, rtxPipeline.renderSettingsUBOMemory);
+        }
+    }
+
+    // 3) Environment
+    if (rtxPipeline.environmentUBOMemory) {
+        EnvironmentUBO env = {0};
+        // Simple directional light from sun
+        VectorSet(env.sunDirection, 0.0f, 0.0f, -1.0f);
+        env.sunIntensity = 5.0f;
+        VectorSet(env.sunColor, 1.0f, 0.98f, 0.95f);
+        env.skyIntensity = 1.0f;
+        VectorSet(env.fogColor, 0.5f, 0.6f, 0.7f);
+        env.fogDensity = 0.0f;
+        env.fogStart = 0.0f;
+        env.fogEnd = 0.0f;
+        env.useEnvironmentMap = 0;
+        env.useProceduralSky = 1;
+        env.time = ri.Milliseconds() * 0.001f;
+        env.cloudCoverage = 0.0f;
+        void *p = NULL;
+        if (vkMapMemory(vk.device, rtxPipeline.environmentUBOMemory, 0, sizeof(env), 0, &p) == VK_SUCCESS) {
+            Com_Memcpy(p, &env, sizeof(env));
+            vkUnmapMemory(vk.device, rtxPipeline.environmentUBOMemory);
+        }
+    }
+
+    // 4) Upload material buffer if dirty
+    if (cmd) {
+        // Bind the material cache buffer into our descriptor (see descriptor update below)
+        RTX_UploadMaterialBuffer(vk.device, cmd, VK_NULL_HANDLE);
+    }
+
+    // 5) Upload dynamic light buffer
+    if (rtxPipeline.lightBuffer && cmd) {
+        int dlCount = tr.refdef.num_dlights;
+        if (dlCount < 0) dlCount = 0; if (dlCount > 256) dlCount = 256;
+        uint32_t count = (uint32_t)dlCount;
+        size_t sz = sizeof(uint32_t) + sizeof(LightData) * 256;
+        // staging
+        VkBufferCreateInfo bi = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, .size = sz, .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT };
+        VkBuffer staging;
+        if (vkCreateBuffer(vk.device, &bi, NULL, &staging) != VK_SUCCESS) {
+            return;
+        }
+        VkMemoryRequirements mr; vkGetBufferMemoryRequirements(vk.device, staging, &mr);
+        VkMemoryAllocateInfo ai = { .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, .allocationSize = mr.size, .memoryTypeIndex = vk_find_memory_type(mr.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) };
+        VkDeviceMemory sm; if (vkAllocateMemory(vk.device, &ai, NULL, &sm) != VK_SUCCESS) { vkDestroyBuffer(vk.device, staging, NULL); return; }
+        if (vkBindBufferMemory(vk.device, staging, sm, 0) != VK_SUCCESS) { vkFreeMemory(vk.device, sm, NULL); vkDestroyBuffer(vk.device, staging, NULL); return; }
+        // map and fill
+        uint8_t *mapped = NULL;
+        if (vkMapMemory(vk.device, sm, 0, sz, 0, (void**)&mapped) != VK_SUCCESS) {
+            vkFreeMemory(vk.device, sm, NULL); vkDestroyBuffer(vk.device, staging, NULL); return;
+        }
+        ((uint32_t*)mapped)[0] = count;
+        LightData *ld = (LightData*)(mapped + sizeof(uint32_t));
+        for (uint32_t i = 0; i < count; ++i) {
+            dlight_t *dl = &tr.refdef.dlights[i];
+            VectorCopy(dl->origin, ld[i].position); ld[i].position[3] = 1.0f; // point light
+            // approximate dir from sun (none for point)
+            VectorSet(ld[i].direction, 0, 0, -1); ld[i].direction[3] = 0.0f;
+            VectorCopy(dl->color, ld[i].color); ld[i].color[3] = dl->radius;
+            ld[i].attenuation[0] = 1.0f; ld[i].attenuation[1] = 0.0f; ld[i].attenuation[2] = 1.0f / (dl->radius + 0.001f); ld[i].attenuation[3] = 0.0f;
+        }
+        vkUnmapMemory(vk.device, sm);
+        // copy to device-local buffer
+        VkBufferCopy c = { .srcOffset = 0, .dstOffset = 0, .size = sz };
+        vkCmdCopyBuffer(cmd, staging, rtxPipeline.lightBuffer, 1, &c);
+        VkMemoryBarrier mb = { .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER, .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT, .dstAccessMask = VK_ACCESS_SHADER_READ_BIT };
+        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, 0, 1, &mb, 0, NULL, 0, NULL);
+        // cleanup staging
+        vkDestroyBuffer(vk.device, staging, NULL);
+        vkFreeMemory(vk.device, sm, NULL);
+    }
+}
+
+/*
+================
 RTX_GetSBTRegions
 
 Get shader binding table regions for ray dispatch
@@ -1099,8 +1307,19 @@ void RTX_UpdateDescriptorSets(VkAccelerationStructureKHR tlas,
                              VkImageView colorImage, VkImageView albedoImage,
                              VkImageView normalImage, VkImageView motionImage,
                              VkImageView depthImage) {
-    VkWriteDescriptorSet writes[15];
+    VkWriteDescriptorSet writes[18];  // Increased for lighting contribution images
     uint32_t writeCount = 0;
+
+    // Get lighting contribution image views
+    VkImageView directLightView = NULL;
+    VkImageView indirectLightView = NULL;
+    VkImageView lightmapView = NULL;
+    RTX_GetLightingContributionViews((void**)&directLightView, (void**)&indirectLightView, (void**)&lightmapView);
+
+    // Use color image as fallback if lighting buffers aren't created yet
+    if (!directLightView) directLightView = colorImage;
+    if (!indirectLightView) indirectLightView = colorImage;
+    if (!lightmapView) lightmapView = colorImage;
     
     // TLAS binding
     VkWriteDescriptorSetAccelerationStructureKHR tlasInfo = {
@@ -1140,14 +1359,13 @@ void RTX_UpdateDescriptorSets(VkAccelerationStructureKHR tlas,
         };
     }
     
-    // Uniform buffers
-    VkDescriptorBufferInfo bufferInfos[3] = {
+    // Uniform buffers - Camera (6) and RenderSettings (7)
+    VkDescriptorBufferInfo bufferInfos[2] = {
         { .buffer = rtxPipeline.cameraUBO, .offset = 0, .range = sizeof(CameraUBO) },
-        { .buffer = rtxPipeline.renderSettingsUBO, .offset = 0, .range = sizeof(RenderSettingsUBO) },
-        { .buffer = rtxPipeline.environmentUBO, .offset = 0, .range = sizeof(EnvironmentUBO) }
+        { .buffer = rtxPipeline.renderSettingsUBO, .offset = 0, .range = sizeof(RenderSettingsUBO) }
     };
     
-    for (uint32_t i = 0; i < 3; i++) {
+    for (uint32_t i = 0; i < 2; i++) {
         writes[writeCount++] = (VkWriteDescriptorSet){
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .dstSet = rtxPipeline.descriptorSet,
@@ -1159,10 +1377,66 @@ void RTX_UpdateDescriptorSets(VkAccelerationStructureKHR tlas,
         };
     }
     
+    // Binding 8: Environment map (use default image as placeholder)
+    // Create a simple sampler for the environment map
+    VkSamplerCreateInfo samplerInfo = {
+        .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+        .magFilter = VK_FILTER_LINEAR,
+        .minFilter = VK_FILTER_LINEAR,
+        .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+        .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .maxLod = VK_LOD_CLAMP_NONE
+    };
+    
+    VkSampler envSampler;
+    VkResult result = vkCreateSampler(vk.device, &samplerInfo, NULL, &envSampler);
+    if (result != VK_SUCCESS) {
+        ri.Printf(PRINT_WARNING, "RTX: Failed to create environment sampler\n");
+        envSampler = VK_NULL_HANDLE;
+    }
+    
+    image_t* envTexture = tr.defaultImage ? tr.defaultImage : tr.whiteImage;
+    VkDescriptorImageInfo envImageInfo = {
+        .sampler = envSampler,
+        .imageView = envTexture ? envTexture->view : VK_NULL_HANDLE,
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    };
+    
+    writes[writeCount++] = (VkWriteDescriptorSet){
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .dstSet = rtxPipeline.descriptorSet,
+        .dstBinding = 8,
+        .dstArrayElement = 0,
+        .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .pImageInfo = &envImageInfo
+    };
+    
+    // Environment UBO at binding 9
+    VkDescriptorBufferInfo envBufferInfo = {
+        .buffer = rtxPipeline.environmentUBO,
+        .offset = 0,
+        .range = sizeof(EnvironmentUBO)
+    };
+    
+    writes[writeCount++] = (VkWriteDescriptorSet){
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .dstSet = rtxPipeline.descriptorSet,
+        .dstBinding = 9,
+        .dstArrayElement = 0,
+        .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        .pBufferInfo = &envBufferInfo
+    };
+    
     // Storage buffers
+    // Use material cache buffer if present
+    VkBuffer matBuf = RTX_GetMaterialBuffer();
     VkDescriptorBufferInfo storageBufferInfos[3] = {
         { .buffer = rtxPipeline.instanceDataBuffer, .offset = 0, .range = VK_WHOLE_SIZE },
-        { .buffer = rtxPipeline.materialBuffer, .offset = 0, .range = VK_WHOLE_SIZE },
+        { .buffer = matBuf ? matBuf : rtxPipeline.materialBuffer, .offset = 0, .range = VK_WHOLE_SIZE },
         { .buffer = rtxPipeline.lightBuffer, .offset = 0, .range = VK_WHOLE_SIZE }
     };
     
@@ -1195,7 +1469,26 @@ void RTX_UpdateDescriptorSets(VkAccelerationStructureKHR tlas,
         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
         .pBufferInfo = &storageBufferInfos[2]
     };
-    
+
+    // Add lighting contribution images (bindings 15, 16, 17)
+    VkDescriptorImageInfo lightingImageInfos[3] = {
+        { .imageView = directLightView, .imageLayout = VK_IMAGE_LAYOUT_GENERAL },
+        { .imageView = indirectLightView, .imageLayout = VK_IMAGE_LAYOUT_GENERAL },
+        { .imageView = lightmapView, .imageLayout = VK_IMAGE_LAYOUT_GENERAL }
+    };
+
+    for (uint32_t i = 0; i < 3; i++) {
+        writes[writeCount++] = (VkWriteDescriptorSet){
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = rtxPipeline.descriptorSet,
+            .dstBinding = 15 + i,  // Bindings 15, 16, 17
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+            .pImageInfo = &lightingImageInfos[i]
+        };
+    }
+
     vkUpdateDescriptorSets(vk.device, writeCount, writes, 0, NULL);
 }
 
