@@ -38,6 +38,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 WinVars_t	g_wv;
 
+#ifndef DEDICATED
+
 /*
 ==================
 Sys_LowPhysicalMemory
@@ -70,6 +72,7 @@ void Sys_BeginProfiling( void ) {
 	// this is just used on the mac build
 }
 
+#endif // !DEDICATED
 
 /*
 =============
