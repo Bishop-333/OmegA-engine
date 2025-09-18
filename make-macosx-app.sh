@@ -143,7 +143,7 @@ fi
 
 AVAILABLE_ARCHS=""
 
-OMG_VERSION="3.3.3"
+OMG_VERSION="3.3.4"
 OMG_CLIENT_ARCHS=""
 OMG_SERVER_ARCHS=""
 OMG_RENDERER_VK_ARCHS=""
@@ -287,6 +287,8 @@ PLIST="<?xml version=\"1.0\" encoding=\"UTF-8\"?>
     <string>${PRODUCT_NAME}</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.games</string>
     <key>CFBundleShortVersionString</key>
     <string>${OMG_VERSION}</string>
     <key>CFBundleSignature</key>
@@ -304,7 +306,7 @@ PLIST="${PLIST}
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
     <key>NSHighResolutionCapable</key>
-    <false/>
+    <true/>
     <key>NSRequiresAquaSystemAppearance</key>
     <false/>
 </dict>
@@ -346,7 +348,7 @@ action "${BUNDLEBINDIR}/${EXECUTABLE_NAME}"				"${OMG_CLIENT_ARCHS}"
 #action "${BUNDLEBINDIR}/${DEDICATED_NAME}"				"${OMG_SERVER_ARCHS}"
 
 # renderers
-action "${BUNDLEBINDIR}/${RENDERER_OPENGL1_NAME}" "${OMG_RENDERER_GL1_ARCHS}"
-action "${BUNDLEBINDIR}/${RENDERER_VULKAN_NAME}" "${OMG_RENDERER_VK_ARCHS}"
-symlinkArch "${RENDERER_OPENGL}" "${RENDERER_OPENGL}" "_" "${BUNDLEBINDIR}"
-symlinkArch "${RENDERER_VULKAN}" "${RENDERER_VULKAN}" "_" "${BUNDLEBINDIR}"
+#action "${BUNDLEBINDIR}/${RENDERER_OPENGL1_NAME}" "${OMG_RENDERER_GL1_ARCHS}"
+#action "${BUNDLEBINDIR}/${RENDERER_VULKAN_NAME}" "${OMG_RENDERER_VK_ARCHS}"
+#symlinkArch "${RENDERER_OPENGL}" "${RENDERER_OPENGL}" "_" "${BUNDLEBINDIR}"
+#symlinkArch "${RENDERER_VULKAN}" "${RENDERER_VULKAN}" "_" "${BUNDLEBINDIR}"

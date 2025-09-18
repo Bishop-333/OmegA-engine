@@ -26,7 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // q_shared.h -- included first by ALL program modules.
 // A user mod should never modify this file
 
-#define Q3_VERSION            "OMG 3.3.3"
+#define Q3_VERSION            "OMG 3.3.4"
 #ifndef SVN_VERSION
   #define SVN_VERSION Q3_VERSION
 #endif
@@ -191,7 +191,7 @@ float FloatSwap( const float *f );
 		typedef __int64 int64_t;
 		typedef __int32 int32_t;
 		typedef __int16 int16_t;
-		typedef __int8 int8_t;
+		typedef signed __int8 int8_t;
 		typedef unsigned __int64 uint64_t;
 		typedef unsigned __int32 uint32_t;
 		typedef unsigned __int16 uint16_t;
