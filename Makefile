@@ -230,6 +230,7 @@ R1DIR=$(MOUNT_DIR)/renderer
 RVDIR=$(MOUNT_DIR)/renderervk
 SDLDIR=$(MOUNT_DIR)/sdl
 SDLHDIR=$(MOUNT_DIR)/libsdl/include/SDL2
+LIBSDIR=$(MOUNT_DIR)/libsdl
 
 CMDIR=$(MOUNT_DIR)/qcommon
 UDIR=$(MOUNT_DIR)/unix
@@ -239,6 +240,7 @@ UIDIR=$(MOUNT_DIR)/ui
 JPDIR=$(MOUNT_DIR)/libjpeg
 OGGDIR=$(MOUNT_DIR)/libogg
 VORBISDIR=$(MOUNT_DIR)/libvorbis
+OPENALDIR=$(MOUNT_DIR)/libopenal
 
 bin_path=$(shell which $(1) 2> /dev/null)
 
@@ -479,21 +481,21 @@ ifdef MINGW
     BASE_CFLAGS += -DUSE_LOCAL_HEADERS=1 -I$(SDLHDIR)
     #CLIENT_CFLAGS += -DUSE_LOCAL_HEADERS=1
     ifeq ($(ARCH),x86)
-      CLIENT_LDFLAGS += -L$(MOUNT_DIR)/libsdl/windows/mingw/lib32
+      CLIENT_LDFLAGS += -L$(LIBSDIR)/windows/mingw/lib32
       CLIENT_LDFLAGS += -lSDL2
-      CLIENT_EXTRA_FILES += $(MOUNT_DIR)/libsdl/windows/mingw/lib32/SDL2.dll
+      CLIENT_EXTRA_FILES += $(LIBSDIR)/windows/mingw/lib32/SDL2.dll
     else
-      CLIENT_LDFLAGS += -L$(MOUNT_DIR)/libsdl/windows/mingw/lib64
+      CLIENT_LDFLAGS += -L$(LIBSDIR)/windows/mingw/lib64
       CLIENT_LDFLAGS += -lSDL264
-      CLIENT_EXTRA_FILES += $(MOUNT_DIR)/libsdl/windows/mingw/lib64/SDL264.dll
+      CLIENT_EXTRA_FILES += $(LIBSDIR)/windows/mingw/lib64/SDL264.dll
     endif
   endif
 
   ifeq ($(USE_OPENAL),1)
     ifeq ($(ARCH),x86)
-      CLIENT_EXTRA_FILES += $(MOUNT_DIR)/libopenal/windows/mingw/lib32/OpenAL32.dll
+      CLIENT_EXTRA_FILES += $(OPENALDIR)/windows/mingw/lib32/OpenAL32.dll
     else
-      CLIENT_EXTRA_FILES += $(MOUNT_DIR)/libopenal/windows/mingw/lib64/OpenAL64.dll
+      CLIENT_EXTRA_FILES += $(OPENALDIR)/windows/mingw/lib64/OpenAL64.dll
     endif
   endif
 
@@ -546,6 +548,9 @@ ifeq ($(COMPILE_PLATFORM),darwin)
   ifeq ($(USE_OPENAL),1)
     ifneq ($(USE_LOCAL_HEADERS),1)
       BASE_CFLAGS += -I/System/Library/Frameworks/OpenAL.framework/Headers
+    else
+      CLIENT_LDFLAGS += $(OPENALDIR)/macosx/libopenal.dylib
+      CLIENT_EXTRA_FILES += $(OPENALDIR)/macosx/libopenal.dylib
     endif
     ifneq ($(USE_OPENAL_DLOPEN),1)
       CLIENT_LDFLAGS += -F/Library/Frameworks -framework OpenAL
@@ -553,10 +558,9 @@ ifeq ($(COMPILE_PLATFORM),darwin)
   endif
 
   ifeq ($(USE_LOCAL_HEADERS),1)
-    MACLIBSDIR=$(MOUNT_DIR)/libsdl/macosx
     BASE_CFLAGS += -I$(SDLHDIR)
-    CLIENT_LDFLAGS += $(MACLIBSDIR)/libSDL2-2.32.8.dylib
-    CLIENT_EXTRA_FILES += $(MACLIBSDIR)/libSDL2-2.32.8.dylib
+    CLIENT_LDFLAGS += $(LIBSDIR)/macosx/libSDL2-2.0.0.dylib
+    CLIENT_EXTRA_FILES += $(LIBSDIR)/macosx/libSDL2-2.0.0.dylib
   else
   ifneq ($(SDL_INCLUDE),)
     BASE_CFLAGS += $(SDL_INCLUDE)
