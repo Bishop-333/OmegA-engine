@@ -23,6 +23,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 // g_public.h -- game module information visible to server
 
+#ifndef G_PUBLIC_H
+#define G_PUBLIC_H
+
+// Define COM_TRAP_GETVALUE if not already defined
+#ifndef COM_TRAP_GETVALUE
+#define COM_TRAP_GETVALUE 700
+#endif
+
 #define	GAME_API_VERSION	8
 
 // entity->svFlags
@@ -398,7 +406,7 @@ typedef enum {
 
 	// engine extensions
 	G_CVAR_SETDESCRIPTION,
-	G_TRAP_GETVALUE = COM_TRAP_GETVALUE
+	G_TRAP_GETVALUE = 700 // Same as COM_TRAP_GETVALUE
 
 } gameImport_t;
 
@@ -440,4 +448,6 @@ typedef enum {
 
 	GAME_EXPORT_LAST
 } gameExport_t;
+
+#endif // G_PUBLIC_H
 

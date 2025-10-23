@@ -34,6 +34,8 @@ typedef struct {
 	char			messageString[MAX_STRING_CHARS];
 } uiClientState_t;
 
+#include "../../engine/common/trap_common.h"
+
 typedef enum {
 	UI_ERROR,
 	UI_PRINT,
