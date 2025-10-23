@@ -1,3 +1,10 @@
+21-Oct-2025:
+* Renderer: enforced modern lighting as the sole path—`r_modernLighting` is now read-only and the legacy lighting CVars (`r_fullbright`, `r_vertexLight`, `r_mergeLightmaps`, `r_lightmap`) have been removed.
+* Docs/Config: updated defaults and documentation to reflect the mandatory modern lighting pipeline and retire the legacy toggles.
+* Renderer: removed BSP lightmap ingestion/merging; legacy lightmap stages now fall back to neutral textures.
+* Renderer: retired remaining lighting debug/perf switches (`r_dynamicLighting`, `r_disableStaticLights`, `r_lightCullDistance`, `r_lightGridSize`, `r_showInteractions`) in favour of the unified lighting pipeline and `r_showLightVolumes`.
+* Note: earlier changelog entries mentioning lightmaps document legacy behaviour preserved for historical context.
+
 14-Oct-2024:
 * Common: improved 'wait' command handling, now it will wait exact amount of client/server frames
 * Common: allow src and dest buffers to be overlapped in Q_strncpy() for QVM compatibility reasons

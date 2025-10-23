@@ -33,6 +33,7 @@ It is based on ioquake3-r1160 (latest non-SDL revision) with upstream patches an
 <li><b>\com_skipIdLogo</b> <font color=silver><b>0</b>|1</font>- skip playing idlogo movie at startup</li>
 <li><b>\com_yieldCPU </b>&lt;milliseconds&gt; - try to sleep specified amout of time between rendered frames when game is active, this will greatly reduce CPU load, use <b>0</b> only if you're experiencing some lags (also it is usually reduces performance on integrated graphics because CPU steals GPU's power budget)</li>
 <li><b>\r_defaultImage</b> <font color=silver>&lt;filename&gt;|#rgb|#rrggbb</font> - replace default (missing) image texture by either exact file or solid #rgb|#rrggbb background color</li>
+<li><b>\r_modernLighting</b> <font color=silver><b>1</b></font> - read-only flag; the unified lighting pipeline is always enabled and the legacy lighting CVars (formerly <code>r_fullbright</code>, <code>r_vertexLight</code>, <code>r_mergeLightmaps</code>, <code>r_lightmap</code>) have been removed.</li>
 <li><b>\r_vbo</b> <font color=silver><b>0</b>|1</font> - use Vertex Buffer Objects to cache static map geometry, may improve FPS on modern GPUs, increases hunk memory usage by 15-30MB (map-dependent)</li>
 <div id="r_fbo"></div>
 <li><b>\r_fbo</b> <font color=silver><b>0</b>|1</font> - use framebuffer objects, enables gamma correction in windowed mode and allows arbitrary size (i.e. greater than logical desktop resolution) screenshot/video capture, required for bloom, hdr rendering, anti-aliasing, greyscale effects, OpenGL 3.0+ required</li>
@@ -50,7 +51,7 @@ It is based on ioquake3-r1160 (latest non-SDL revision) with upstream patches an
 <li><b>\r_nomip</b> <font color=silver><b>0</b>|1</font>- apply picmip only on worldspawn textures</li>
 <li><b>\r_neatsky</b> <font color=silver><b>0</b>|1</font> - nopicmip for skyboxes</li>
 <li><b>\r_greyscale</b> <font color=silver>[<b>0</b>..1.0]</font> - desaturates rendered frame, requires <b><a href="#r_fbo">\r_fbo 1</a></b>, can be changed on 	the fly</li>
-<li><b>\r_mapGreyScale</b> <font color=silver>[-1.0..1.0]</font> - desaturate world map textures only, works independently from <b>\r_greyscale</b>, negative values desaturates lightmaps only</li>
+<li><b>\r_mapGreyScale</b> <font color=silver>[-1.0..1.0]</font> - desaturate world map textures only, works independently from <b>\r_greyscale</b>; negative values apply an extra ambient desaturation (legacy lightmap behaviour).</li>
 <li><b>\r_ext_multisample</b> <font color=silver><b>0</b>|2|4|6|8</font> - multi-sample anti-aliasing, requires <b><a href="#r_fbo">\r_fbo 1</a></b>, can be changed on the fly</li>
 <li><b>\r_ext_supersample</b> <font color=silver><b>0</b>|1</font> - super-sample anti-aliasing, requires <b><a href="#r_fbo">\r_fbo 1</a></b></li>
 <li><b>\r_noborder</b> <font color=silver><b>0</b>|1</font> - to draw game window without border, hold ALT to drag & drop it with opened console</li>
@@ -177,6 +178,7 @@ console
   }
 }
 </pre>
+<p><i>Note:</i> Because <code>r_modernLighting</code> is enforced, the legacy <code>r_vertexLight</code> toggle remains off; this conditional only applies to downstream forks that reintroduce the old lighting path.</p>
 New shader:
 <pre>
 console

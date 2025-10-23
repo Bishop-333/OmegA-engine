@@ -41,7 +41,7 @@ The project emphasizes both visual excellence and performance optimization, leve
 
 ### Visual Enhancements
 - **High Dynamic Range (HDR)**: Full HDR pipeline from rendering to display output
-- **Advanced Shadow System**: Cascaded shadow maps, ray-traced shadows, contact shadows, and transparent shadows
+- **Advanced Shadow System**: Unified path-traced shadows with soft contacts, transmissive occluders, and RTX acceleration
 - **Enhanced Water Rendering**: Real-time reflections, refractions, caustics, and subsurface scattering
 - **Atmospheric Effects**: Planetary atmosphere simulation, weather effects, and dynamic sky rendering
 - **Material System**: Support for parallax occlusion mapping, displacement mapping, and tessellation
@@ -372,18 +372,19 @@ Hardware detection automatically suggests appropriate quality settings. Benchmar
 | `r_materialAutoGen` | 1 | Auto-generate PBR materials | 0: Off, 1: On | For legacy textures |
 | `r_materialGenQuality` | 2 | Generation quality | 1: Fast, 2: Balanced, 3: Quality | |
 
-### Shadows
+### Path-Traced Lighting
 
 | CVar | Default | Description | Values | Notes |
 |------|---------|-------------|--------|-------|
-| `r_shadows` | 2 | Shadow mode | 0: Off, 1: Simple, 2: Stencil, 3: Shadow maps, 4: Ray-traced | |
-| `r_shadowMapSize` | 2048 | Shadow map resolution | 512 to 8192 | Power of 2 only |
-| `r_shadowCascades` | 4 | Cascade shadow maps | 1 to 6 | More = better quality at distance |
-| `r_shadowFilterMode` | 2 | Shadow filtering | 0: Hard, 1: PCF, 2: PCSS, 3: Advanced | |
-| `r_shadowBlur` | 1 | Shadow blur amount | 0 to 2 | Softer shadows |
-| `r_shadowPCF` | 2 | PCF sample count | 1: Low, 2: Medium, 3: High | |
-| `r_contactShadows` | 1 | Contact shadows | 0: Off, 1: On | Improves shadow contact |
-| `r_sunShadows` | 1 | Sun shadow casting | 0: Off, 1: On | |
+| `rt_enable` | 1 | Enable the unified path tracer | 0: Off, 1: On | Required for modern lighting |
+| `rt_mode` | dynamic | Lighting coverage | `dynamic`, `all` | `all` includes static light extraction |
+| `rt_samples` | 2 | Samples per pixel | 1–8 | Higher values reduce noise at a performance cost |
+| `rt_bounces` | 2 | Indirect light bounces | 0–5 | Increase for richer global illumination |
+| `rt_temporal` | 1 | Temporal accumulation | 0: Off, 1: On | Smooths noise over time |
+| `rt_denoise` | 1 | Reprojection denoiser | 0: Off, 1: On | Works best with temporal accumulation |
+| `rt_staticLights` | 1 | Include static BSP lights | 0: Off, 1: On | Keeps baked lights in the unified feed |
+
+> Note: All legacy shadow toggles (`r_shadows`, `r_shadowMap*`, `r_shadowFilter*`, etc.) have been removed. Hardware and software backends now share the exact same path-traced lighting model.
 
 ### Post-Processing
 
@@ -530,7 +531,7 @@ make -j$(nproc)
 **For Competitive Play (240+ FPS)**:
 - Disable ray tracing features (`r_rtx 0`)
 - Use base configuration as starting point
-- Reduce shadow quality (`r_shadows 1`, `r_shadowMapSize 1024`)
+- Reduce path-tracing cost (`rt_samples 1`, `rt_temporal 0`, `rt_denoise 0`)
 - Disable expensive post-processing (`r_bloom 0`, `r_motionBlur 0`)
 - Enable dynamic resolution scaling with 240 FPS target
 
@@ -542,9 +543,8 @@ make -j$(nproc)
 - Use VRS to optimize shading rate
 
 **For Maximum Quality (Screenshot/Video)**:
-- Enable path tracing (`r_pathTracing 1`)
-- Increase sample counts (`r_pathTracingSamples 32`)
-- Maximum shadow resolution (`r_shadowMapSize 8192`)
+- Crank path tracer quality (`rt_samples 8`, `rt_bounces 4`)
+- Keep temporal accumulation and denoising enabled
 - Disable all performance optimizations
 - Use offline rendering mode for best results
 
@@ -564,7 +564,7 @@ make -j$(nproc)
 
 **Memory Issues**:
 - Reduce texture quality with `r_picmip 1`
-- Lower shadow map resolution
+- Lower path-tracing load (`rt_samples 1`, `rt_bounces 1`)
 - Disable texture streaming if stuttering occurs
 - Clear shader cache if corruption suspected
 
