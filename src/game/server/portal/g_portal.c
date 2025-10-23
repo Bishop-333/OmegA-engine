@@ -4,11 +4,17 @@ Portal System Implementation for Quake3e-HD
 ===========================================================================
 */
 
+#include "g_local.h"
 #include "g_portal.h"
 #include "../../../engine/common/q_shared.h"
 
 portalInfo_t g_portals[MAX_PORTAL_PAIRS * 2];
 playerPortalState_t g_playerPortalStates[MAX_CLIENTS];
+
+// External declarations
+extern gentity_t g_entities[MAX_GENTITIES];
+extern level_locals_t level;
+extern gclient_t g_clients[MAX_CLIENTS];
 
 static int G_FindFreePortalSlot(void) {
     int i;
@@ -64,7 +70,10 @@ void G_InitPortalSystem(void) {
     memset(g_portals, 0, sizeof(g_portals));
     memset(g_playerPortalStates, 0, sizeof(g_playerPortalStates));
     
-    G_Printf("Portal system initialized\n");
+    G_Printf("^2Portal system initialized\n");
+    G_Printf("  Max portal pairs: %d\n", MAX_PORTAL_PAIRS);
+    G_Printf("  Portal radius: %.0f\n", PORTAL_RADIUS);
+    G_Printf("  Activation time: %d ms\n", PORTAL_ACTIVATION_TIME);
 }
 
 void G_ShutdownPortalSystem(void) {
@@ -557,4 +566,114 @@ qboolean G_TraceThroughPortals(vec3_t start, vec3_t end, trace_t *trace, int pas
     }
     
     return qfalse;
+}
+
+void G_UpdatePortalSystem(void) {
+    int i;
+    gentity_t *portal;
+    
+    // Update all active portals
+    for (i = 0; i < MAX_PORTAL_PAIRS * 2; i++) {
+        if (g_portals[i].inUse) {
+            if (g_portals[i].entityNum >= 0 && g_portals[i].entityNum < MAX_GENTITIES) {
+                portal = &g_entities[g_portals[i].entityNum];
+                if (portal->inuse && portal->think) {
+                    // Portal think is handled by entity system
+                }
+            }
+        }
+    }
+}
+
+void G_DebugPortalSystem(void) {
+    int i, activeCount = 0, linkedCount = 0;
+    
+    G_Printf("\n^5===== Portal System Debug =====\n");
+    
+    for (i = 0; i < MAX_PORTAL_PAIRS * 2; i++) {
+        if (g_portals[i].inUse) {
+            activeCount++;
+            if (g_portals[i].linkedPortalNum >= 0) {
+                linkedCount++;
+            }
+            G_DebugDrawPortal(&g_portals[i]);
+        }
+    }
+    
+    G_Printf("^7Active portals: %d\n", activeCount);
+    G_Printf("^7Linked portals: %d\n", linkedCount / 2);
+    G_Printf("^5==============================\n");
+}
+
+void G_PrintPortalStats(void) {
+    int i;
+    int orangeCount = 0, blueCount = 0;
+    int linkedPairs = 0;
+    
+    for (i = 0; i < MAX_PORTAL_PAIRS * 2; i++) {
+        if (g_portals[i].inUse) {
+            if (g_portals[i].type == PORTAL_ORANGE) {
+                orangeCount++;
+            } else {
+                blueCount++;
+            }
+            if (g_portals[i].linkedPortalNum >= 0 && g_portals[i].type == PORTAL_ORANGE) {
+                linkedPairs++;
+            }
+        }
+    }
+    
+    G_Printf("\n^6===== Portal Statistics =====\n");
+    G_Printf("^3Orange portals: %d\n", orangeCount);
+    G_Printf("^4Blue portals: %d\n", blueCount);
+    G_Printf("^2Linked pairs: %d\n", linkedPairs);
+    G_Printf("^7Free slots: %d\n", (MAX_PORTAL_PAIRS * 2) - orangeCount - blueCount);
+    G_Printf("^6============================\n");
+}
+
+void G_ProcessPortalCommands(gentity_t *ent, usercmd_t *ucmd) {
+    if (!ent || !ent->client || !ucmd) {
+        return;
+    }
+    
+    // Check for portal firing commands (if using custom buttons)
+    // This is a placeholder - actual button implementation depends on client mod
+    
+    // Store old buttons for edge detection
+    ent->client->oldbuttons = ent->client->buttons;
+    ent->client->buttons = ucmd->buttons;
+}
+
+qboolean G_CheckPortalFallDamageImmunity(gentity_t *ent) {
+    int clientNum;
+    
+    if (!ent || !ent->client) {
+        return qfalse;
+    }
+    
+    clientNum = ent->client - g_clients;
+    if (clientNum < 0 || clientNum >= MAX_CLIENTS) {
+        return qfalse;
+    }
+    
+    if (g_playerPortalStates[clientNum].fallDamageImmunityEndTime > level.time) {
+        return qtrue;
+    }
+    
+    return qfalse;
+}
+
+void G_UpdatePortalRendering(void) {
+    // Placeholder for portal rendering updates
+    // This would handle visual updates for portals
+}
+
+void G_DrawPortalDebugInfo(void) {
+    // Placeholder for debug drawing
+    // This would draw debug info in the 3D world
+}
+
+void G_AddPortalCommands(void) {
+    // Register portal console commands
+    // This would be called during initialization
 }
