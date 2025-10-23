@@ -27,7 +27,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 // External references
 extern lightSystem_t tr_lightSystem;
-extern cvar_t *r_lightCullDistance;
+
+// Allow lights to remain visible slightly beyond their cutoff radius so
+// large probes and emissive volumes do not pop.
+static const float LIGHT_CULL_HYSTERESIS = 8192.0f;
 
 /*
 ===============
@@ -50,7 +53,7 @@ void R_CullLights(viewParms_t *view) {
         // Distance cull
         VectorSubtract(light->origin, view->or.origin, delta);
         distance = VectorLength(delta);
-        if (distance > light->cutoffDistance + r_lightCullDistance->value) {
+        if (distance > light->cutoffDistance + LIGHT_CULL_HYSTERESIS) {
             continue;
         }
         

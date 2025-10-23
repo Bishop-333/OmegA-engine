@@ -1,0 +1,102 @@
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+// Input linearized depth image
+layout(set = 0, binding = 0, r32f) uniform readonly image2D depthImage;
+
+// Output reconstructed normals
+layout(set = 0, binding = 1, rgba16f) uniform writeonly image2D normalImage;
+
+// Push constants for inverse projection and view matrices
+layout(push_constant) uniform PushConstants {
+    mat4 invProj;
+    mat4 invView;
+} pc;
+
+// Reconstruct world position from depth
+vec3 reconstructPosition(ivec2 coord, float depth) {
+    ivec2 imageSize = imageSize(depthImage);
+    vec2 uv = (vec2(coord) + 0.5) / vec2(imageSize);
+
+    // Convert UV to NDC space [-1, 1]
+    vec2 ndc = uv * 2.0 - 1.0;
+
+    // Reconstruct clip space position
+    vec4 clipPos = vec4(ndc, depth, 1.0);
+
+    // Transform to view space
+    vec4 viewPos = pc.invProj * clipPos;
+    viewPos /= viewPos.w;
+
+    // Transform to world space
+    vec4 worldPos = pc.invView * viewPos;
+
+    return worldPos.xyz;
+}
+
+// Calculate normal from depth using central differences
+vec3 calculateNormal(ivec2 coord) {
+    // Sample depth at current position and neighbors
+    float depthCenter = imageLoad(depthImage, coord).r;
+
+    // Early out for background/invalid depth
+    if (depthCenter <= 0.0 || depthCenter >= 1.0) {
+        return vec3(0.0, 0.0, 1.0); // Default to facing camera
+    }
+
+    ivec2 imageSize = imageSize(depthImage);
+
+    // Use central differences for better accuracy
+    ivec2 coordLeft = ivec2(max(0, coord.x - 1), coord.y);
+    ivec2 coordRight = ivec2(min(imageSize.x - 1, coord.x + 1), coord.y);
+    ivec2 coordUp = ivec2(coord.x, max(0, coord.y - 1));
+    ivec2 coordDown = ivec2(coord.x, min(imageSize.y - 1, coord.y + 1));
+
+    float depthLeft = imageLoad(depthImage, coordLeft).r;
+    float depthRight = imageLoad(depthImage, coordRight).r;
+    float depthUp = imageLoad(depthImage, coordUp).r;
+    float depthDown = imageLoad(depthImage, coordDown).r;
+
+    // Reconstruct positions
+    vec3 posCenter = reconstructPosition(coord, depthCenter);
+    vec3 posLeft = reconstructPosition(coordLeft, depthLeft);
+    vec3 posRight = reconstructPosition(coordRight, depthRight);
+    vec3 posUp = reconstructPosition(coordUp, depthUp);
+    vec3 posDown = reconstructPosition(coordDown, depthDown);
+
+    // Calculate gradients
+    vec3 dx = posRight - posLeft;
+    vec3 dy = posDown - posUp;
+
+    // Calculate normal via cross product
+    vec3 normal = normalize(cross(dx, dy));
+
+    // Handle edge cases where normal might be invalid
+    if (length(normal) < 0.01) {
+        normal = vec3(0.0, 0.0, 1.0);
+    }
+
+    return normal;
+}
+
+void main() {
+    ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
+
+    // Get image dimensions
+    ivec2 imageSize = imageSize(normalImage);
+
+    // Check bounds
+    if (coord.x >= imageSize.x || coord.y >= imageSize.y) {
+        return;
+    }
+
+    // Calculate normal from depth
+    vec3 normal = calculateNormal(coord);
+
+    // Encode normal to [0, 1] range for storage
+    vec3 encodedNormal = normal * 0.5 + 0.5;
+
+    // Store the reconstructed normal
+    imageStore(normalImage, coord, vec4(encodedNormal, 1.0));
+}

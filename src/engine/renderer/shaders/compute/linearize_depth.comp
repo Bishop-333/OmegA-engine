@@ -1,0 +1,61 @@
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+// Input depth texture (from depth buffer)
+layout(set = 0, binding = 0) uniform sampler2D depthTexture;
+
+// Output linearized depth image
+layout(set = 0, binding = 1, r32f) uniform writeonly image2D linearDepthImage;
+
+// Push constants for near/far planes
+layout(push_constant) uniform PushConstants {
+    float zNear;
+    float zFar;
+    int reserved;
+} pc;
+
+// Linearize depth from [0,1] to actual view space depth
+float linearizeDepth(float depth) {
+    // Safety check for invalid near/far values
+    float zNear = max(pc.zNear, 0.001);
+    float zFar = max(pc.zFar, zNear + 1.0);
+
+    // For reversed-Z depth buffer (common in modern renderers)
+    // If using standard depth buffer, swap zNear and zFar in the formula
+    float z = depth;
+    float denominator = zFar + zNear - z * (zFar - zNear);
+
+    // Prevent division by zero
+    if (abs(denominator) < 0.0001) {
+        return zFar;
+    }
+
+    return (2.0 * zNear * zFar) / denominator;
+}
+
+void main() {
+    ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
+
+    // Get image dimensions
+    ivec2 imageSize = imageSize(linearDepthImage);
+
+    // Check bounds
+    if (coord.x >= imageSize.x || coord.y >= imageSize.y) {
+        return;
+    }
+
+    // Sample depth from texture
+    vec2 uv = (vec2(coord) + 0.5) / vec2(imageSize);
+    float depth = texture(depthTexture, uv).r;
+
+    // Linearize the depth value
+    float linearDepth = linearizeDepth(depth);
+
+    // Normalize to [0,1] for storage if needed
+    // This helps with precision when storing in lower bit formats
+    float normalizedLinearDepth = linearDepth / pc.zFar;
+
+    // Write to output image
+    imageStore(linearDepthImage, coord, vec4(normalizedLinearDepth, 0.0, 0.0, 0.0));
+}

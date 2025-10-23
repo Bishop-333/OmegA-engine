@@ -202,4 +202,8 @@ VkShadingRatePaletteEntryNV R_VRSRateToVulkan( vrsRate_t rate );
 void R_CreateShadingRateImage( uint32_t width, uint32_t height );
 void R_DestroyShadingRateImage( void );
 
+// Expose motion vector view for consumers (read-only)
+VkImageView R_GetMotionVectorView( void );
+VkImage     R_GetMotionVectorImage( void );
+
 #endif // __TR_VRS_H

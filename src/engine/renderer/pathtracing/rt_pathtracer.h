@@ -11,6 +11,7 @@ Hybrid approach combining rasterization with ray-traced lighting
 #define RT_PATHTRACER_H
 
 #include "../core/tr_local.h"
+#include <stdint.h>
 
 // ============================================================================
 // Path Tracing Configuration
@@ -21,8 +22,10 @@ Hybrid approach combining rasterization with ray-traced lighting
 #define RT_TEMPORAL_SAMPLES     16      // Temporal accumulation samples
 #define RT_MAX_LIGHTS           256     // Maximum dynamic lights to trace
 #define RT_MAX_STATIC_LIGHTS    1024    // Maximum static lights to trace
+#define RT_MAX_SCENE_LIGHTS     (RT_MAX_LIGHTS + RT_MAX_STATIC_LIGHTS)
 #define RT_CACHE_SIZE           65536   // Light cache entries
 #define RT_PROBE_GRID_SIZE      32      // Irradiance probe grid resolution
+#define RT_DIRECTIONAL_MAX_DISTANCE 100000.0f
 
 // Ray tracing quality levels
 typedef enum {
@@ -52,6 +55,13 @@ typedef struct ray_s {
     int     depth;          // Recursion depth
     float   ior;           // Index of refraction
 } ray_t;
+
+typedef struct rtShadowQuery_s {
+    vec3_t      origin;
+    vec3_t      direction;
+    float       maxDistance;
+    qboolean    occluded;
+} rtShadowQuery_t;
 
 // ============================================================================
 // Ray Hit Information
@@ -143,6 +153,57 @@ typedef struct staticLight_s {
     qboolean        castShadows;    // Shadow casting
 } staticLight_t;
 
+typedef enum {
+    RT_LIGHT_TYPE_POINT,
+    RT_LIGHT_TYPE_SPOT,
+    RT_LIGHT_TYPE_DIRECTIONAL
+} rtSceneLightType_t;
+
+typedef struct rtDynamicLight_s {
+    rtSceneLightType_t type;
+    vec3_t          origin;
+    vec3_t          color;
+    vec3_t          direction;
+    float           radius;
+    float           intensity;
+    float           spotCos;
+    qboolean        castsShadows;
+    qboolean        isStatic;
+    qboolean        additive;
+} rtDynamicLight_t;
+
+typedef struct rtSceneLight_s {
+    rtSceneLightType_t type;
+    vec3_t          origin;
+    vec3_t          color;
+    float           radius;
+    float           intensity;
+    vec3_t          direction;
+    float           spotCos;
+    qboolean        castsShadows;
+    qboolean        isStatic;
+} rtSceneLight_t;
+
+typedef struct rtLightEval_s {
+    const rtSceneLight_t *light;
+    vec3_t          direction;
+    float           distance;
+    int             queryIndex;
+} rtLightEval_t;
+
+typedef struct rtBackendValidation_s {
+    qboolean        valid;
+    qboolean        hardware;
+    char            map[MAX_QPATH];
+    int             width;
+    int             height;
+    int             frame;
+    int             samples;
+    uint32_t        hash;
+    double          rmse;
+    double          maxError;
+} rtBackendValidation_t;
+
 // ============================================================================
 // Path Tracer State
 // ============================================================================
@@ -154,6 +215,7 @@ typedef struct pathTracer_s {
     int             maxBounces;
     int             samplesPerPixel;
     qboolean        enabled;
+    qboolean        useRTX;
     
     // Acceleration structure
     rtBspNode_t     *bspTree;
@@ -163,6 +225,11 @@ typedef struct pathTracer_s {
     staticLight_t   *staticLights;
     int             numStaticLights;
     int             maxStaticLights;
+    rtDynamicLight_t dynamicLights[RT_MAX_LIGHTS];
+    int             numDynamicLights;
+    rtSceneLight_t  sceneLights[RT_MAX_SCENE_LIGHTS];
+    int             numSceneLights;
+    uint32_t        sceneLightHash;
     
     // Light cache
     lightCacheEntry_t *lightCache;
@@ -180,6 +247,17 @@ typedef struct pathTracer_s {
     float           *varianceBuffer;   // Variance estimation
     int             *sampleBuffer;     // Sample count per pixel
     int             currentFrame;
+    int             temporalWidth;
+    int             temporalHeight;
+    qboolean        temporalEnabled;
+    double          validationRMSE;
+    double          validationMaxError;
+    int             validationSamples;
+    rtBackendValidation_t backendValidation[2];
+    double          backendRMSEDelta;
+    double          backendMaxErrorDelta;
+    int             backendParityFrame;
+    char            backendParityMap[MAX_QPATH];
     
     // Denoising
     float           *denoisedBuffer;
@@ -191,6 +269,12 @@ typedef struct pathTracer_s {
     int             triangleTests;
     int             boxTests;
     float           traceTime;
+#ifdef USE_VULKAN
+    VkBuffer        sceneLightBuffer;
+    VkDeviceMemory  sceneLightBufferMemory;
+    VkDeviceSize    sceneLightBufferSize;
+    qboolean        sceneLightBufferDirty;
+#endif
 } pathTracer_t;
 
 // ============================================================================
@@ -198,6 +282,7 @@ typedef struct pathTracer_s {
 // ============================================================================
 
 extern pathTracer_t rt;
+const char *RT_GetBackendStatus(void);
 
 // ============================================================================
 // Core Functions
@@ -206,7 +291,26 @@ extern pathTracer_t rt;
 // Initialization
 void RT_InitPathTracer(void);
 void RT_ShutdownPathTracer(void);
+void RT_ShutdownBackend(void);
 void RT_BuildAccelerationStructure(void);
+
+#ifdef USE_VULKAN
+typedef struct rtxLightGpu_s {
+    vec4_t position;
+    vec4_t direction;
+    vec4_t color;
+    vec4_t attenuation;
+} rtxLightGpu_t;
+
+VkBuffer RT_GetSceneLightBuffer(void);
+VkDeviceSize RT_GetSceneLightBufferSize(void);
+void RT_UpdateSceneLightBuffer(void);
+#endif
+
+#ifdef USE_VULKAN
+void RT_RecordBackendCommands(VkCommandBuffer cmd);
+void RT_ApplyBackendDebugOverlay(VkCommandBuffer cmd, VkImage colorImage);
+#endif
 
 // Ray tracing
 qboolean RT_TraceRay(const ray_t *ray, hitInfo_t *hit);
@@ -255,6 +359,8 @@ void RT_InitTemporalBuffers(void);
 void RT_AccumulateSample(int x, int y, const vec3_t color);
 void RT_GetAccumulatedColor(int x, int y, vec3_t result);
 void RT_ResetAccumulation(void);
+void RT_ProcessGpuFrame(const float *rgba, int width, int height);
+void RT_BuildCameraRay(int x, int y, int width, int height, ray_t *ray);
 
 // Integration with main renderer
 void RT_RenderPathTracedLighting(void);
@@ -280,10 +386,12 @@ extern cvar_t *rt_bounces;
 extern cvar_t *rt_samples;
 extern cvar_t *rt_denoise;
 extern cvar_t *rt_temporal;
+extern cvar_t *r_rt_backend;
 extern cvar_t *rt_probes;
 extern cvar_t *rt_cache;
 extern cvar_t *rt_debug;
 extern cvar_t *rt_staticLights;    // New: enable static light extraction
+extern cvar_t *rt_gpuValidate;
 
 // Full-screen ray tracing dispatch
 void RT_AllocateScreenBuffers(int width, int height);
@@ -291,5 +399,6 @@ void RT_RenderFullScreen(void);
 void RT_CopyToFramebuffer(void);
 void RT_ScreenDispatchCommands(void);
 void RT_FreeScreenBuffers(void);
+void RT_ResetScreenProgress(void);
 
 #endif // RT_PATHTRACER_H

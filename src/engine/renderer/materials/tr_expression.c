@@ -567,6 +567,7 @@ void Material_ParseTCGen(material_t *material, materialStage_t *stage, char **te
     if (!Q_stricmp(token, "base") || !Q_stricmp(token, "texture")) {
         stage->tcGen = TCGEN_TEXTURE;
     } else if (!Q_stricmp(token, "lightmap")) {
+        R_ReportLegacyLightmapUsage("Material_ParseTCGen");
         stage->tcGen = TCGEN_LIGHTMAP;
     } else if (!Q_stricmp(token, "environment")) {
         stage->tcGen = TCGEN_ENVIRONMENT_MAPPED;

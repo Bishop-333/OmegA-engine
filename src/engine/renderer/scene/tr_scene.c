@@ -299,6 +299,7 @@ RE_AddLinearLightToScene
 */
 void RE_AddLinearLightToScene( const vec3_t start, const vec3_t end, float intensity, float r, float g, float b  ) {
 	dlight_t	*dl;
+	
 	if ( VectorCompare( start, end ) ) {
 		RE_AddDynamicLightToScene( start, intensity, r, g, b, 0 );
 		return;
@@ -459,12 +460,6 @@ void RE_RenderScene( const refdef_t *fd ) {
 
 	tr.refdef.numPolys = r_numpolys - r_firstScenePoly;
 	tr.refdef.polys = &backEndData->polys[r_firstScenePoly];
-
-	// turn off dynamic lighting globally by clearing all the
-	// dlights if it needs to be disabled
-	if ( r_dynamiclight->integer == 0 || glConfig.hardwareType == GLHW_PERMEDIA2 ) {
-		tr.refdef.num_dlights = 0;
-	}
 
 	// a single frame may have multiple scenes draw inside it --
 	// a 3D game view, 3D status bar renderings, 3D menus, etc.

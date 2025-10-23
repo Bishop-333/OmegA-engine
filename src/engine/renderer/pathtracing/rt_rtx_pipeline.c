@@ -12,10 +12,16 @@ Handles RT pipeline creation, shader binding table, and descriptor sets
 #include "rt_pathtracer.h"
 #include "../core/tr_local.h"
 #include "../vulkan/vk.h"
+#include <math.h>
 #include <stdio.h>
+#include <stdint.h>
+
 
 // External RTX state
 extern rtxState_t rtx;
+extern cvar_t *r_rtx_surface_debug;
+extern cvar_t *r_rtx_debug;
+extern VkBuffer RTX_GetMaterialBuffer(void);
 
 // Pipeline management structures
 typedef struct {
@@ -23,12 +29,14 @@ typedef struct {
     VkShaderModule missShader;
     VkShaderModule shadowMissShader;
     VkShaderModule closestHitShader;
+    VkShaderModule rayQueryShader;
 } rtxShaders_t;
 
 typedef struct {
     VkDescriptorSetLayout descriptorSetLayout;
     VkPipelineLayout pipelineLayout;
     VkPipeline pipeline;
+    VkPipeline rayQueryPipeline;
 } rtxPipelineInfo_t;
 
 typedef struct {
@@ -43,6 +51,15 @@ typedef struct {
     uint32_t handleSizeAligned;
     uint32_t groupCount;
 } rtxSBT_t;
+
+typedef struct {
+    float origin[4];
+    float direction[4];
+    uint32_t occluded;
+    uint32_t pad0;
+    uint32_t pad1;
+    uint32_t pad2;
+} rtxShadowQueryGpu_t;
 
 // Uniform buffer structures
 typedef struct {
@@ -63,6 +80,8 @@ typedef struct {
     uint32_t enablePathTracing;
     uint32_t maxBounces;
     uint32_t samplesPerPixel;
+    uint32_t surfaceDebugMode;
+    uint32_t _padSurfaceDebug[3];
 } CameraUBO;
 
 typedef struct {
@@ -79,6 +98,15 @@ typedef struct {
     uint32_t enableDLSS;
     uint32_t enableMotionBlur;
 } RenderSettingsUBO;
+
+// Debug options
+typedef struct {
+    uint32_t noTextures;
+    uint32_t debugMode;
+    uint32_t reserved1;
+    uint32_t reserved2;
+} DebugSettingsUBO;
+
 
 typedef struct {
     vec3_t sunDirection;
@@ -114,14 +142,6 @@ typedef struct {
     uint32_t flags;
 } MaterialData;
 
-// Light data
-typedef struct {
-    vec4_t position;    // w = type (0=directional, 1=point, 2=spot)
-    vec4_t direction;   // w = inner cone angle for spot
-    vec4_t color;       // w = intensity
-    vec4_t attenuation; // x=constant, y=linear, z=quadratic, w=outer cone angle
-} LightData;
-
 // Global pipeline state
 static struct {
     rtxShaders_t shaders;
@@ -139,14 +159,20 @@ static struct {
     VkDeviceMemory renderSettingsUBOMemory;
     VkBuffer environmentUBO;
     VkDeviceMemory environmentUBOMemory;
+    VkBuffer debugSettingsUBO;
+    VkDeviceMemory debugSettingsUBOMemory;
     
     // Storage buffers
-    VkBuffer materialBuffer;
-    VkDeviceMemory materialBufferMemory;
-    VkBuffer lightBuffer;
-    VkDeviceMemory lightBufferMemory;
     VkBuffer instanceDataBuffer;
     VkDeviceMemory instanceDataBufferMemory;
+    VkBuffer triangleMaterialBuffer;
+    VkDeviceMemory triangleMaterialBufferMemory;
+    uint32_t triangleMaterialCount;
+    uint32_t triangleMaterialCapacity;
+    VkBuffer rayQueryBuffer;
+    VkDeviceMemory rayQueryBufferMemory;
+    rtxShadowQueryGpu_t *rayQueryMapped;
+    uint32_t rayQueryCapacity;
     
     // Texture arrays
     VkSampler textureSampler;
@@ -160,9 +186,27 @@ static struct {
 } rtxPipeline;
 
 // Function pointers for RT pipeline
-static PFN_vkCreateRayTracingPipelinesKHR qvkCreateRayTracingPipelinesKHR;
 static PFN_vkGetRayTracingShaderGroupHandlesKHR qvkGetRayTracingShaderGroupHandlesKHR;
 static PFN_vkCmdTraceRaysKHR qvkCmdTraceRaysKHR;
+
+static qboolean RTX_CreateRayQueryPipeline(VkDevice device);
+static void RTX_DestroyRayQueryPipeline(void);
+static void RTX_DestroyRayQueryBuffer(void);
+static qboolean RTX_EnsureRayQueryCapacity(uint32_t count);
+
+static void RTX_DestroyDescriptorSetLayoutSafe(VkDescriptorSetLayout *layout) {
+    if (!layout || *layout == VK_NULL_HANDLE) {
+        return;
+    }
+
+    if (qvkDestroyDescriptorSetLayout) {
+        vkDestroyDescriptorSetLayout(vk.device, *layout, NULL);
+    } else {
+        ri.Printf(PRINT_WARNING, "RTX_ShutdownPipeline: qvkDestroyDescriptorSetLayout missing, skipping destroy\n");
+    }
+
+    *layout = VK_NULL_HANDLE;
+}
 
 /*
 ================
@@ -176,25 +220,39 @@ static VkShaderModule RTX_LoadShaderModule(VkDevice device, const char *filename
     int fileSize;
     VkShaderModule module = VK_NULL_HANDLE;
     
-    // Build full path (relative to game data)
+    // Attempt to load from RTX and compute shader directories
+    const char *searchPaths[] = {
+        "shaders/rtx/%s",
+        "shaders/compute/%s"
+    };
     char fullPath[MAX_QPATH];
-    Com_sprintf(fullPath, sizeof(fullPath), "shaders/rtx/%s", filename);
-    
-    // Use the Quake 3 filesystem to load the shader
-    ri.Printf(PRINT_ALL, "RTX: Attempting to load shader: %s\n", fullPath);
-    fileSize = ri.FS_ReadFile(fullPath, (void **)&shaderCode);
+    shaderCode = NULL;
+    fileSize = 0;
+
+    for (int i = 0; i < ARRAY_LEN(searchPaths); i++) {
+        Com_sprintf(fullPath, sizeof(fullPath), searchPaths[i], filename);
+        ri.Printf(PRINT_ALL, "RTX: Attempting to load shader: %s\n", fullPath);
+        fileSize = ri.FS_ReadFile(fullPath, (void **)&shaderCode);
+        if (fileSize > 0 && shaderCode) {
+            ri.Printf(PRINT_ALL, "RTX: Successfully read %d bytes from %s\n", fileSize, filename);
+            break;
+        }
+        if (shaderCode) {
+            ri.FS_FreeFile(shaderCode);
+            shaderCode = NULL;
+        }
+    }
+
     if (fileSize <= 0 || !shaderCode) {
-        ri.Printf(PRINT_WARNING, "RTX: Failed to open shader file: %s (fileSize=%d, shaderCode=%p)\n",
-                  fullPath, fileSize, shaderCode);
+        ri.Printf(PRINT_WARNING, "RTX: Failed to open shader file: %s\n", filename);
         return VK_NULL_HANDLE;
     }
-    ri.Printf(PRINT_ALL, "RTX: Successfully read %d bytes from %s\n", fileSize, filename);
     
     // Create shader module
     VkShaderModuleCreateInfo createInfo = {
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
         .codeSize = fileSize,
-        .pCode = shaderCode
+        .pCode = (const uint32_t *)shaderCode
     };
     
     VkResult result = vkCreateShaderModule(device, &createInfo, NULL, &module);
@@ -225,7 +283,7 @@ static qboolean RTX_CreateDescriptorSetLayout(VkDevice device) {
             .binding = 0,
             .descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
             .descriptorCount = 1,
-            .stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR
+            .stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_COMPUTE_BIT
         },
         // Binding 1: Output color image
         {
@@ -267,14 +325,14 @@ static qboolean RTX_CreateDescriptorSetLayout(VkDevice device) {
             .binding = 6,
             .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
             .descriptorCount = 1,
-            .stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR
+            .stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_COMPUTE_BIT
         },
         // Binding 7: Render settings UBO
         {
             .binding = 7,
             .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
             .descriptorCount = 1,
-            .stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR
+            .stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_COMPUTE_BIT
         },
         // Binding 8: Environment map
         {
@@ -288,21 +346,21 @@ static qboolean RTX_CreateDescriptorSetLayout(VkDevice device) {
             .binding = 9,
             .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
             .descriptorCount = 1,
-            .stageFlags = VK_SHADER_STAGE_MISS_BIT_KHR
+            .stageFlags = VK_SHADER_STAGE_MISS_BIT_KHR | VK_SHADER_STAGE_COMPUTE_BIT
         },
         // Binding 10: Instance data buffer
         {
             .binding = 10,
             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
             .descriptorCount = 1,
-            .stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR
+            .stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_COMPUTE_BIT
         },
         // Binding 11: Material buffer
         {
             .binding = 11,
             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
             .descriptorCount = 1,
-            .stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR
+            .stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_COMPUTE_BIT
         },
         // Binding 12: Texture array
         {
@@ -323,7 +381,7 @@ static qboolean RTX_CreateDescriptorSetLayout(VkDevice device) {
             .binding = 14,
             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
             .descriptorCount = 1,
-            .stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR
+            .stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_COMPUTE_BIT
         },
         // Binding 15: Direct light contribution image
         {
@@ -345,6 +403,26 @@ static qboolean RTX_CreateDescriptorSetLayout(VkDevice device) {
             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
             .descriptorCount = 1,
             .stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR
+        },
+        {
+            .binding = 18,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .descriptorCount = 1,
+            .stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_COMPUTE_BIT
+        },
+        {
+            .binding = 19,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .descriptorCount = 1,
+            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT
+        },
+        {
+            .binding = 20,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .descriptorCount = 1,
+            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT |
+                          VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+                          VK_SHADER_STAGE_RAYGEN_BIT_KHR
         }
     };
     
@@ -359,6 +437,7 @@ static qboolean RTX_CreateDescriptorSetLayout(VkDevice device) {
     // since they're not the highest binding number
     flags[12] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
     flags[13] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
+    flags[20] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
     bindingFlags.pBindingFlags = flags;
     
     VkDescriptorSetLayoutCreateInfo layoutInfo = {
@@ -389,9 +468,9 @@ static qboolean RTX_CreateDescriptorPool(VkDevice device) {
     VkDescriptorPoolSize poolSizes[] = {
         { VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1 },
         { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 5 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4 },
         { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 321 }, // 256 + 64 + 1
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3 }
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4 }
     };
     
     VkDescriptorPoolCreateInfo poolInfo = {
@@ -511,6 +590,22 @@ static qboolean RTX_CreateUniformBuffers(VkDevice device, VkPhysicalDevice physi
     
     vkBindBufferMemory(device, rtxPipeline.environmentUBO, rtxPipeline.environmentUBOMemory, 0);
     
+    // Debug settings UBO
+    bufferInfo.size = sizeof(DebugSettingsUBO);
+    if (vkCreateBuffer(device, &bufferInfo, NULL, &rtxPipeline.debugSettingsUBO) != VK_SUCCESS) {
+        return qfalse;
+    }
+
+    vkGetBufferMemoryRequirements(device, rtxPipeline.debugSettingsUBO, &memReqs);
+    allocInfo.allocationSize = memReqs.size;
+
+    if (vkAllocateMemory(device, &allocInfo, NULL, &rtxPipeline.debugSettingsUBOMemory) != VK_SUCCESS) {
+        vkDestroyBuffer(device, rtxPipeline.debugSettingsUBO, NULL);
+        return qfalse;
+    }
+
+    vkBindBufferMemory(device, rtxPipeline.debugSettingsUBO, rtxPipeline.debugSettingsUBOMemory, 0);
+
     return qtrue;
 }
 
@@ -522,67 +617,36 @@ Create storage buffers for materials, lights, and instance data
 ================
 */
 static qboolean RTX_CreateStorageBuffers(VkDevice device, VkPhysicalDevice physicalDevice) {
-    // Material buffer (max 4096 materials)
+    (void)physicalDevice;
     VkBufferCreateInfo bufferInfo = {
         .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-        .size = sizeof(MaterialData) * 4096,
+        .size = sizeof(uint64_t) * 8 * RTX_MAX_INSTANCES,
         .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE
     };
-    
-    if (vkCreateBuffer(device, &bufferInfo, NULL, &rtxPipeline.materialBuffer) != VK_SUCCESS) {
+
+    if (vkCreateBuffer(device, &bufferInfo, NULL, &rtxPipeline.instanceDataBuffer) != VK_SUCCESS) {
         return qfalse;
     }
-    
+
     VkMemoryRequirements memReqs;
-    vkGetBufferMemoryRequirements(device, rtxPipeline.materialBuffer, &memReqs);
-    
+    vkGetBufferMemoryRequirements(device, rtxPipeline.instanceDataBuffer, &memReqs);
+
     VkMemoryAllocateInfo allocInfo = {
         .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
         .allocationSize = memReqs.size,
         .memoryTypeIndex = vk_find_memory_type(memReqs.memoryTypeBits,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
     };
-    
-    if (vkAllocateMemory(device, &allocInfo, NULL, &rtxPipeline.materialBufferMemory) != VK_SUCCESS) {
-        vkDestroyBuffer(device, rtxPipeline.materialBuffer, NULL);
-        return qfalse;
-    }
-    
-    vkBindBufferMemory(device, rtxPipeline.materialBuffer, rtxPipeline.materialBufferMemory, 0);
-    
-    // Light buffer (max 256 lights)
-    bufferInfo.size = sizeof(uint32_t) + sizeof(LightData) * 256;
-    if (vkCreateBuffer(device, &bufferInfo, NULL, &rtxPipeline.lightBuffer) != VK_SUCCESS) {
-        return qfalse;
-    }
-    
-    vkGetBufferMemoryRequirements(device, rtxPipeline.lightBuffer, &memReqs);
-    allocInfo.allocationSize = memReqs.size;
-    
-    if (vkAllocateMemory(device, &allocInfo, NULL, &rtxPipeline.lightBufferMemory) != VK_SUCCESS) {
-        vkDestroyBuffer(device, rtxPipeline.lightBuffer, NULL);
-        return qfalse;
-    }
-    
-    vkBindBufferMemory(device, rtxPipeline.lightBuffer, rtxPipeline.lightBufferMemory, 0);
-    
-    // Instance data buffer
-    bufferInfo.size = sizeof(uint64_t) * 8 * RTX_MAX_INSTANCES;  // Instance data structure size
-    if (vkCreateBuffer(device, &bufferInfo, NULL, &rtxPipeline.instanceDataBuffer) != VK_SUCCESS) {
-        return qfalse;
-    }
-    
-    vkGetBufferMemoryRequirements(device, rtxPipeline.instanceDataBuffer, &memReqs);
-    allocInfo.allocationSize = memReqs.size;
-    
+
     if (vkAllocateMemory(device, &allocInfo, NULL, &rtxPipeline.instanceDataBufferMemory) != VK_SUCCESS) {
         vkDestroyBuffer(device, rtxPipeline.instanceDataBuffer, NULL);
+        rtxPipeline.instanceDataBuffer = VK_NULL_HANDLE;
         return qfalse;
     }
-    
+
     vkBindBufferMemory(device, rtxPipeline.instanceDataBuffer, rtxPipeline.instanceDataBufferMemory, 0);
-    
+
     return qtrue;
 }
 
@@ -632,17 +696,18 @@ qboolean RTX_CreateRTPipeline(VkDevice device, VkPhysicalDevice physicalDevice) 
     VkResult result;
     
     // Load RT extension function pointers
-    qvkCreateRayTracingPipelinesKHR = (PFN_vkCreateRayTracingPipelinesKHR)
+    PFN_vkCreateRayTracingPipelinesKHR createPipelines = (PFN_vkCreateRayTracingPipelinesKHR)
         vkGetDeviceProcAddr(device, "vkCreateRayTracingPipelinesKHR");
     qvkGetRayTracingShaderGroupHandlesKHR = (PFN_vkGetRayTracingShaderGroupHandlesKHR)
         vkGetDeviceProcAddr(device, "vkGetRayTracingShaderGroupHandlesKHR");
     qvkCmdTraceRaysKHR = (PFN_vkCmdTraceRaysKHR)
         vkGetDeviceProcAddr(device, "vkCmdTraceRaysKHR");
     
-    if (!qvkCreateRayTracingPipelinesKHR || !qvkGetRayTracingShaderGroupHandlesKHR || !qvkCmdTraceRaysKHR) {
+    if (!createPipelines || !qvkGetRayTracingShaderGroupHandlesKHR || !qvkCmdTraceRaysKHR) {
         ri.Printf(PRINT_WARNING, "RTX: Failed to load RT pipeline function pointers\n");
         return qfalse;
     }
+    vk_register_ray_tracing_pipeline_dispatch(createPipelines);
     
     // Get RT pipeline properties
     rtxPipeline.rtProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
@@ -741,13 +806,19 @@ qboolean RTX_CreateRTPipeline(VkDevice device, VkPhysicalDevice physicalDevice) 
         return qfalse;
     }
     
-    // Create pipeline layout
+    // Create pipeline layout (shared between RT and compute pipelines)
+    VkPushConstantRange pushRange = {
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        .offset = 0,
+        .size = sizeof(uint32_t)
+    };
+
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .setLayoutCount = 1,
         .pSetLayouts = &rtxPipeline.pipeline.descriptorSetLayout,
-        .pushConstantRangeCount = 0,
-        .pPushConstantRanges = NULL
+        .pushConstantRangeCount = 1,
+        .pPushConstantRanges = &pushRange
     };
     
     result = vkCreatePipelineLayout(device, &pipelineLayoutInfo, NULL, 
@@ -799,6 +870,166 @@ qboolean RTX_CreateRTPipeline(VkDevice device, VkPhysicalDevice physicalDevice) 
 
     ri.Printf(PRINT_ALL, "RTX: Ray tracing pipeline created successfully (handle=%p)\n",
               (void*)rtxPipeline.pipeline.pipeline);
+
+    if (!RTX_CreateRayQueryPipeline(device)) {
+        ri.Printf(PRINT_WARNING, "RTX: Ray query compute pipeline not available; CPU fallback will be used\n");
+    }
+
+    return qtrue;
+}
+
+static qboolean RTX_CreateRayQueryPipeline(VkDevice device) {
+    if (!(rtx.features & RTX_FEATURE_RAY_QUERY)) {
+        return qtrue;
+    }
+
+    if (rtxPipeline.pipeline.rayQueryPipeline != VK_NULL_HANDLE) {
+        return qtrue;
+    }
+
+    if (!rtxPipeline.shaders.rayQueryShader) {
+        rtxPipeline.shaders.rayQueryShader = RTX_LoadShaderModule(device, "shadow_queries.spv");
+        if (!rtxPipeline.shaders.rayQueryShader) {
+            ri.Printf(PRINT_WARNING, "RTX: Failed to load shadow query shader module\n");
+            return qfalse;
+        }
+    }
+
+    VkPipelineShaderStageCreateInfo stageInfo = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        .stage = VK_SHADER_STAGE_COMPUTE_BIT,
+        .module = rtxPipeline.shaders.rayQueryShader,
+        .pName = "main"
+    };
+
+    VkComputePipelineCreateInfo pipelineInfo = {
+        .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+        .stage = stageInfo,
+        .layout = rtxPipeline.pipeline.pipelineLayout
+    };
+
+    VkResult result = vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo,
+                                               NULL, &rtxPipeline.pipeline.rayQueryPipeline);
+    if (result != VK_SUCCESS) {
+        ri.Printf(PRINT_WARNING, "RTX: Failed to create ray query compute pipeline (result: %d)\n", result);
+        if (rtxPipeline.pipeline.rayQueryPipeline != VK_NULL_HANDLE) {
+            vkDestroyPipeline(device, rtxPipeline.pipeline.rayQueryPipeline, NULL);
+            rtxPipeline.pipeline.rayQueryPipeline = VK_NULL_HANDLE;
+        }
+        return qfalse;
+    }
+
+    return qtrue;
+}
+
+static void RTX_DestroyRayQueryPipeline(void) {
+    if (rtxPipeline.pipeline.rayQueryPipeline) {
+        vkDestroyPipeline(vk.device, rtxPipeline.pipeline.rayQueryPipeline, NULL);
+        rtxPipeline.pipeline.rayQueryPipeline = VK_NULL_HANDLE;
+    }
+    if (rtxPipeline.shaders.rayQueryShader) {
+        vkDestroyShaderModule(vk.device, rtxPipeline.shaders.rayQueryShader, NULL);
+        rtxPipeline.shaders.rayQueryShader = VK_NULL_HANDLE;
+    }
+}
+
+static void RTX_DestroyRayQueryBuffer(void) {
+    if (rtxPipeline.rayQueryMapped && rtxPipeline.rayQueryBufferMemory) {
+        vkUnmapMemory(vk.device, rtxPipeline.rayQueryBufferMemory);
+        rtxPipeline.rayQueryMapped = NULL;
+    }
+
+    if (rtxPipeline.rayQueryBuffer) {
+        vkDestroyBuffer(vk.device, rtxPipeline.rayQueryBuffer, NULL);
+        rtxPipeline.rayQueryBuffer = VK_NULL_HANDLE;
+    }
+    if (rtxPipeline.rayQueryBufferMemory) {
+        vkFreeMemory(vk.device, rtxPipeline.rayQueryBufferMemory, NULL);
+        rtxPipeline.rayQueryBufferMemory = VK_NULL_HANDLE;
+    }
+    rtxPipeline.rayQueryCapacity = 0;
+}
+
+static qboolean RTX_EnsureRayQueryCapacity(uint32_t count) {
+    if (!(rtx.features & RTX_FEATURE_RAY_QUERY)) {
+        return qfalse;
+    }
+
+    if (count == 0) {
+        return qtrue;
+    }
+
+    if (rtxPipeline.rayQueryCapacity >= count && rtxPipeline.rayQueryBuffer != VK_NULL_HANDLE) {
+        return qtrue;
+    }
+
+    uint32_t newCapacity = rtxPipeline.rayQueryCapacity ? rtxPipeline.rayQueryCapacity : 64;
+    while (newCapacity < count) {
+        newCapacity = (newCapacity < UINT32_MAX / 2) ? newCapacity * 2 : count;
+        if (newCapacity >= count) {
+            break;
+        }
+    }
+
+    RTX_DestroyRayQueryBuffer();
+
+    VkDeviceSize bufferSize = sizeof(rtxShadowQueryGpu_t) * (VkDeviceSize)newCapacity;
+
+    VkBufferCreateInfo bufferInfo = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .size = bufferSize,
+        .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE
+    };
+
+    if (vkCreateBuffer(vk.device, &bufferInfo, NULL, &rtxPipeline.rayQueryBuffer) != VK_SUCCESS) {
+        return qfalse;
+    }
+
+    VkMemoryRequirements memReqs;
+    vkGetBufferMemoryRequirements(vk.device, rtxPipeline.rayQueryBuffer, &memReqs);
+
+    VkMemoryAllocateInfo allocInfo = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .allocationSize = memReqs.size,
+        .memoryTypeIndex = vk_find_memory_type(memReqs.memoryTypeBits,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+    };
+
+    if (vkAllocateMemory(vk.device, &allocInfo, NULL, &rtxPipeline.rayQueryBufferMemory) != VK_SUCCESS) {
+        vkDestroyBuffer(vk.device, rtxPipeline.rayQueryBuffer, NULL);
+        rtxPipeline.rayQueryBuffer = VK_NULL_HANDLE;
+        return qfalse;
+    }
+
+    vkBindBufferMemory(vk.device, rtxPipeline.rayQueryBuffer, rtxPipeline.rayQueryBufferMemory, 0);
+
+    if (vkMapMemory(vk.device, rtxPipeline.rayQueryBufferMemory, 0, VK_WHOLE_SIZE, 0,
+                    (void**)&rtxPipeline.rayQueryMapped) != VK_SUCCESS) {
+        RTX_DestroyRayQueryBuffer();
+        return qfalse;
+    }
+
+    rtxPipeline.rayQueryCapacity = newCapacity;
+
+    VkDescriptorBufferInfo bufferDesc = {
+        .buffer = rtxPipeline.rayQueryBuffer,
+        .offset = 0,
+        .range = bufferSize
+    };
+
+    VkWriteDescriptorSet write = {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .dstSet = rtxPipeline.descriptorSet,
+        .dstBinding = 19,
+        .dstArrayElement = 0,
+        .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        .pBufferInfo = &bufferDesc
+    };
+
+    vkUpdateDescriptorSets(vk.device, 1, &write, 0, NULL);
+
     return qtrue;
 }
 
@@ -908,7 +1139,8 @@ qboolean RTX_CreateShaderBindingTable(VkDevice device, VkPhysicalDevice physical
     Z_Free(shaderHandles);
     
     // Get the buffer's device address
-    VkDeviceAddress rawAddress = RTX_GetBufferDeviceAddress(rtxPipeline.sbt.buffer);
+    VkDeviceAddress rawAddress = RTX_GetBufferDeviceAddressVK(rtxPipeline.sbt.buffer);
+    if (!rawAddress) rawAddress = RTX_GetBufferDeviceAddress(rtxPipeline.sbt.buffer);
     
     // Since the buffer is already sized and aligned properly, use the raw address directly
     rtxPipeline.sbt.deviceAddress = rawAddress;
@@ -1040,78 +1272,99 @@ void RTX_ShutdownPipeline(void) {
     }
     
     vkDeviceWaitIdle(vk.device);
+
+    RTX_DestroyRayQueryPipeline();
+    RTX_DestroyRayQueryBuffer();
     
     // Destroy shader modules
     if (rtxPipeline.shaders.raygenShader) {
         vkDestroyShaderModule(vk.device, rtxPipeline.shaders.raygenShader, NULL);
+        rtxPipeline.shaders.raygenShader = VK_NULL_HANDLE;
     }
     if (rtxPipeline.shaders.missShader) {
         vkDestroyShaderModule(vk.device, rtxPipeline.shaders.missShader, NULL);
+        rtxPipeline.shaders.missShader = VK_NULL_HANDLE;
     }
     if (rtxPipeline.shaders.shadowMissShader) {
         vkDestroyShaderModule(vk.device, rtxPipeline.shaders.shadowMissShader, NULL);
+        rtxPipeline.shaders.shadowMissShader = VK_NULL_HANDLE;
     }
     if (rtxPipeline.shaders.closestHitShader) {
         vkDestroyShaderModule(vk.device, rtxPipeline.shaders.closestHitShader, NULL);
+        rtxPipeline.shaders.closestHitShader = VK_NULL_HANDLE;
     }
     
     // Destroy pipeline
     if (rtxPipeline.pipeline.pipeline) {
         vkDestroyPipeline(vk.device, rtxPipeline.pipeline.pipeline, NULL);
+        rtxPipeline.pipeline.pipeline = VK_NULL_HANDLE;
     }
     if (rtxPipeline.pipeline.pipelineLayout) {
         vkDestroyPipelineLayout(vk.device, rtxPipeline.pipeline.pipelineLayout, NULL);
+        rtxPipeline.pipeline.pipelineLayout = VK_NULL_HANDLE;
     }
-    if (rtxPipeline.pipeline.descriptorSetLayout) {
-        vkDestroyDescriptorSetLayout(vk.device, rtxPipeline.pipeline.descriptorSetLayout, NULL);
-    }
+    RTX_DestroyDescriptorSetLayoutSafe(&rtxPipeline.pipeline.descriptorSetLayout);
     
     // Destroy SBT
     if (rtxPipeline.sbt.buffer) {
         vkDestroyBuffer(vk.device, rtxPipeline.sbt.buffer, NULL);
+        rtxPipeline.sbt.buffer = VK_NULL_HANDLE;
     }
     if (rtxPipeline.sbt.memory) {
         vkFreeMemory(vk.device, rtxPipeline.sbt.memory, NULL);
+        rtxPipeline.sbt.memory = VK_NULL_HANDLE;
     }
     
     // Destroy descriptor pool
     if (rtxPipeline.descriptorPool) {
         vkDestroyDescriptorPool(vk.device, rtxPipeline.descriptorPool, NULL);
+        rtxPipeline.descriptorPool = VK_NULL_HANDLE;
     }
     
     // Destroy uniform buffers
     if (rtxPipeline.cameraUBO) {
         vkDestroyBuffer(vk.device, rtxPipeline.cameraUBO, NULL);
         vkFreeMemory(vk.device, rtxPipeline.cameraUBOMemory, NULL);
+        rtxPipeline.cameraUBO = VK_NULL_HANDLE;
+        rtxPipeline.cameraUBOMemory = VK_NULL_HANDLE;
     }
     if (rtxPipeline.renderSettingsUBO) {
         vkDestroyBuffer(vk.device, rtxPipeline.renderSettingsUBO, NULL);
         vkFreeMemory(vk.device, rtxPipeline.renderSettingsUBOMemory, NULL);
+        rtxPipeline.renderSettingsUBO = VK_NULL_HANDLE;
+        rtxPipeline.renderSettingsUBOMemory = VK_NULL_HANDLE;
     }
     if (rtxPipeline.environmentUBO) {
         vkDestroyBuffer(vk.device, rtxPipeline.environmentUBO, NULL);
         vkFreeMemory(vk.device, rtxPipeline.environmentUBOMemory, NULL);
+        rtxPipeline.environmentUBO = VK_NULL_HANDLE;
+        rtxPipeline.environmentUBOMemory = VK_NULL_HANDLE;
     }
     
     // Destroy storage buffers
-    if (rtxPipeline.materialBuffer) {
-        vkDestroyBuffer(vk.device, rtxPipeline.materialBuffer, NULL);
-        vkFreeMemory(vk.device, rtxPipeline.materialBufferMemory, NULL);
-    }
-    if (rtxPipeline.lightBuffer) {
-        vkDestroyBuffer(vk.device, rtxPipeline.lightBuffer, NULL);
-        vkFreeMemory(vk.device, rtxPipeline.lightBufferMemory, NULL);
-    }
     if (rtxPipeline.instanceDataBuffer) {
         vkDestroyBuffer(vk.device, rtxPipeline.instanceDataBuffer, NULL);
         vkFreeMemory(vk.device, rtxPipeline.instanceDataBufferMemory, NULL);
+        rtxPipeline.instanceDataBuffer = VK_NULL_HANDLE;
+        rtxPipeline.instanceDataBufferMemory = VK_NULL_HANDLE;
     }
-    
+    if (rtxPipeline.triangleMaterialBuffer) {
+        vkDestroyBuffer(vk.device, rtxPipeline.triangleMaterialBuffer, NULL);
+        rtxPipeline.triangleMaterialBuffer = VK_NULL_HANDLE;
+    }
+    if (rtxPipeline.triangleMaterialBufferMemory) {
+        vkFreeMemory(vk.device, rtxPipeline.triangleMaterialBufferMemory, NULL);
+        rtxPipeline.triangleMaterialBufferMemory = VK_NULL_HANDLE;
+    }
+    rtxPipeline.triangleMaterialCount = 0;
+    rtxPipeline.triangleMaterialCapacity = 0;
+
     // Destroy sampler
     if (rtxPipeline.textureSampler) {
         vkDestroySampler(vk.device, rtxPipeline.textureSampler, NULL);
+        rtxPipeline.textureSampler = VK_NULL_HANDLE;
     }
-    
+
     Com_Memset(&rtxPipeline, 0, sizeof(rtxPipeline));
     ri.Printf(PRINT_ALL, "RTX: Pipeline shutdown complete\n");
 }
@@ -1149,6 +1402,63 @@ VkDescriptorSet RTX_GetDescriptorSet(void) {
     return rtxPipeline.descriptorSet;
 }
 
+VkPipeline RTX_GetRayQueryPipelineHandle(void) {
+    return rtxPipeline.pipeline.rayQueryPipeline;
+}
+
+VkBuffer RTX_RayQueryGetBuffer(void) {
+    return rtxPipeline.rayQueryBuffer;
+}
+
+VkDeviceSize RTX_RayQueryRecordSize(void) {
+    return sizeof(rtxShadowQueryGpu_t);
+}
+
+qboolean RTX_RayQueryUpload(const rtShadowQuery_t *queries, int count) {
+    if (!queries || count <= 0) {
+        return qfalse;
+    }
+
+    if (!RTX_EnsureRayQueryCapacity((uint32_t)count)) {
+        return qfalse;
+    }
+
+    if (!rtxPipeline.rayQueryMapped) {
+        return qfalse;
+    }
+
+    rtxShadowQueryGpu_t *dst = rtxPipeline.rayQueryMapped;
+    for (int i = 0; i < count; i++) {
+        dst[i].origin[0] = queries[i].origin[0];
+        dst[i].origin[1] = queries[i].origin[1];
+        dst[i].origin[2] = queries[i].origin[2];
+        dst[i].origin[3] = 1.0f;
+
+        dst[i].direction[0] = queries[i].direction[0];
+        dst[i].direction[1] = queries[i].direction[1];
+        dst[i].direction[2] = queries[i].direction[2];
+        dst[i].direction[3] = queries[i].maxDistance;
+
+        dst[i].occluded = 0;
+        dst[i].pad0 = 0;
+        dst[i].pad1 = 0;
+        dst[i].pad2 = 0;
+    }
+
+    return qtrue;
+}
+
+void RTX_RayQueryDownload(rtShadowQuery_t *queries, int count) {
+    if (!queries || count <= 0 || !rtxPipeline.rayQueryMapped) {
+        return;
+    }
+
+    rtxShadowQueryGpu_t *src = rtxPipeline.rayQueryMapped;
+    for (int i = 0; i < count; i++) {
+        queries[i].occluded = src[i].occluded ? qtrue : qfalse;
+    }
+}
+
 /*
 ================
 RTX_PrepareFrameData
@@ -1178,6 +1488,17 @@ void RTX_PrepareFrameData(VkCommandBuffer cmd)
         cam.enablePathTracing = 1;
         cam.maxBounces = (uint32_t)(rtx_gi_bounces ? rtx_gi_bounces->integer : 2);
         cam.samplesPerPixel = 1;
+        int debugModeInt = (r_rtx_debug) ? r_rtx_debug->integer : 0;
+        if (debugModeInt == 0 && r_rtx_surface_debug) {
+            debugModeInt = r_rtx_surface_debug->integer;
+        }
+        if (debugModeInt < 0) {
+            debugModeInt = 0;
+        }
+        if (debugModeInt > 8) {
+            debugModeInt = 8;
+        }
+        cam.surfaceDebugMode = (uint32_t)debugModeInt;
         void *p = NULL;
         if (vkMapMemory(vk.device, rtxPipeline.cameraUBOMemory, 0, sizeof(cam), 0, &p) == VK_SUCCESS) {
             Com_Memcpy(p, &cam, sizeof(cam));
@@ -1196,7 +1517,17 @@ void RTX_PrepareFrameData(VkCommandBuffer cmd)
         rs.reflectionRoughnessCutoff = 0.9f;
         rs.giIntensity = 1.0f;
         rs.aoRadius = 0.5f;
-        rs.debugMode = 0;
+        int debugModeInt = (r_rtx_debug) ? r_rtx_debug->integer : 0;
+        if (debugModeInt == 0 && r_rtx_surface_debug) {
+            debugModeInt = r_rtx_surface_debug->integer;
+        }
+        if (debugModeInt < 0) {
+            debugModeInt = 0;
+        }
+        if (debugModeInt > 8) {
+            debugModeInt = 8;
+        }
+        rs.debugMode = (uint32_t)debugModeInt;
         rs.enableDenoiser = (rtx_denoise && rtx_denoise->integer) ? 1 : 0;
         rs.enableDLSS = (rtx_dlss && rtx_dlss->integer) ? 1 : 0;
         rs.enableMotionBlur = 0;
@@ -1230,53 +1561,27 @@ void RTX_PrepareFrameData(VkCommandBuffer cmd)
         }
     }
 
+    if (rtxPipeline.debugSettingsUBOMemory) {
+        DebugSettingsUBO debugData = {0};
+        debugData.noTextures = (r_rtx_debug && r_rtx_debug->integer == 2) ? 1u : 0u;
+        debugData.debugMode = (r_rtx_debug) ? (uint32_t)MAX(r_rtx_debug->integer, 0) : 0u;
+
+        void *p = NULL;
+        if (vkMapMemory(vk.device, rtxPipeline.debugSettingsUBOMemory, 0, sizeof(debugData), 0, &p) == VK_SUCCESS) {
+            Com_Memcpy(p, &debugData, sizeof(debugData));
+            vkUnmapMemory(vk.device, rtxPipeline.debugSettingsUBOMemory);
+        }
+    }
+
     // 4) Upload material buffer if dirty
+    RTX_BuildMaterialBuffer();
     if (cmd) {
         // Bind the material cache buffer into our descriptor (see descriptor update below)
         RTX_UploadMaterialBuffer(vk.device, cmd, VK_NULL_HANDLE);
     }
 
-    // 5) Upload dynamic light buffer
-    if (rtxPipeline.lightBuffer && cmd) {
-        int dlCount = tr.refdef.num_dlights;
-        if (dlCount < 0) dlCount = 0; if (dlCount > 256) dlCount = 256;
-        uint32_t count = (uint32_t)dlCount;
-        size_t sz = sizeof(uint32_t) + sizeof(LightData) * 256;
-        // staging
-        VkBufferCreateInfo bi = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, .size = sz, .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT };
-        VkBuffer staging;
-        if (vkCreateBuffer(vk.device, &bi, NULL, &staging) != VK_SUCCESS) {
-            return;
-        }
-        VkMemoryRequirements mr; vkGetBufferMemoryRequirements(vk.device, staging, &mr);
-        VkMemoryAllocateInfo ai = { .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, .allocationSize = mr.size, .memoryTypeIndex = vk_find_memory_type(mr.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) };
-        VkDeviceMemory sm; if (vkAllocateMemory(vk.device, &ai, NULL, &sm) != VK_SUCCESS) { vkDestroyBuffer(vk.device, staging, NULL); return; }
-        if (vkBindBufferMemory(vk.device, staging, sm, 0) != VK_SUCCESS) { vkFreeMemory(vk.device, sm, NULL); vkDestroyBuffer(vk.device, staging, NULL); return; }
-        // map and fill
-        uint8_t *mapped = NULL;
-        if (vkMapMemory(vk.device, sm, 0, sz, 0, (void**)&mapped) != VK_SUCCESS) {
-            vkFreeMemory(vk.device, sm, NULL); vkDestroyBuffer(vk.device, staging, NULL); return;
-        }
-        ((uint32_t*)mapped)[0] = count;
-        LightData *ld = (LightData*)(mapped + sizeof(uint32_t));
-        for (uint32_t i = 0; i < count; ++i) {
-            dlight_t *dl = &tr.refdef.dlights[i];
-            VectorCopy(dl->origin, ld[i].position); ld[i].position[3] = 1.0f; // point light
-            // approximate dir from sun (none for point)
-            VectorSet(ld[i].direction, 0, 0, -1); ld[i].direction[3] = 0.0f;
-            VectorCopy(dl->color, ld[i].color); ld[i].color[3] = dl->radius;
-            ld[i].attenuation[0] = 1.0f; ld[i].attenuation[1] = 0.0f; ld[i].attenuation[2] = 1.0f / (dl->radius + 0.001f); ld[i].attenuation[3] = 0.0f;
-        }
-        vkUnmapMemory(vk.device, sm);
-        // copy to device-local buffer
-        VkBufferCopy c = { .srcOffset = 0, .dstOffset = 0, .size = sz };
-        vkCmdCopyBuffer(cmd, staging, rtxPipeline.lightBuffer, 1, &c);
-        VkMemoryBarrier mb = { .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER, .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT, .dstAccessMask = VK_ACCESS_SHADER_READ_BIT };
-        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, 0, 1, &mb, 0, NULL, 0, NULL);
-        // cleanup staging
-        vkDestroyBuffer(vk.device, staging, NULL);
-        vkFreeMemory(vk.device, sm, NULL);
-    }
+    // 5) Ensure unified light buffer is up to date
+    RT_UpdateSceneLightBuffer();
 }
 
 /*
@@ -1307,14 +1612,14 @@ void RTX_UpdateDescriptorSets(VkAccelerationStructureKHR tlas,
                              VkImageView colorImage, VkImageView albedoImage,
                              VkImageView normalImage, VkImageView motionImage,
                              VkImageView depthImage) {
-    VkWriteDescriptorSet writes[18];  // Increased for lighting contribution images
+    VkWriteDescriptorSet writes[24];
     uint32_t writeCount = 0;
 
     // Get lighting contribution image views
     VkImageView directLightView = NULL;
     VkImageView indirectLightView = NULL;
     VkImageView lightmapView = NULL;
-    RTX_GetLightingContributionViews((void**)&directLightView, (void**)&indirectLightView, (void**)&lightmapView);
+    RTX_GetLightingContributionViews(&directLightView, &indirectLightView, &lightmapView);
 
     // Use color image as fallback if lighting buffers aren't created yet
     if (!directLightView) directLightView = colorImage;
@@ -1432,12 +1737,18 @@ void RTX_UpdateDescriptorSets(VkAccelerationStructureKHR tlas,
     };
     
     // Storage buffers
-    // Use material cache buffer if present
+    RT_UpdateSceneLightBuffer();
     VkBuffer matBuf = RTX_GetMaterialBuffer();
+    VkBuffer lightBuf = RT_GetSceneLightBuffer();
+    VkDeviceSize lightRange = RT_GetSceneLightBufferSize();
+    if (matBuf == VK_NULL_HANDLE || lightBuf == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_WARNING, "RTX: Shared buffers unavailable for descriptor update\n");
+        return;
+    }
     VkDescriptorBufferInfo storageBufferInfos[3] = {
         { .buffer = rtxPipeline.instanceDataBuffer, .offset = 0, .range = VK_WHOLE_SIZE },
-        { .buffer = matBuf ? matBuf : rtxPipeline.materialBuffer, .offset = 0, .range = VK_WHOLE_SIZE },
-        { .buffer = rtxPipeline.lightBuffer, .offset = 0, .range = VK_WHOLE_SIZE }
+        { .buffer = matBuf, .offset = 0, .range = VK_WHOLE_SIZE },
+        { .buffer = lightBuf, .offset = 0, .range = lightRange ? lightRange : VK_WHOLE_SIZE }
     };
     
     writes[writeCount++] = (VkWriteDescriptorSet){
@@ -1470,6 +1781,24 @@ void RTX_UpdateDescriptorSets(VkAccelerationStructureKHR tlas,
         .pBufferInfo = &storageBufferInfos[2]
     };
 
+    if (rtxPipeline.triangleMaterialBuffer && rtxPipeline.triangleMaterialCount > 0) {
+        VkDescriptorBufferInfo triangleMaterialInfo = {
+            .buffer = rtxPipeline.triangleMaterialBuffer,
+            .offset = 0,
+            .range = sizeof(uint32_t) * rtxPipeline.triangleMaterialCount
+        };
+
+        writes[writeCount++] = (VkWriteDescriptorSet){
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = rtxPipeline.descriptorSet,
+            .dstBinding = 20,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .pBufferInfo = &triangleMaterialInfo
+        };
+    }
+
     // Add lighting contribution images (bindings 15, 16, 17)
     VkDescriptorImageInfo lightingImageInfos[3] = {
         { .imageView = directLightView, .imageLayout = VK_IMAGE_LAYOUT_GENERAL },
@@ -1489,7 +1818,187 @@ void RTX_UpdateDescriptorSets(VkAccelerationStructureKHR tlas,
         };
     }
 
+    // Debug settings UBO (binding 18)
+    VkDescriptorBufferInfo debugBufferInfo = {
+        .buffer = rtxPipeline.debugSettingsUBO,
+        .offset = 0,
+        .range = sizeof(DebugSettingsUBO)
+    };
+
+    writes[writeCount++] = (VkWriteDescriptorSet){
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .dstSet = rtxPipeline.descriptorSet,
+        .dstBinding = 18,
+        .dstArrayElement = 0,
+        .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        .pBufferInfo = &debugBufferInfo
+    };
+
+    if (rtxPipeline.rayQueryBuffer) {
+        VkDescriptorBufferInfo queryBufferInfo = {
+            .buffer = rtxPipeline.rayQueryBuffer,
+            .offset = 0,
+            .range = sizeof(rtxShadowQueryGpu_t) * rtxPipeline.rayQueryCapacity
+        };
+
+        writes[writeCount++] = (VkWriteDescriptorSet){
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = rtxPipeline.descriptorSet,
+            .dstBinding = 19,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .pBufferInfo = &queryBufferInfo
+        };
+    }
+    
     vkUpdateDescriptorSets(vk.device, writeCount, writes, 0, NULL);
+}
+
+void RTX_UploadTriangleMaterials(VkCommandBuffer cmd, const uint32_t *materials, uint32_t count) {
+    if (!vk.device) {
+        return;
+    }
+
+    if (count == 0 || !materials) {
+        if (rtxPipeline.triangleMaterialBuffer) {
+            vkDestroyBuffer(vk.device, rtxPipeline.triangleMaterialBuffer, NULL);
+            rtxPipeline.triangleMaterialBuffer = VK_NULL_HANDLE;
+        }
+        if (rtxPipeline.triangleMaterialBufferMemory) {
+            vkFreeMemory(vk.device, rtxPipeline.triangleMaterialBufferMemory, NULL);
+            rtxPipeline.triangleMaterialBufferMemory = VK_NULL_HANDLE;
+        }
+        rtxPipeline.triangleMaterialCount = 0;
+        rtxPipeline.triangleMaterialCapacity = 0;
+        return;
+    }
+
+    VkDeviceSize bufferSize = sizeof(uint32_t) * (VkDeviceSize)count;
+
+    if (!rtxPipeline.triangleMaterialBuffer ||
+        rtxPipeline.triangleMaterialCapacity < count) {
+        if (rtxPipeline.triangleMaterialBuffer) {
+            vkDestroyBuffer(vk.device, rtxPipeline.triangleMaterialBuffer, NULL);
+            rtxPipeline.triangleMaterialBuffer = VK_NULL_HANDLE;
+        }
+        if (rtxPipeline.triangleMaterialBufferMemory) {
+            vkFreeMemory(vk.device, rtxPipeline.triangleMaterialBufferMemory, NULL);
+            rtxPipeline.triangleMaterialBufferMemory = VK_NULL_HANDLE;
+        }
+
+        VkBufferCreateInfo bufferInfo = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+            .size = bufferSize,
+            .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            .sharingMode = VK_SHARING_MODE_EXCLUSIVE
+        };
+
+        if (vkCreateBuffer(vk.device, &bufferInfo, NULL, &rtxPipeline.triangleMaterialBuffer) != VK_SUCCESS) {
+            rtxPipeline.triangleMaterialBuffer = VK_NULL_HANDLE;
+            rtxPipeline.triangleMaterialCount = 0;
+            rtxPipeline.triangleMaterialCapacity = 0;
+            return;
+        }
+
+        VkMemoryRequirements memReqs;
+        vkGetBufferMemoryRequirements(vk.device, rtxPipeline.triangleMaterialBuffer, &memReqs);
+
+        VkMemoryAllocateInfo allocInfo = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+            .allocationSize = memReqs.size,
+            .memoryTypeIndex = vk_find_memory_type(memReqs.memoryTypeBits,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+        };
+
+        if (vkAllocateMemory(vk.device, &allocInfo, NULL, &rtxPipeline.triangleMaterialBufferMemory) != VK_SUCCESS) {
+            vkDestroyBuffer(vk.device, rtxPipeline.triangleMaterialBuffer, NULL);
+            rtxPipeline.triangleMaterialBuffer = VK_NULL_HANDLE;
+            rtxPipeline.triangleMaterialBufferMemory = VK_NULL_HANDLE;
+            rtxPipeline.triangleMaterialCount = 0;
+            rtxPipeline.triangleMaterialCapacity = 0;
+            return;
+        }
+
+        vkBindBufferMemory(vk.device, rtxPipeline.triangleMaterialBuffer,
+                           rtxPipeline.triangleMaterialBufferMemory, 0);
+        rtxPipeline.triangleMaterialCapacity = count;
+    }
+
+    if (!cmd) {
+        return;
+    }
+
+    VkBuffer stagingBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
+
+    VkBufferCreateInfo stagingInfo = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .size = bufferSize,
+        .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE
+    };
+
+    if (vkCreateBuffer(vk.device, &stagingInfo, NULL, &stagingBuffer) != VK_SUCCESS) {
+        return;
+    }
+
+    VkMemoryRequirements stagingReqs;
+    vkGetBufferMemoryRequirements(vk.device, stagingBuffer, &stagingReqs);
+
+    VkMemoryAllocateInfo stagingAlloc = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .allocationSize = stagingReqs.size,
+        .memoryTypeIndex = vk_find_memory_type(stagingReqs.memoryTypeBits,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+    };
+
+    if (vkAllocateMemory(vk.device, &stagingAlloc, NULL, &stagingMemory) != VK_SUCCESS) {
+        vkDestroyBuffer(vk.device, stagingBuffer, NULL);
+        return;
+    }
+
+    vkBindBufferMemory(vk.device, stagingBuffer, stagingMemory, 0);
+
+    void *mapped = NULL;
+    if (vkMapMemory(vk.device, stagingMemory, 0, bufferSize, 0, &mapped) == VK_SUCCESS) {
+        Com_Memcpy(mapped, materials, bufferSize);
+        vkUnmapMemory(vk.device, stagingMemory);
+    } else {
+        vkFreeMemory(vk.device, stagingMemory, NULL);
+        vkDestroyBuffer(vk.device, stagingBuffer, NULL);
+        return;
+    }
+
+    VkBufferCopy copyRegion = {
+        .srcOffset = 0,
+        .dstOffset = 0,
+        .size = bufferSize
+    };
+
+    vkCmdCopyBuffer(cmd, stagingBuffer, rtxPipeline.triangleMaterialBuffer, 1, &copyRegion);
+
+    VkBufferMemoryBarrier barrier = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .buffer = rtxPipeline.triangleMaterialBuffer,
+        .offset = 0,
+        .size = bufferSize
+    };
+
+    vkCmdPipelineBarrier(cmd,
+        VK_PIPELINE_STAGE_TRANSFER_BIT,
+        VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        0, 0, NULL, 1, &barrier, 0, NULL);
+
+    vkDestroyBuffer(vk.device, stagingBuffer, NULL);
+    vkFreeMemory(vk.device, stagingMemory, NULL);
+
+    rtxPipeline.triangleMaterialCount = count;
 }
 
 // vk_find_memory_type is already defined in vk.c and declared in vk.h

@@ -111,6 +111,14 @@ layout(binding = 14, set = 0, scalar) buffer LightBuffer {
     Light lights[];
 } lightData;
 
+// Debug settings uniform buffer
+layout(binding = 18, set = 0) uniform DebugSettings {
+    uint noTextures;     // 1 = disable textures (use grey)
+    uint debugMode;      // Various debug visualization modes
+    uint reserved1;
+    uint reserved2;
+} debugSettings;
+
 // Helper functions
 vec3 getNormal(vec3 barycentrics, vec3 n0, vec3 n1, vec3 n2) {
     return normalize(n0 * barycentrics.x + n1 * barycentrics.y + n2 * barycentrics.z);
@@ -229,44 +237,56 @@ void main() {
     
     // Sample textures
     vec3 albedo = mat.albedo.rgb;
-    if (mat.albedoTexture != 0) {
+    if (mat.albedoTexture != 0 && debugSettings.noTextures == 0) {
         albedo *= texture(textures[mat.albedoTexture - 1], texCoord).rgb;
+    } else if (debugSettings.noTextures != 0) {
+        // Use default grey color when textures are disabled for debugging
+        albedo = vec3(0.5, 0.5, 0.5);
     }
     albedo *= vertexColor;
     
     // Normal mapping
-    if (mat.normalTexture != 0) {
+    if (mat.normalTexture != 0 && debugSettings.noTextures == 0) {
         vec3 normalMap = texture(textures[mat.normalTexture - 1], texCoord).rgb;
         worldNormal = applyNormalMap(worldNormal, worldTangent, normalMap, mat.normalScale);
     }
     
     // PBR parameters
     float roughness = mat.roughness;
-    if (mat.roughnessTexture != 0) {
+    if (mat.roughnessTexture != 0 && debugSettings.noTextures == 0) {
         roughness *= texture(textures[mat.roughnessTexture - 1], texCoord).r;
+    } else if (debugSettings.noTextures != 0) {
+        // Use default roughness when textures are disabled
+        roughness = 0.5;
     }
     
     float metallic = mat.metallic;
-    if (mat.metallicTexture != 0) {
+    if (mat.metallicTexture != 0 && debugSettings.noTextures == 0) {
         metallic *= texture(textures[mat.metallicTexture - 1], texCoord).r;
+    } else if (debugSettings.noTextures != 0) {
+        // Use default non-metallic when textures are disabled
+        metallic = 0.0;
     }
     
     // Ambient occlusion
     float ao = 1.0;
-    if (mat.occlusionTexture != 0) {
+    if (mat.occlusionTexture != 0 && debugSettings.noTextures == 0) {
         ao = texture(textures[mat.occlusionTexture - 1], texCoord).r;
         ao = mix(1.0, ao, mat.occlusionStrength);
     }
     
     // Emission
     vec3 emission = mat.emission.rgb * mat.emission.a;
-    if (mat.emissionTexture != 0) {
+    if (mat.emissionTexture != 0 && debugSettings.noTextures == 0) {
         emission *= texture(textures[mat.emissionTexture - 1], texCoord).rgb;
+    } else if (debugSettings.noTextures != 0) {
+        // No emission when textures are disabled
+        emission = vec3(0.0);
     }
     
     // Lightmap
     vec3 lightmapColor = vec3(1.0);
-    if (instance.lightmapIndex != 0 && mat.lightmapTexture != 0) {
+    if (instance.lightmapIndex != 0 && mat.lightmapTexture != 0 && debugSettings.noTextures == 0) {
         vec2 lightmapUV = getTexCoord(barycentrics, v0.texCoord, v1.texCoord, v2.texCoord);
         lightmapColor = texture(lightmaps[mat.lightmapTexture - 1], lightmapUV).rgb;
     }

@@ -134,7 +134,6 @@ typedef enum {
 
 } Vk_Shader_Type;
 
-// used with r_shadows == 2
 typedef enum {
 	SHADOW_DISABLED,
 	SHADOW_EDGES,
@@ -310,6 +309,16 @@ void vk_reset_descriptor( int index );
 void vk_update_descriptor( int index, VkDescriptorSet descriptor );
 void vk_update_descriptor_offset( int index, uint32_t offset );
 
+void vk_destroy_descriptor_pool( VkDescriptorPool pool );
+void vk_reset_descriptor_pool( VkDescriptorPool pool );
+void vk_cmd_register(const char *tag, VkCommandBuffer buffer, VkCommandPool pool);
+void vk_cmd_unregister(VkCommandBuffer buffer);
+void vk_cmd_dump_leaks(void);
+
+VkImageLayout vk_image_get_layout( VkImage image );
+VkImageLayout vk_image_get_layout_or( VkImage image, VkImageLayout fallback );
+void vk_image_set_layout( VkImage image, VkImageLayout layout );
+
 void vk_update_post_process_pipelines( void );
 
 const char *vk_format_string( VkFormat format );
@@ -350,6 +359,8 @@ typedef struct vk_tess_s {
 
 	Vk_Depth_Range		depth_range;
 	VkPipeline			last_pipeline;
+	qboolean			uber_shader_active;  // Track if uber shader is currently bound
+	uint32_t			uber_vertex_count;   // Vertex count when uber shader is active
 
 	uint32_t num_indexes; // value from most recent vk_bind_index() call
 
@@ -407,6 +418,7 @@ typedef struct {
 
 	VkImage color_image;
 	VkImageView color_image_view;
+	VkImageLayout color_image_layout;
 
 	VkImage bloom_image[1+VK_NUM_BLOOM_PASSES*2];
 	VkImageView bloom_image_view[1+VK_NUM_BLOOM_PASSES*2];
@@ -415,6 +427,7 @@ typedef struct {
 
 	VkImage depth_image;
 	VkImageView depth_image_view;
+	VkImageView depth_image_view_depth_only; // Depth-only view for sampling in shaders
 
 	VkImage msaa_image;
 	VkImageView msaa_image_view;
@@ -436,6 +449,7 @@ typedef struct {
 	struct {
 		VkImage image;
 		VkImageView image_view;
+		VkImageLayout layout;
 	} capture;
 
 	struct {
@@ -533,11 +547,6 @@ typedef struct {
 	// Standard pipelines.
 	//
 	uint32_t skybox_pipeline;
-
-	// dim 0: 0 - front side, 1 - back size
-	// dim 1: 0 - normal view, 1 - mirror view
-	uint32_t shadow_volume_pipelines[2][2];
-	uint32_t shadow_finish_pipeline;
 
 	// dim 0 is based on fogPass_t: 0 - corresponds to FP_EQUAL, 1 - corresponds to FP_LE.
 	// dim 1 is directly a cullType_t enum value.
@@ -696,6 +705,14 @@ uint32_t* R_LoadSPIRV( const char *filename, uint32_t *codeSize );
 void vk_push_staging_buffer( VkBuffer buffer, VkDeviceSize offset, VkDeviceSize size, const void *data );
 void vk_begin_command_buffer( VkCommandBuffer commandBuffer );
 void vk_end_command_buffer( VkCommandBuffer commandBuffer );
+VkCommandBuffer vk_begin_one_time_commands( void );
+void vk_end_one_time_commands( VkCommandBuffer commandBuffer );
+void vk_get_mvp_transform( float *mvp );
+
+void vk_log_resource_event(const char *action, const char *type, uint64_t handleValue, const char *tag, const char *details);
+void vk_register_acceleration_structure_dispatch(PFN_vkCreateAccelerationStructureKHR createFn,
+    PFN_vkDestroyAccelerationStructureKHR destroyFn);
+void vk_register_ray_tracing_pipeline_dispatch(PFN_vkCreateRayTracingPipelinesKHR createFn);
 
 // Vulkan error checking macro
 #ifndef VK_CHECK
@@ -705,4 +722,109 @@ void vk_end_command_buffer( VkCommandBuffer commandBuffer );
         ri.Error( ERR_FATAL, "Vulkan: %s returned error %d", #function_call, res ); \
     } \
 }
+#endif
+
+// Extern declarations for Vulkan functions
+extern PFN_vkAllocateCommandBuffers qvkAllocateCommandBuffers;
+extern PFN_vkFreeCommandBuffers qvkFreeCommandBuffers;
+extern PFN_vkCreateCommandPool qvkCreateCommandPool;
+extern PFN_vkDestroyCommandPool qvkDestroyCommandPool;
+extern PFN_vkCreateImage qvkCreateImage;
+extern PFN_vkGetImageMemoryRequirements qvkGetImageMemoryRequirements;
+extern PFN_vkAllocateMemory qvkAllocateMemory;
+extern PFN_vkBindImageMemory qvkBindImageMemory;
+extern PFN_vkCreateImageView qvkCreateImageView;
+extern PFN_vkCreateBuffer qvkCreateBuffer;
+extern PFN_vkGetBufferMemoryRequirements qvkGetBufferMemoryRequirements;
+extern PFN_vkBindBufferMemory qvkBindBufferMemory;
+extern PFN_vkDestroyImageView qvkDestroyImageView;
+extern PFN_vkDestroyImage qvkDestroyImage;
+extern PFN_vkFreeMemory qvkFreeMemory;
+extern PFN_vkDestroyBuffer qvkDestroyBuffer;
+extern PFN_vkCreatePipelineCache qvkCreatePipelineCache;
+extern PFN_vkDestroyPipelineCache qvkDestroyPipelineCache;
+extern PFN_vkDestroyPipeline qvkDestroyPipeline;
+extern PFN_vkMapMemory qvkMapMemory;
+extern PFN_vkUnmapMemory qvkUnmapMemory;
+extern PFN_vkCmdPipelineBarrier qvkCmdPipelineBarrier;
+extern PFN_vkCmdBindPipeline qvkCmdBindPipeline;
+extern PFN_vkCmdBindDescriptorSets qvkCmdBindDescriptorSets;
+extern PFN_vkCmdDispatch qvkCmdDispatch;
+extern PFN_vkCmdBeginRenderPass qvkCmdBeginRenderPass;
+extern PFN_vkCmdDraw qvkCmdDraw;
+extern PFN_vkCmdEndRenderPass qvkCmdEndRenderPass;
+extern PFN_vkCreateShaderModule qvkCreateShaderModule;
+extern PFN_vkDestroyShaderModule qvkDestroyShaderModule;
+extern PFN_vkCreateDescriptorSetLayout qvkCreateDescriptorSetLayout;
+extern PFN_vkDestroyDescriptorSetLayout qvkDestroyDescriptorSetLayout;
+extern PFN_vkCreatePipelineLayout qvkCreatePipelineLayout;
+extern PFN_vkDestroyPipelineLayout qvkDestroyPipelineLayout;
+extern PFN_vkCreateGraphicsPipelines qvkCreateGraphicsPipelines;
+extern PFN_vkCreateComputePipelines qvkCreateComputePipelines;
+extern PFN_vkCreateAccelerationStructureKHR qvkCreateAccelerationStructureKHR;
+extern PFN_vkDestroyAccelerationStructureKHR qvkDestroyAccelerationStructureKHR;
+extern PFN_vkCreateRayTracingPipelinesKHR qvkCreateRayTracingPipelinesKHR;
+extern PFN_vkCreateDescriptorPool qvkCreateDescriptorPool;
+extern PFN_vkDestroyDescriptorPool qvkDestroyDescriptorPool;
+extern PFN_vkAllocateDescriptorSets qvkAllocateDescriptorSets;
+extern PFN_vkFreeDescriptorSets qvkFreeDescriptorSets;
+extern PFN_vkUpdateDescriptorSets qvkUpdateDescriptorSets;
+extern PFN_vkCreateSampler qvkCreateSampler;
+extern PFN_vkDestroySampler qvkDestroySampler;
+extern PFN_vkCreateFramebuffer qvkCreateFramebuffer;
+extern PFN_vkDestroyFramebuffer qvkDestroyFramebuffer;
+extern PFN_vkCreateRenderPass qvkCreateRenderPass;
+extern PFN_vkDestroyRenderPass qvkDestroyRenderPass;
+extern PFN_vkCreateFence qvkCreateFence;
+extern PFN_vkDestroyFence qvkDestroyFence;
+extern PFN_vkCreateSemaphore qvkCreateSemaphore;
+extern PFN_vkDestroySemaphore qvkDestroySemaphore;
+extern PFN_vkCreateSwapchainKHR qvkCreateSwapchainKHR;
+extern PFN_vkDestroySwapchainKHR qvkDestroySwapchainKHR;
+
+
+#ifndef VK_NO_API_WRAPPERS
+// Map raw Vulkan entry points to tracked wrappers
+#define vkAllocateCommandBuffers qvkAllocateCommandBuffers
+#define vkFreeCommandBuffers qvkFreeCommandBuffers
+#define vkCreateCommandPool qvkCreateCommandPool
+#define vkDestroyCommandPool qvkDestroyCommandPool
+#define vkCreateBuffer qvkCreateBuffer
+#define vkDestroyBuffer qvkDestroyBuffer
+#define vkAllocateMemory qvkAllocateMemory
+#define vkFreeMemory qvkFreeMemory
+#define vkCreateImage qvkCreateImage
+#define vkDestroyImage qvkDestroyImage
+#define vkCreateImageView qvkCreateImageView
+#define vkDestroyImageView qvkDestroyImageView
+#define vkCreateShaderModule qvkCreateShaderModule
+#define vkDestroyShaderModule qvkDestroyShaderModule
+#define vkCreatePipelineLayout qvkCreatePipelineLayout
+#define vkDestroyPipelineLayout qvkDestroyPipelineLayout
+#define vkCreateGraphicsPipelines qvkCreateGraphicsPipelines
+#define vkCreateComputePipelines qvkCreateComputePipelines
+#define vkCreateAccelerationStructureKHR qvkCreateAccelerationStructureKHR
+#define vkDestroyAccelerationStructureKHR qvkDestroyAccelerationStructureKHR
+#define vkCreateRayTracingPipelinesKHR qvkCreateRayTracingPipelinesKHR
+#define vkDestroyPipeline qvkDestroyPipeline
+#define vkCreateDescriptorPool qvkCreateDescriptorPool
+#define vkDestroyDescriptorPool qvkDestroyDescriptorPool
+#define vkAllocateDescriptorSets qvkAllocateDescriptorSets
+#define vkFreeDescriptorSets qvkFreeDescriptorSets
+#define vkCreateDescriptorSetLayout qvkCreateDescriptorSetLayout
+#define vkDestroyDescriptorSetLayout qvkDestroyDescriptorSetLayout
+#define vkCreateSampler qvkCreateSampler
+#define vkDestroySampler qvkDestroySampler
+#define vkCreateFramebuffer qvkCreateFramebuffer
+#define vkDestroyFramebuffer qvkDestroyFramebuffer
+#define vkCreateRenderPass qvkCreateRenderPass
+#define vkDestroyRenderPass qvkDestroyRenderPass
+#define vkCreatePipelineCache qvkCreatePipelineCache
+#define vkDestroyPipelineCache qvkDestroyPipelineCache
+#define vkCreateFence qvkCreateFence
+#define vkDestroyFence qvkDestroyFence
+#define vkCreateSemaphore qvkCreateSemaphore
+#define vkDestroySemaphore qvkDestroySemaphore
+#define vkCreateSwapchainKHR qvkCreateSwapchainKHR
+#define vkDestroySwapchainKHR qvkDestroySwapchainKHR
 #endif

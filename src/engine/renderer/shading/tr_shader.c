@@ -2967,7 +2967,7 @@ static void VertexLightingCollapse( void ) {
 InitShader
 ===============
 */
-static void InitShader( const char *name, int lightmapIndex ) {
+static void InitShader( const char *name, shaderCategory_t category ) {
 	int i;
 
 	// clear the global shader
@@ -2975,12 +2975,7 @@ static void InitShader( const char *name, int lightmapIndex ) {
 	Com_Memset( &stages, 0, sizeof( stages ) );
 
 	Q_strncpyz( shader.name, name, sizeof( shader.name ) );
-	shader.lightmapIndex = lightmapIndex;
-
-	// we need to know original (unmodified) lightmap index
-	// because shader search functions expects this
-	// otherwise they will fail and cause massive duplication
-	shader.lightmapSearchIndex = shader.lightmapIndex;
+	shader.category = category;
 
 	for ( i = 0 ; i < MAX_SHADER_STAGES ; i++ ) {
 		stages[i].bundle[0].texMods = texMods[i];

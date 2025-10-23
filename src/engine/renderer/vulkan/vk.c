@@ -3216,38 +3216,6 @@ static void vk_alloc_persistent_pipelines( void )
 		vk.skybox_pipeline = vk_find_pipeline_ext( 0, &def, qtrue );
 	}
 
-	// stencil shadows
-	{
-		cullType_t cull_types[2] = { CT_FRONT_SIDED, CT_BACK_SIDED };
-		qboolean mirror_flags[2] = { qfalse, qtrue };
-		int i, j;
-
-		Com_Memset(&def, 0, sizeof(def));
-		def.polygon_offset = qfalse;
-		def.state_bits = 0;
-		def.shader_type = TYPE_SIGNLE_TEXTURE;
-		def.shadow_phase = SHADOW_EDGES;
-
-		for (i = 0; i < 2; i++) {
-			def.face_culling = cull_types[i];
-			for (j = 0; j < 2; j++) {
-				def.mirror = mirror_flags[j];
-				vk.shadow_volume_pipelines[i][j] = vk_find_pipeline_ext( 0, &def, r_shadows->integer ? qtrue: qfalse );
-			}
-		}
-	}
-	{
-		Com_Memset( &def, 0, sizeof( def ) );
-		def.face_culling = CT_FRONT_SIDED;
-		def.polygon_offset = qfalse;
-		def.state_bits = GLS_DEPTHMASK_TRUE | GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO;
-		def.shader_type = TYPE_SIGNLE_TEXTURE;
-		def.mirror = qfalse;
-		def.shadow_phase = SHADOW_FS_QUAD;
-		def.primitives = TRIANGLE_STRIP;
-		vk.shadow_finish_pipeline = vk_find_pipeline_ext( 0, &def, r_shadows->integer ? qtrue: qfalse );
-	}
-
 	// fog and dlights
 	{
 		unsigned int fog_state_bits[2] = {
@@ -4615,10 +4583,6 @@ void vk_initialize( void )
 	// Note: Currently not using uber shader system, RTX has its own shaders
 	// VK_InitUberShaderSystem();
 
-	// Initialize RTX hardware raytracing
-	extern qboolean RTX_Init(void);
-	RTX_Init();
-
 	vk.active = qtrue;
 }
 
@@ -4928,9 +4892,8 @@ void vk_shutdown( refShutdownCode_t code )
 	qvkDestroyShaderModule(vk.device, vk.modules.gamma_fs, NULL);
 
 __cleanup:
-	// Shutdown RTX before destroying device
-	extern void RTX_Shutdown(void);
-	RTX_Shutdown();
+	// Ensure the path tracer backend releases GPU resources before destroying the device
+	RT_ShutdownBackend();
 
 	if ( vk.device != VK_NULL_HANDLE ) {
 		qvkDestroyDevice( vk.device, NULL );
@@ -7805,26 +7768,11 @@ void vk_end_frame( void )
 		{
 			vk_bloom();
 		}
-		// Record RTX ray tracing commands if enabled
-		// This must happen after scene rendering but before post-processing
-		extern cvar_t *rtx_enable;
-		if ( rtx_enable && rtx_enable->integer )
-		{
-			extern void RTX_RecordCommands(VkCommandBuffer cmd);
-			RTX_RecordCommands(vk.cmd->command_buffer);
-		}
+		// Allow the path tracer to submit backend work (RTX or compute fallback)
+		RT_RecordBackendCommands(vk.cmd->command_buffer);
 
-		// Apply RTX debug overlay BEFORE post-processing
-		// This ensures the overlay is visible and not overwritten
-		extern cvar_t *rtx_debug;
-		if ( rtx_debug && rtx_debug->integer > 0 )
-		{
-			// The overlay should be applied here as a compute shader or full-screen pass
-			// For now, we'll ensure it's visible by applying it before post-processing
-			extern void RTX_ApplyDebugOverlayCompute(VkCommandBuffer cmd, VkImage colorImage);
-			RTX_ApplyDebugOverlayCompute(vk.cmd->command_buffer, vk.color_image);
-			// ri.Printf(PRINT_DEVELOPER, "RTX Debug Overlay Active (mode %d)\n", rtx_debug->integer);
-		}
+		// Apply any active debug overlay before post-processing
+		RT_ApplyBackendDebugOverlay(vk.cmd->command_buffer, vk.color_image);
 		
 		// Execute post-processing chain if enabled
 		if ( r_postProcess && r_postProcess->integer )

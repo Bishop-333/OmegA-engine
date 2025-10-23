@@ -50,49 +50,25 @@ void RT_AllocateScreenBuffers(int width, int height) {
     screenRT.normalBuffer = ri.Malloc(pixelCount * 3 * sizeof(float));
     screenRT.albedoBuffer = ri.Malloc(pixelCount * 3 * sizeof(float));
     
+    if (screenRT.colorBuffer) {
+        Com_Memset(screenRT.colorBuffer, 0, pixelCount * 3 * sizeof(float));
+    }
+    if (screenRT.depthBuffer) {
+        Com_Memset(screenRT.depthBuffer, 0, pixelCount * sizeof(float));
+    }
+    if (screenRT.normalBuffer) {
+        Com_Memset(screenRT.normalBuffer, 0, pixelCount * 3 * sizeof(float));
+    }
+    if (screenRT.albedoBuffer) {
+        Com_Memset(screenRT.albedoBuffer, 0, pixelCount * 3 * sizeof(float));
+    }
+    
     screenRT.width = width;
     screenRT.height = height;
     screenRT.initialized = qtrue;
     screenRT.currentSample = 0;
     
     ri.Printf(PRINT_ALL, "RT: Allocated screen buffers %dx%d\n", width, height);
-}
-
-/*
-================
-RT_GeneratePrimaryRay
-
-Generate ray from camera through pixel
-================
-*/
-static void RT_GeneratePrimaryRay(int x, int y, ray_t *ray) {
-    // Get camera vectors from backend
-    vec3_t forward, right, up;
-    VectorCopy(backEnd.viewParms.or.axis[0], forward);
-    VectorCopy(backEnd.viewParms.or.axis[1], right);
-    VectorCopy(backEnd.viewParms.or.axis[2], up);
-    
-    // Convert pixel to NDC (-1 to 1)
-    float ndcX = (2.0f * x / screenRT.width) - 1.0f;
-    float ndcY = 1.0f - (2.0f * y / screenRT.height);
-    
-    // Apply FOV
-    float tanHalfFov = tan(DEG2RAD(backEnd.viewParms.fovX * 0.5f));
-    float aspectRatio = (float)screenRT.width / screenRT.height;
-    
-    ndcX *= tanHalfFov * aspectRatio;
-    ndcY *= tanHalfFov;
-    
-    // Generate ray direction
-    VectorCopy(backEnd.viewParms.or.origin, ray->origin);
-    
-    ray->direction[0] = forward[0] + ndcX * right[0] + ndcY * up[0];
-    ray->direction[1] = forward[1] + ndcX * right[1] + ndcY * up[1];
-    ray->direction[2] = forward[2] + ndcX * right[2] + ndcY * up[2];
-    VectorNormalize(ray->direction);
-    
-    ray->tMin = 0.01f;
-    ray->tMax = 10000.0f;
 }
 
 /*
@@ -107,16 +83,26 @@ static void RT_RenderScreenPixel(int x, int y) {
     
     // Generate primary ray
     ray_t ray;
-    RT_GeneratePrimaryRay(x, y, &ray);
+    RT_BuildCameraRay(x, y, screenRT.width, screenRT.height, &ray);
     
     // Trace path
     vec3_t color;
     RT_TracePath(&ray, 0, color);
+
+    // Accumulate temporal history
+    RT_AccumulateSample(x, y, color);
+
+    vec3_t displayColor;
+    if (rt.temporalEnabled) {
+        RT_GetAccumulatedColor(x, y, displayColor);
+    } else {
+        VectorCopy(color, displayColor);
+    }
     
     // Store results
-    screenRT.colorBuffer[pixelIndex * 3 + 0] = color[0];
-    screenRT.colorBuffer[pixelIndex * 3 + 1] = color[1];
-    screenRT.colorBuffer[pixelIndex * 3 + 2] = color[2];
+    screenRT.colorBuffer[pixelIndex * 3 + 0] = displayColor[0];
+    screenRT.colorBuffer[pixelIndex * 3 + 1] = displayColor[1];
+    screenRT.colorBuffer[pixelIndex * 3 + 2] = displayColor[2];
     
     // Trace for additional buffers (for denoising)
     hitInfo_t hit;
@@ -129,6 +115,24 @@ static void RT_RenderScreenPixel(int x, int y) {
         screenRT.depthBuffer[pixelIndex] = ray.tMax;
         VectorClear(&screenRT.normalBuffer[pixelIndex * 3]);
         VectorSet(&screenRT.albedoBuffer[pixelIndex * 3], 0.5f, 0.7f, 1.0f); // Sky color
+    }
+}
+
+static void RT_UpdateColorBufferFromSource(const float *source) {
+    if (!screenRT.initialized || !screenRT.colorBuffer || !source) {
+        return;
+    }
+
+    int pixelCount = screenRT.width * screenRT.height;
+    for (int i = 0; i < pixelCount; i++) {
+        if (rt.sampleBuffer && rt.sampleBuffer[i] <= 0) {
+            continue;
+        }
+
+        int base = i * 3;
+        screenRT.colorBuffer[base + 0] = source[base + 0];
+        screenRT.colorBuffer[base + 1] = source[base + 1];
+        screenRT.colorBuffer[base + 2] = source[base + 2];
     }
 }
 
@@ -147,6 +151,7 @@ void RT_RenderFullScreen(void) {
     
     // Ensure buffers are allocated
     RT_AllocateScreenBuffers(glConfig.vidWidth, glConfig.vidHeight);
+    RT_InitTemporalBuffers();
     
     // Progressive rendering - render in tiles for interactivity
     int tileSize = 32;
@@ -177,13 +182,16 @@ void RT_RenderFullScreen(void) {
     }
     
     screenRT.currentSample++;
-    
-    // Apply denoising if available
-    if (rtx_denoise && rtx_denoise->integer && RTX_IsAvailable()) {
-        // TODO: Implement RTX denoising
-        // RTX_DenoiseImage(screenRT.colorBuffer, screenRT.albedoBuffer, 
-        //                 screenRT.normalBuffer, screenRT.width, screenRT.height);
+
+    const float *source = NULL;
+    if (rt_denoise && rt_denoise->integer && rt.accumBuffer && rt.denoisedBuffer) {
+        RT_DenoiseFrame(rt.accumBuffer, rt.denoisedBuffer, screenRT.width, screenRT.height);
+        source = rt.denoisedBuffer;
+    } else if (rt.accumBuffer) {
+        source = rt.accumBuffer;
     }
+
+    RT_UpdateColorBufferFromSource(source);
 }
 
 /*
@@ -265,4 +273,15 @@ void RT_FreeScreenBuffers(void) {
     if (screenRT.albedoBuffer) ri.Free(screenRT.albedoBuffer);
     
     Com_Memset(&screenRT, 0, sizeof(screenRT));
+}
+
+void RT_ResetScreenProgress(void) {
+    screenRT.currentSample = 0;
+
+    if (!screenRT.initialized || !screenRT.colorBuffer) {
+        return;
+    }
+
+    int pixelCount = screenRT.width * screenRT.height;
+    Com_Memset(screenRT.colorBuffer, 0, pixelCount * 3 * sizeof(float));
 }

@@ -27,14 +27,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 // External references
 extern lightSystem_t tr_lightSystem;
-extern cvar_t *r_dynamicLighting;
 extern cvar_t *r_maxLights;
-extern cvar_t *r_lightCullDistance;
 
 // Forward declarations
 static void R_CalculateFrustumBounds(renderLight_t *light);
 static void R_BuildLightProjectionMatrix(renderLight_t *light);
-shadowMapInfo_t *R_FindOrAllocateShadowMap(renderLight_t *light);
 
 // Helper function for matrix identity
 static void MatrixIdentity(mat3_t m) {
@@ -97,7 +94,6 @@ renderLight_t* R_CreateLight(void) {
     light->linear = 0.0f;
     light->quadratic = 1.0f;
     light->cutoffDistance = 512.0f;
-    light->shadowLod = 1;
     light->shadowBias = 0.005f;
     light->shadowSoftness = 1.0f;
     light->areaNum = -1;
@@ -133,12 +129,6 @@ void R_FreeLight(renderLight_t *light) {
         R_RemoveLightFromArea(light);
     }
     
-    // Free shadow map if allocated
-    if (light->shadowMap) {
-        R_FreeShadowMap(light->shadowMap);
-        light->shadowMap = NULL;
-    }
-    
     // Clear the light structure
     Com_Memset(light, 0, sizeof(renderLight_t));
 }
@@ -152,10 +142,6 @@ Add light from game (replaces RE_AddLightToScene)
 */
 void RE_AddDynamicLight(const vec3_t origin, float radius, float r, float g, float b) {
     renderLight_t *light;
-    
-    if (!r_dynamicLighting || !r_dynamicLighting->integer) {
-        return;
-    }
     
     light = R_CreateLight();
     if (!light) {
@@ -460,50 +446,4 @@ void R_BuildLightProjectionMatrix(renderLight_t *light) {
     light->projectionMatrix[10] = zScale;
     light->projectionMatrix[11] = 1.0f;
     light->projectionMatrix[14] = -light->nearClip * zScale;
-}
-
-/*
-===============
-R_ConvertDlights
-
-Convert old dlight system to new renderLights
-===============
-*/
-void R_ConvertDlights(void) {
-    int i;
-    dlight_t *dl;
-    renderLight_t *light;
-    
-    // Clear active lights
-    tr_lightSystem.numActiveLights = 0;
-    
-    // Convert dlights to renderLights
-    for (i = 0; i < tr.refdef.num_dlights; i++) {
-        dl = &tr.refdef.dlights[i];
-        
-        light = R_CreateLight();
-        if (!light) {
-            break;
-        }
-        
-        VectorCopy(dl->origin, light->origin);
-        VectorCopy(dl->color, light->color);
-        light->radius = dl->radius;
-        light->cutoffDistance = dl->radius;
-        light->type = RL_OMNI;
-        light->isStatic = qfalse;
-        
-        // Set attenuation to match old behavior
-        light->constant = 0.0f;
-        light->linear = 2.0f / dl->radius;
-        light->quadratic = 1.0f / (dl->radius * dl->radius);
-        
-        if (dl->additive) {
-            light->flags |= LIGHTFLAG_NOSHADOWS;
-        }
-        
-        R_UpdateLight(light);
-        
-        tr_lightSystem.activeLights[tr_lightSystem.numActiveLights++] = light;
-    }
 }

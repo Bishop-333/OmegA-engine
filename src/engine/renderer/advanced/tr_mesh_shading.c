@@ -607,8 +607,8 @@ Create default mesh shading pipelines
 void R_CreateMeshShadingPipelines( void ) {
     // Load task and mesh shaders
     uint32_t taskCodeSize, meshCodeSize;
-    uint32_t *taskSpirv = R_LoadSPIRV( "task_shader.spv", &taskCodeSize );
-    uint32_t *meshSpirv = R_LoadSPIRV( "mesh_shader.spv", &meshCodeSize );
+    uint32_t *taskSpirv = R_LoadSPIRV( "compute/task_shader.spv", &taskCodeSize );
+    uint32_t *meshSpirv = R_LoadSPIRV( "compute/mesh_shader.spv", &meshCodeSize );
     
     if ( !taskSpirv || !meshSpirv ) {
         ri.Printf( PRINT_WARNING, "Failed to load mesh shading shaders\n" );

@@ -51,6 +51,20 @@ typedef struct {
 
 static backendThread_t backendThread;
 
+#if defined(_DEBUG)
+static void backend_log_cmd(const char *action, VkCommandBuffer buffer, const char *tag) {
+    if (buffer == VK_NULL_HANDLE) {
+        return;
+    }
+    if (!tag) {
+        tag = "";
+    }
+    ri.Printf(PRINT_DEVELOPER, "VK-BACKEND %s %p %s\n", action, (void*)buffer, tag);
+}
+#else
+#define backend_log_cmd(action, buffer, tag) ((void)0)
+#endif
+
 // Forward declaration
 void vk_shutdown_backend_thread( void );
 
@@ -164,6 +178,8 @@ void vk_initialize_backend_thread( void ) {
         backendThread.commandPool = VK_NULL_HANDLE;
         return;
     }
+    backend_log_cmd("alloc", backendThread.commandBuffer, "backend");
+    vk_cmd_register("backend_thread", backendThread.commandBuffer, backendThread.commandPool);
     
     // Create fence for synchronization
     VkFenceCreateInfo fenceInfo = {
@@ -267,10 +283,19 @@ void vk_shutdown_backend_thread( void ) {
     // Cleanup Vulkan resources
     if ( backendThread.fence != VK_NULL_HANDLE ) {
         vkDestroyFence( vk.device, backendThread.fence, NULL );
+        backendThread.fence = VK_NULL_HANDLE;
     }
-    
+
+    if ( backendThread.commandBuffer != VK_NULL_HANDLE && backendThread.commandPool != VK_NULL_HANDLE ) {
+        backend_log_cmd("free", backendThread.commandBuffer, "backend_shutdown");
+        vk_cmd_unregister(backendThread.commandBuffer);
+        vkFreeCommandBuffers( vk.device, backendThread.commandPool, 1, &backendThread.commandBuffer );
+        backendThread.commandBuffer = VK_NULL_HANDLE;
+    }
+
     if ( backendThread.commandPool != VK_NULL_HANDLE ) {
         vkDestroyCommandPool( vk.device, backendThread.commandPool, NULL );
+        backendThread.commandPool = VK_NULL_HANDLE;
     }
     
     Com_Memset( &backendThread, 0, sizeof(backendThread) );

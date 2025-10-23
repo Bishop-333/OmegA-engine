@@ -157,15 +157,16 @@ void Material_ConvertStage(materialStage_t *mStage, shaderStage_t *sStage) {
     // Copy texture bundles
     Com_Memcpy(mStage->bundle, sStage->bundle, sizeof(textureBundle_t) * NUM_TEXTURE_BUNDLES);
     
+    if (sStage->bundle[0].isLightmap || sStage->bundle[0].tcGen == TCGEN_LIGHTMAP) {
+        R_ReportLegacyLightmapUsage("MaterialStageFromShaderStage");
+        mStage->active = qfalse;
+        mStage->lighting = SL_NONE;
+        return;
+    }
+    
     // Set primary texture
     if (sStage->bundle[0].image[0]) {
         mStage->colorMap = sStage->bundle[0].image[0];
-    }
-    
-    // Check for lightmap
-    if (sStage->bundle[0].isLightmap) {
-        mStage->isLightmap = qtrue;
-        mStage->lighting = SL_DIFFUSE;
     }
     
     // Convert texture coordinate generation
@@ -198,17 +199,8 @@ void Material_ConvertStage(materialStage_t *mStage, shaderStage_t *sStage) {
     // Extract blend functions from state bits
     Material_ExtractBlendFunc(mStage);
     
-    // Determine lighting mode
-    if (sStage->bundle[0].isLightmap) {
-        mStage->lighting = SL_DIFFUSE;
-    } else if (sStage->bundle[1].image[0]) {
-        // Check if second bundle is a lightmap
-        if (sStage->bundle[1].isLightmap) {
-            mStage->lighting = SL_DIFFUSE;
-        }
-    } else {
-        mStage->lighting = SL_NONE;
-    }
+    // Determine lighting mode (default to diffuse for compatibility)
+    mStage->lighting = SL_DIFFUSE;
     
     // Handle detail flag
     mStage->isDetail = sStage->isDetail;
@@ -296,9 +288,7 @@ shader_t* Material_CreateShaderWrapper(material_t *material) {
     shader->isStaticShader = material->isStaticMaterial;
     
     // Determine optimal stage iterator
-    if (material->hasLightmap && material->numStages == 2) {
-        shader->optimalStageIteratorFunc = RB_StageIteratorLightmappedMultitexture;
-    } else if (material->vertexAttribs & ATTR_COLOR) {
+    if (material->vertexAttribs & ATTR_COLOR) {
         shader->optimalStageIteratorFunc = RB_StageIteratorVertexLitTexture;
     } else {
         shader->optimalStageIteratorFunc = RB_StageIteratorGeneric;
@@ -356,10 +346,6 @@ shaderStage_t* Material_CreateStageWrapper(materialStage_t *mStage) {
     
     // Handle special flags
     sStage->isDetail = mStage->isDetail;
-    if (mStage->isLightmap) {
-        sStage->bundle[0].isLightmap = qtrue;
-    }
-    
     // Handle fog
     sStage->bundle[0].adjustColorsForFog = ACFF_NONE;
     if (mStage->stateBits & GLS_SRCBLEND_SRC_ALPHA) {

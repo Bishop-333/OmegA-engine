@@ -67,7 +67,10 @@ qboolean R_InitBindlessResources( void ) {
     vkGetPhysicalDeviceFeatures2( vk.physical_device, &features2 );
     
     if ( !indexingFeatures.descriptorBindingPartiallyBound ||
-         !indexingFeatures.runtimeDescriptorArray ) {
+         !indexingFeatures.runtimeDescriptorArray ||
+         !indexingFeatures.descriptorBindingSampledImageUpdateAfterBind ||
+         !indexingFeatures.descriptorBindingStorageImageUpdateAfterBind ||
+         !indexingFeatures.descriptorBindingStorageBufferUpdateAfterBind ) {
         ri.Printf( PRINT_WARNING, "Bindless resources not fully supported by GPU\n" );
         return qfalse;
     }
@@ -75,6 +78,7 @@ qboolean R_InitBindlessResources( void ) {
     bindlessState.supported = qtrue;
     bindlessState.descriptorIndexingSupported = qtrue;
     bindlessState.runtimeDescriptorArraySupported = qtrue;
+    bindlessState.updateAfterBindSupported = qtrue;
     
     // Get descriptor limits
     VkPhysicalDeviceProperties2 props2 = {

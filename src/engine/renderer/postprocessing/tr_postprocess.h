@@ -137,6 +137,11 @@ typedef struct postProcessState_s {
     VkSampler           linearSampler;
     VkSampler           pointSampler;
     
+    // Vulkan pipelines and layouts
+    VkPipeline          pipelines[POST_PASS_COUNT];
+    VkPipelineLayout    pipelineLayouts[POST_PASS_COUNT];
+    VkDescriptorSet     descriptorSets[POST_PASS_COUNT];
+    
     // Statistics
     float               frameTime;
     uint32_t            passesExecuted;
@@ -144,6 +149,15 @@ typedef struct postProcessState_s {
 
 // Global post-processing state
 extern postProcessState_t postProcessState;
+
+// CVars
+extern cvar_t *r_postProcess;
+extern cvar_t *r_postProcessDebug;
+extern cvar_t *r_dof;
+extern cvar_t *r_motionBlur;
+extern cvar_t *r_chromaticAberration;
+extern cvar_t *r_vignette;
+extern cvar_t *r_filmGrain;
 
 // Initialization
 qboolean R_InitPostProcess( void );
@@ -197,5 +211,19 @@ void R_SwapPostProcessBuffers( void );
 // Debug
 void R_DrawPostProcessDebug( void );
 void R_ShowPostProcessPasses( void );
+
+// Pipeline management
+void R_InitPostProcessPipelines( void );
+void R_ShutdownPostProcessPipelines( void );
+
+// Descriptor management
+void R_InitPostProcessDescriptors( void );
+void R_ShutdownPostProcessDescriptors( void );
+void R_EnsurePostProcessBuffers( void );
+VkDescriptorSet R_AllocatePostProcessDescriptorSet( VkDescriptorSetLayout layout );
+void R_UpdatePostProcessDescriptorSet( VkDescriptorSet descriptorSet, 
+                                       VkImageView colorView, 
+                                       VkImageView secondaryView,
+                                       VkSampler sampler );
 
 #endif // __TR_POSTPROCESS_H

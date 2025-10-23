@@ -22,6 +22,11 @@ layout(binding = 3, set = 0, rgba32f) uniform image2D normalImage;
 layout(binding = 4, set = 0, rgba32f) uniform image2D motionVectorImage;
 layout(binding = 5, set = 0, r32f) uniform image2D depthImage;
 
+// Lighting contribution buffers for debug visualization
+layout(binding = 15, set = 0, rgba32f) uniform image2D directLightImage;
+layout(binding = 16, set = 0, rgba32f) uniform image2D indirectLightImage;
+layout(binding = 17, set = 0, rgba32f) uniform image2D lightmapImage;
+
 layout(binding = 6, set = 0) uniform CameraBuffer {
     mat4 viewInverse;
     mat4 projInverse;
@@ -118,6 +123,35 @@ vec3 randomCosineDirection(vec3 normal, inout uint seed) {
     return normalize(u * x + v * y + w * z);
 }
 
+float luminance(vec3 color) {
+    return dot(color, vec3(0.299, 0.587, 0.114));
+}
+
+vec3 hashColor(uint id) {
+    vec3 seed = vec3(float(id) + 1.0f, (float(id) + 1.0f) * 1.321f, (float(id) + 1.0f) * 1.123f);
+    return fract(sin(seed) * 43758.5453f);
+}
+
+vec3 heatmapColor(float value) {
+    float v = clamp(value, 0.0, 1.0);
+    vec3 color;
+    if (v < 0.25) {
+        color = mix(vec3(0.0, 0.0, 0.2), vec3(0.0, 0.5, 1.0), v * 4.0);
+    } else if (v < 0.5) {
+        color = mix(vec3(0.0, 0.5, 1.0), vec3(0.0, 1.0, 0.0), (v - 0.25) * 4.0);
+    } else if (v < 0.75) {
+        color = mix(vec3(0.0, 1.0, 0.0), vec3(1.0, 1.0, 0.0), (v - 0.5) * 4.0);
+    } else {
+        color = mix(vec3(1.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), (v - 0.75) * 4.0);
+    }
+
+    if (v > 0.95) {
+        color = vec3(1.0, 1.0, 1.0);
+    }
+
+    return color;
+}
+
 vec2 getPixelJitter(uint frameCount, uint pixelIndex) {
     uint seed = pixelIndex + frameCount * 1024;
     return vec2(randomFloat(seed), randomFloat(seed)) - 0.5;
@@ -152,6 +186,11 @@ void main() {
     vec3 finalAlbedo = vec3(0.0);
     vec3 finalNormal = vec3(0.0);
     float finalDepth = 1.0;
+
+    // Separate lighting contributions for debug visualization
+    vec3 finalDirectLight = vec3(0.0);
+    vec3 finalIndirectLight = vec3(0.0);
+    vec3 finalLightmap = vec3(0.0);
     
     // Multi-sample anti-aliasing through multiple rays
     uint samples = cam.samplesPerPixel > 0 ? cam.samplesPerPixel : 1;
@@ -178,11 +217,14 @@ void main() {
         
         if (hitInfo.hitType == 1) {
             vec3 color = vec3(0.0);
-            
+            vec3 directLight = vec3(0.0);
+            vec3 indirectLight = vec3(0.0);
+            vec3 lightmapContrib = vec3(0.0);
+
             // Direct lighting
             vec3 lightDir = normalize(vec3(1.0, 1.0, 0.5));
             float NdotL = max(dot(hitInfo.normal, lightDir), 0.0);
-            
+
             // Shadow ray
             if (settings.enableShadows > 0 && NdotL > 0.0) {
                 shadowPayload = 1.0;
@@ -200,21 +242,23 @@ void main() {
                            );
                 NdotL *= shadowPayload;
             }
-            
-            // Basic shading
-            color = hitInfo.albedo * NdotL;
-            
-            // Ambient
-            color += hitInfo.albedo * 0.1;
+
+            // Calculate direct lighting contribution
+            directLight = hitInfo.albedo * NdotL;
+            color = directLight;
+
+            // Ambient/Lightmap contribution (simulated for now)
+            lightmapContrib = hitInfo.albedo * 0.1;
+            color += lightmapContrib;
             
             // Global illumination
             if (settings.enableGI > 0 && cam.maxBounces > 0) {
                 vec3 giColor = vec3(0.0);
                 uint giSamples = 4;
-                
+
                 for (uint gi = 0; gi < giSamples; gi++) {
                     vec3 giDir = randomCosineDirection(hitInfo.normal, rngSeed);
-                    
+
                     // Trace GI ray
                     HitInfo giHit;
                     traceRayEXT(topLevelAS,
@@ -226,13 +270,15 @@ void main() {
                                giDir,
                                100.0,
                                0);
-                    
+
                     if (giHit.hitType == 1) {
                         giColor += giHit.albedo * 0.5;
                     }
                 }
-                
-                color += (giColor / float(giSamples)) * settings.giIntensity * hitInfo.albedo;
+
+                // Calculate indirect lighting contribution
+                indirectLight = (giColor / float(giSamples)) * settings.giIntensity * hitInfo.albedo;
+                color += indirectLight;
             }
             
             // Reflections
@@ -260,6 +306,11 @@ void main() {
             finalAlbedo += hitInfo.albedo;
             finalNormal += hitInfo.normal;
             finalDepth = min(finalDepth, hitInfo.distance / cam.farPlane);
+
+            // Accumulate lighting contributions
+            finalDirectLight += directLight;
+            finalIndirectLight += indirectLight;
+            finalLightmap += lightmapContrib;
         } else {
             // Sky color
             float t = 0.5 * (normalize(direction.xyz).y + 1.0);
@@ -272,6 +323,9 @@ void main() {
     finalColor /= float(samples);
     finalAlbedo /= float(samples);
     finalNormal = normalize(finalNormal);
+    finalDirectLight /= float(samples);
+    finalIndirectLight /= float(samples);
+    finalLightmap /= float(samples);
     
     // Calculate motion vectors for temporal effects
     vec2 motionVector = vec2(0.0);
@@ -290,12 +344,60 @@ void main() {
     // Debug visualization modes
     if (settings.debugMode > 0) {
         switch (settings.debugMode) {
-            case 1: finalColor = finalNormal * 0.5 + 0.5; break;  // Normals
-            case 2: finalColor = finalAlbedo; break;               // Albedo
-            case 3: finalColor = vec3(finalDepth); break;          // Depth
-            case 4: finalColor = vec3(hitInfo.roughness); break;   // Roughness
-            case 5: finalColor = vec3(hitInfo.metallic); break;    // Metallic
-            case 6: finalColor = vec3(length(motionVector) * 10.0); break; // Motion
+            case 1: // RT participation heuristic
+                if (hitInfo.hitType == 0u) {
+                    finalColor = vec3(0.6, 0.0, 0.0);
+                } else {
+                    float roughnessWeight = clamp(1.0 - hitInfo.roughness, 0.0, 1.0);
+                    vec3 base = mix(vec3(0.0, 0.3, 0.0), vec3(0.0, 0.9, 0.0), roughnessWeight);
+                    float metallicWeight = clamp(hitInfo.metallic, 0.0, 1.0);
+                    vec3 reflective = vec3(0.0, 0.8, 0.8);
+                    finalColor = mix(base, reflective, metallicWeight);
+                }
+                break;
+            case 2: // Material properties (roughness/metallic/emissive proxy)
+                {
+                    float litLuminance = luminance(finalDirectLight + finalIndirectLight + finalLightmap);
+                    float emissive = clamp(luminance(finalColor) - litLuminance, 0.0, 1.0);
+                    finalColor = vec3(hitInfo.roughness, hitInfo.metallic, emissive);
+                }
+                break;
+            case 3: // Lighting contributions (direct / indirect / lightmap)
+                {
+                    float directLum = luminance(finalDirectLight);
+                    float indirectLum = luminance(finalIndirectLight);
+                    float lightmapLum = luminance(finalLightmap);
+                    float total = max(directLum + indirectLum + lightmapLum, 1e-5);
+                    finalColor = vec3(directLum, indirectLum, lightmapLum) / total;
+                }
+                break;
+            case 4: // Ray density proxy using distance heatmap
+                {
+                    float density = (hitInfo.hitType == 0u) ? 0.0 : 1.0 / (hitInfo.distance + 1.0);
+                    finalColor = heatmapColor(density * 2.0);
+                }
+                break;
+            case 5: // Surface normals
+                finalColor = finalNormal * 0.5 + 0.5;
+                break;
+            case 6: // Lightmap coverage approximation
+                {
+                    float lightmapLum = luminance(finalLightmap);
+                    finalColor = vec3(lightmapLum);
+                }
+                break;
+            case 7: // Instance identifiers
+                finalColor = hashColor(hitInfo.instanceID);
+                break;
+            case 8: // Random verification noise
+            {
+                uint pixelId = gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x;
+                finalColor = hashColor(pixelId + cam.frameCount * 733u);
+                break;
+            }
+            default:
+                finalColor = finalAlbedo;
+                break;
         }
     }
     
@@ -305,4 +407,9 @@ void main() {
     imageStore(normalImage, ivec2(gl_LaunchIDEXT.xy), vec4(finalNormal * 0.5 + 0.5, 1.0));
     imageStore(motionVectorImage, ivec2(gl_LaunchIDEXT.xy), vec4(motionVector, 0.0, 1.0));
     imageStore(depthImage, ivec2(gl_LaunchIDEXT.xy), vec4(finalDepth, 0.0, 0.0, 1.0));
+
+    // Store lighting contributions for debug visualization
+    imageStore(directLightImage, ivec2(gl_LaunchIDEXT.xy), vec4(finalDirectLight, 1.0));
+    imageStore(indirectLightImage, ivec2(gl_LaunchIDEXT.xy), vec4(finalIndirectLight, 1.0));
+    imageStore(lightmapImage, ivec2(gl_LaunchIDEXT.xy), vec4(finalLightmap, 1.0));
 }

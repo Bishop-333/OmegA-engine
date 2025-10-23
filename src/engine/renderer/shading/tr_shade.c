@@ -347,11 +347,7 @@ static void DrawMultitextured( const shaderCommands_t *input, int stage ) {
 	qglEnable( GL_TEXTURE_2D );
 	R_BindAnimatedImage( &pStage->bundle[1] );
 
-	if ( r_lightmap->integer ) {
-		GL_TexEnv( GL_REPLACE );
-	} else {
-		GL_TexEnv( pStage->mtEnv );
-	}
+	GL_TexEnv( pStage->mtEnv );
 
 	R_DrawElements( input->numIndexes, input->indexes );
 
@@ -943,6 +939,9 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 	int fog_stage;
 	qboolean pushUniform;
 
+	// Clear stage hint before iterating
+	VK_SetUberStage( NULL, -1 );
+
 	vk_bind_index();
 
 	tess_flags = input->shader->tessFlags;
@@ -1007,10 +1006,8 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 
 		GL_SelectTexture( 0 );
 
-		if ( r_lightmap->integer && pStage->bundle[1].lightmap != LIGHTMAP_INDEX_NONE ) {
-			//GL_SelectTexture( 0 );
-			GL_Bind( tr.whiteImage ); // replace diffuse texture with a white one thus effectively render only lightmap
-		}
+		// Provide current stage info to uber shader path
+		VK_SetUberStage( pStage, stage );
 
 		if ( backEnd.viewParms.portalView == PV_MIRROR ) {
 			pipeline = pStage->vk_mirror_pipeline[fog_stage];
@@ -1070,12 +1067,13 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		}
 #endif
 
-		// allow skipping out to show just lightmaps during development
-		if ( r_lightmap->integer && ( pStage->bundle[0].lightmap != LIGHTMAP_INDEX_NONE || pStage->bundle[1].lightmap != LIGHTMAP_INDEX_NONE ) )
-			break;
-
 		tess_flags = 0;
 	}
+
+#ifdef USE_VULKAN
+	// No further stages
+	VK_SetUberStage( NULL, -1 );
+#endif
 
 #ifdef USE_VULKAN
 	if ( pushUniform ) {
@@ -1424,11 +1422,6 @@ void RB_EndSurface( void ) {
 		ri.Error( ERR_DROP, "RB_EndSurface() - SHADER_MAX_VERTEXES hit" );
 	}
 
-	if ( tess.shader == tr.shadowShader ) {
-		RB_ShadowTessEnd();
-		return;
-	}
-
 	// for debugging of sort order issues, stop rendering after a given sort value
 	if ( r_debugSort->integer && r_debugSort->integer < tess.shader->sort && !backEnd.doneSurfaces ) {
 #ifdef USE_VBO
@@ -1502,3 +1495,4 @@ void RB_StageIteratorVertexLitTexture( void )
 	// TODO: Implement optimized vertex lit path
 	RB_StageIteratorGeneric();
 }
+

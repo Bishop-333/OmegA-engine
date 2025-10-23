@@ -35,7 +35,6 @@ permutations with a single flexible uber-shader.
 
 // Global pipelines
 vkPipeline_t *vk_uberPipeline = NULL;
-vkPipeline_t *vk_shadowPipeline = NULL;
 vkPipeline_t *vk_postProcessPipeline = NULL;
 vkPipeline_t *vk_skyboxPipeline = NULL;
 
@@ -43,10 +42,85 @@ vkPipeline_t *vk_skyboxPipeline = NULL;
 VkShaderModule vk_uberVertexShader = VK_NULL_HANDLE;
 VkShaderModule vk_uberFragmentShader = VK_NULL_HANDLE;
 
+// Uber shader descriptor set layout
+VkDescriptorSetLayout vk_uberDescriptorSetLayout = VK_NULL_HANDLE;
+
 // Pipeline cache for different blend states
 #define MAX_PIPELINE_CACHE 16
 static vkPipeline_t pipelineCache[MAX_PIPELINE_CACHE];
 static int numCachedPipelines = 0;
+
+/*
+================
+VK_CreateUberDescriptorSetLayout
+
+Create descriptor set layout for uber shader
+================
+*/
+static void VK_CreateUberDescriptorSetLayout(void) {
+    VkDescriptorSetLayoutBinding bindings[6];
+    VkDescriptorSetLayoutCreateInfo layoutInfo;
+    VkResult result;
+
+    // Binding 0: Dynamic uniform buffer for transforms
+    Com_Memset(&bindings[0], 0, sizeof(bindings[0]));
+    bindings[0].binding = 0;
+    bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    bindings[0].descriptorCount = 1;
+    bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings[0].pImmutableSamplers = NULL;
+
+    // Binding 1: Diffuse texture
+    Com_Memset(&bindings[1], 0, sizeof(bindings[1]));
+    bindings[1].binding = 1;
+    bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[1].descriptorCount = 1;
+    bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings[1].pImmutableSamplers = NULL;
+
+    // Binding 2: Lightmap texture
+    Com_Memset(&bindings[2], 0, sizeof(bindings[2]));
+    bindings[2].binding = 2;
+    bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[2].descriptorCount = 1;
+    bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings[2].pImmutableSamplers = NULL;
+
+    // Binding 3: Normal map
+    Com_Memset(&bindings[3], 0, sizeof(bindings[3]));
+    bindings[3].binding = 3;
+    bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[3].descriptorCount = 1;
+    bindings[3].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings[3].pImmutableSamplers = NULL;
+
+    // Binding 4: Specular map
+    Com_Memset(&bindings[4], 0, sizeof(bindings[4]));
+    bindings[4].binding = 4;
+    bindings[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[4].descriptorCount = 1;
+    bindings[4].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings[4].pImmutableSamplers = NULL;
+
+    // Binding 5: Environment map
+    Com_Memset(&bindings[5], 0, sizeof(bindings[5]));
+    bindings[5].binding = 5;
+    bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[5].descriptorCount = 1;
+    bindings[5].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings[5].pImmutableSamplers = NULL;
+
+    // Create descriptor set layout
+    Com_Memset(&layoutInfo, 0, sizeof(layoutInfo));
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 6;
+    layoutInfo.pBindings = bindings;
+
+    result = vkCreateDescriptorSetLayout(vk.device, &layoutInfo, NULL, &vk_uberDescriptorSetLayout);
+    if (result != VK_SUCCESS) {
+        ri.Error(ERR_FATAL, "Failed to create uber shader descriptor set layout: %d", result);
+    }
+}
 
 /*
 ================
@@ -57,13 +131,16 @@ Initialize the uber-shader system
 */
 void VK_InitUberShaderSystem(void) {
     vkPipelineState_t defaultState;
-    
+
     ri.Printf(PRINT_ALL, "Initializing Vulkan uber-shader system...\n");
-    
+
+    // Create uber shader descriptor set layout
+    VK_CreateUberDescriptorSetLayout();
+
     // Load shader modules
     vk_uberVertexShader = VK_LoadShaderModule("shaders/uber.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
     vk_uberFragmentShader = VK_LoadShaderModule("shaders/uber.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-    
+
     if (!vk_uberVertexShader || !vk_uberFragmentShader) {
         ri.Error(ERR_FATAL, "Failed to load uber-shader modules");
     }
@@ -71,10 +148,16 @@ void VK_InitUberShaderSystem(void) {
     // Create main uber-pipeline with default state
     Com_Memset(&defaultState, 0, sizeof(defaultState));
     defaultState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    defaultState.cullMode = VK_CULL_MODE_BACK_BIT;
+    // Temporarily disable culling to validate geometry is correct
+    defaultState.cullMode = VK_CULL_MODE_NONE; // VK_CULL_MODE_BACK_BIT;
     defaultState.depthTestEnable = VK_TRUE;
     defaultState.depthWriteEnable = VK_TRUE;
+    // Depth compare op must match reversed depth mode
+#ifdef USE_REVERSED_DEPTH
+    defaultState.depthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
+#else
     defaultState.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+#endif
     defaultState.blendEnable = VK_FALSE;
     defaultState.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
     defaultState.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
@@ -85,16 +168,15 @@ void VK_InitUberShaderSystem(void) {
     
     vk_uberPipeline = VK_CreateUberPipeline("uber_main", &defaultState);
     
-    // Create shadow pipeline
-    defaultState.cullMode = VK_CULL_MODE_NONE;
-    defaultState.depthWriteEnable = VK_FALSE;
-    vk_shadowPipeline = VK_CreateUberPipeline("uber_shadow", &defaultState);
-    
     // Create post-process pipeline
     defaultState.depthTestEnable = VK_FALSE;
     defaultState.depthWriteEnable = VK_FALSE;
     vk_postProcessPipeline = VK_CreateUberPipeline("uber_post", &defaultState);
-    
+
+    // Initialize uber shader integration
+    extern void VK_InitUberIntegration(void);
+    VK_InitUberIntegration();
+
     ri.Printf(PRINT_ALL, "Uber-shader system initialized\n");
 }
 
@@ -107,16 +189,15 @@ Shutdown the uber-shader system
 */
 void VK_ShutdownUberShaderSystem(void) {
     int i;
-    
+
+    // Shutdown the vertex adapter
+    extern void VK_ShutdownUberAdapter(void);
+    VK_ShutdownUberAdapter();
+
     // Destroy pipelines
     if (vk_uberPipeline) {
         VK_DestroyPipeline(vk_uberPipeline);
         vk_uberPipeline = NULL;
-    }
-    
-    if (vk_shadowPipeline) {
-        VK_DestroyPipeline(vk_shadowPipeline);
-        vk_shadowPipeline = NULL;
     }
     
     if (vk_postProcessPipeline) {
@@ -145,10 +226,16 @@ void VK_ShutdownUberShaderSystem(void) {
         VK_DestroyShaderModule(vk_uberVertexShader);
         vk_uberVertexShader = VK_NULL_HANDLE;
     }
-    
+
     if (vk_uberFragmentShader) {
         VK_DestroyShaderModule(vk_uberFragmentShader);
         vk_uberFragmentShader = VK_NULL_HANDLE;
+    }
+
+    // Destroy descriptor set layout
+    if (vk_uberDescriptorSetLayout != VK_NULL_HANDLE) {
+        vkDestroyDescriptorSetLayout(vk.device, vk_uberDescriptorSetLayout, NULL);
+        vk_uberDescriptorSetLayout = VK_NULL_HANDLE;
     }
 }
 
@@ -183,14 +270,14 @@ vkPipeline_t* VK_CreateUberPipeline(const char *name, vkPipelineState_t *state) 
         .inputRate = VK_VERTEX_INPUT_RATE_VERTEX
     };
     
-    // Vertex input attributes
+    // Vertex input attributes (must match shader input locations)
     VkVertexInputAttributeDescription vertexAttribs[] = {
-        { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(vkVertex_t, position) },
-        { 1, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(vkVertex_t, texCoord0) },
-        { 2, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(vkVertex_t, texCoord1) },
-        { 3, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(vkVertex_t, normal) },
-        { 4, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(vkVertex_t, tangent) },
-        { 5, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(vkVertex_t, color) }
+        { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(vkVertex_t, position) },     // inPosition
+        { 1, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(vkVertex_t, texCoord0) },        // inTexCoord
+        { 2, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(vkVertex_t, texCoord1) },        // inTexCoord2
+        { 3, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(vkVertex_t, normal) },        // inNormal
+        { 4, 0, VK_FORMAT_R8G8B8A8_UNORM, offsetof(vkVertex_t, color) },           // inColor
+        { 5, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(vkVertex_t, tangent) }     // inTangent (w = handedness)
     };
     
     // Dynamic states
@@ -251,7 +338,7 @@ vkPipeline_t* VK_CreateUberPipeline(const char *name, vkPipelineState_t *state) 
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
     rasterizer.cullMode = state->cullMode;
-    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;  // Match vk_get_mvp_transform() Y flip
     rasterizer.depthBiasEnable = VK_FALSE;
     
     // Multisampling
@@ -303,17 +390,11 @@ vkPipeline_t* VK_CreateUberPipeline(const char *name, vkPipelineState_t *state) 
     pushConstantRange.size = sizeof(vkPushConstants_t);
     
     // Pipeline layout
-    VkDescriptorSetLayout descriptorSetLayouts[3];
+    VkDescriptorSetLayout descriptorSetLayouts[1];
     uint32_t numDescriptorSetLayouts = 0;
-    
-    // Add descriptor set layouts as needed
-    descriptorSetLayouts[numDescriptorSetLayouts++] = vk.set_layout_sampler;
-    if (vk.set_layout_uniform != VK_NULL_HANDLE) {
-        descriptorSetLayouts[numDescriptorSetLayouts++] = vk.set_layout_uniform;
-    }
-    if (vk.set_layout_storage != VK_NULL_HANDLE) {
-        descriptorSetLayouts[numDescriptorSetLayouts++] = vk.set_layout_storage;
-    }
+
+    // Use the uber shader descriptor set layout
+    descriptorSetLayouts[numDescriptorSetLayouts++] = vk_uberDescriptorSetLayout;
     
     Com_Memset(&pipelineLayoutInfo, 0, sizeof(pipelineLayoutInfo));
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -455,49 +536,54 @@ Configure uber-shader features based on material stage
 void VK_ConfigureUberShader(const materialStage_t *stage, uberShaderConfig_t *config) {
     Com_Memset(config, 0, sizeof(uberShaderConfig_t));
     
-    // Set feature flags
-    if (stage->bundle[0].isLightmap || stage->bundle[1].isLightmap) {
-        config->features |= UBER_FEATURE_LIGHTMAP;
+    // Legacy lightmap bundle warning
+    if (stage->bundle[1].image[0]) {
+        R_ReportLegacyLightmapUsage("VK_ConfigureUberShader bundle1");
     }
     
     if (stage->rgbGen == CGEN_VERTEX) {
-        config->features |= UBER_FEATURE_VERTEX_COLOR;
+        config->features |= FEAT_VERTEX_COLOR;
     }
     
     if (stage->stateBits & GLS_ALPHATEST_ENABLE) {
-        config->features |= UBER_FEATURE_ALPHA_TEST;
+        config->features |= FEAT_ALPHA_TEST;
     }
     
     if (stage->rgbGen == CGEN_WAVEFORM) {
-        config->features |= UBER_FEATURE_RGBGEN_WAVE;
+        // TODO: Add wave support
+        // config->features |= FEAT_RGBGEN_WAVE;
     }
     
     if (stage->alphaGen == AGEN_WAVEFORM) {
-        config->features |= UBER_FEATURE_ALPHAGEN_WAVE;
+        // TODO: Add wave support
+        // config->features |= FEAT_ALPHAGEN_WAVE;
     }
     
     if (stage->bundle[0].tcGen == TCGEN_ENVIRONMENT_MAPPED) {
-        config->features |= UBER_FEATURE_TCGEN_ENVIRONMENT;
+        config->features |= FEAT_ENV_MAP;
     }
     
     if (stage->numTexMods > 0) {
-        config->features |= UBER_FEATURE_TCMOD_TRANSFORM;
+        // TODO: Add tcmod support
+        // config->features |= FEAT_TCMOD_TRANSFORM;
     }
     
     if (stage->normalMap) {
-        config->features |= UBER_FEATURE_NORMALMAP;
+        config->features |= FEAT_NORMAL_MAP;
     }
     
     if (stage->specularMap) {
-        config->features |= UBER_FEATURE_SPECULARMAP;
+        config->features |= FEAT_SPECULAR_MAP;
     }
     
     if (stage->glowMap) {
-        config->features |= UBER_FEATURE_GLOWMAP;
+        // TODO: Add glow map support
+        // config->features |= FEAT_GLOWMAP;
     }
     
     if (stage->isDetail) {
-        config->features |= UBER_FEATURE_DETAIL;
+        // TODO: Add detail texture support
+        // config->features |= FEAT_DETAIL;
     }
     
     // Set texture flags
@@ -506,7 +592,7 @@ void VK_ConfigureUberShader(const materialStage_t *stage, uberShaderConfig_t *co
     }
     
     if (stage->bundle[1].image[0]) {
-        config->textureFlags |= TEXTURE_FLAG_LIGHTMAP;
+        // Legacy lightmap bundle ignored
     }
     
     if (stage->normalMap) {
@@ -562,103 +648,72 @@ Setup push constants for a material stage
 void VK_SetupMaterialPushConstants(const material_t *material, int stageNum, vkPushConstants_t *pc) {
     const materialStage_t *stage;
     int i;
-    
+    float metallic = 0.0f;
+    float roughness = 0.6f;
+    float ao = 1.0f;
+    float emissive = 0.0f;
+    vec3_t sunColor;
+    vec3_t sunDir;
+    float sunIntensity;
+
     if (!material || stageNum >= material->numStages) {
         return;
     }
-    
+
     stage = &material->stages[stageNum];
     Com_Memset(pc, 0, sizeof(vkPushConstants_t));
-    
-    // Configure uber-shader
-    VK_ConfigureUberShader(stage, &pc->config);
-    
-    // Setup matrices (would come from backend state)
-    // TODO: Calculate MVP matrix from view and projection matrices
-    // Com_Memcpy(pc->mvpMatrix, backEnd.viewParms.modelViewProjectionMatrix, sizeof(mat4_t));
-    // Com_Memcpy(pc->modelMatrix, backEnd.or.modelMatrix, sizeof(mat4_t));
-    
-    // Calculate normal matrix (transpose of inverse model matrix)
-    // Simplified: just copy model matrix for now
-    // Com_Memcpy(pc->normalMatrix, backEnd.or.modelMatrix, sizeof(mat4_t));
-    
-    // Material colors
+
+    uberShaderConfig_t config;
+    VK_ConfigureUberShader(stage, &config);
+    pc->features = config.features | FEAT_PBR_SHADING;
+    pc->textureMask = config.textureFlags;
+
     for (i = 0; i < 4; i++) {
         pc->baseColor[i] = stage->constantColor[i] / 255.0f;
     }
-    
-    if (material->specularColor) {
-        VectorCopy(material->specularColor, pc->specularColor);
-        pc->specularColor[3] = 1.0f;
-    } else {
-        VectorSet(pc->specularColor, 1.0f, 1.0f, 1.0f);
-        pc->specularColor[3] = 1.0f;
+
+    if (material->specularExponent > 0.0f) {
+        float spec = Com_Clamp(1.0f, 256.0f, material->specularExponent);
+        roughness = Com_Clamp(0.04f, 1.0f, 1.0f - (spec / 256.0f));
     }
-    
-    pc->specularExponent = material->specularExponent;
-    pc->alphaTestValue = 0.5f;  // Default alpha test threshold
-    pc->currentTime = backEnd.refdef.floatTime;
-    pc->portalRange = material->portalRange;
-    
-    // Setup texture coordinate modifications
-    if (stage->numTexMods > 0) {
-        for (i = 0; i < stage->numTexMods && i < 2; i++) {
-            const texModInfo_t *texMod = &stage->texMods[i];
-            
-            switch (texMod->type) {
-            case TMOD_SCROLL:
-                pc->tcModParams[0][0] = texMod->scroll[0];
-                pc->tcModParams[0][1] = texMod->scroll[1];
-                break;
-            case TMOD_SCALE:
-                pc->tcModParams[0][2] = texMod->scale[0];
-                pc->tcModParams[0][3] = texMod->scale[1];
-                break;
-            case TMOD_ROTATE:
-                pc->tcModParams[1][0] = texMod->rotateSpeed;
-                break;
-            case TMOD_TURBULENT:
-                pc->tcModParams[1][1] = texMod->wave.amplitude;
-                pc->tcModParams[1][2] = texMod->wave.frequency;
-                pc->tcModParams[1][3] = texMod->wave.phase;
-                break;
-            }
-        }
-        pc->tcModParams[1][3] = pc->currentTime;  // Time in w component
+
+    pc->materialParams[0] = Com_Clamp(0.0f, 1.0f, metallic);
+    pc->materialParams[1] = Com_Clamp(0.04f, 1.0f, roughness);
+    pc->materialParams[2] = Com_Clamp(0.0f, 2.0f, ao);
+    pc->materialParams[3] = Com_Clamp(0.0f, 10.0f, emissive);
+
+    VectorCopy(tr.sunLight, sunColor);
+    sunIntensity = VectorLength(sunColor);
+    if (sunIntensity <= 0.0001f) {
+        sunColor[0] = sunColor[1] = sunColor[2] = 1.0f;
+        sunIntensity = 1.0f;
     }
-    
-    // Setup wave parameters
-    if (stage->rgbGen == CGEN_WAVEFORM) {
-        VK_SetupWaveParams(&stage->rgbWave, pc->rgbWaveParams);
+    pc->sunColor[0] = sunColor[0];
+    pc->sunColor[1] = sunColor[1];
+    pc->sunColor[2] = sunColor[2];
+    pc->sunColor[3] = sunIntensity;
+
+    VectorCopy(tr.sunDirection, sunDir);
+    if (VectorNormalize(sunDir) == 0.0f) {
+        VectorSet(sunDir, 0.0f, 0.0f, -1.0f);
     }
-    
-    if (stage->alphaGen == AGEN_WAVEFORM) {
-        VK_SetupWaveParams(&stage->alphaWave, pc->alphaWaveParams);
-    }
-    
-    // Fog parameters (if applicable)
-    if (tess.fogNum) {
-        fog_t *fog = tr.world->fogs + tess.fogNum;
-        VectorCopy(fog->color, pc->fogColor);
-        pc->fogColor[3] = 1.0f;
-        pc->fogParams[0] = 1.0f;  // TODO: Calculate proper fog density
-        pc->fogParams[1] = fog->parms.depthForOpaque;
-    }
+    pc->sunDirection[0] = sunDir[0];
+    pc->sunDirection[1] = sunDir[1];
+    pc->sunDirection[2] = sunDir[2];
+    pc->sunDirection[3] = sunIntensity;
+
+    pc->alphaTestValue = 0.5f;
+    VectorCopy(backEnd.refdef.vieworg, pc->cameraPos_time);
+    pc->cameraPos_time[3] = backEnd.refdef.floatTime;
+
+    VectorSet(pc->fogColor, 0.0f, 0.0f, 0.0f);
+    pc->fogColor[3] = 0.0f;
+    pc->fogParams[0] = 0.0f;
+    pc->fogParams[1] = 0.0f;
 }
 
-/*
-================
-VK_SetupWaveParams
 
-Setup wave parameters for push constants
-================
-*/
-void VK_SetupWaveParams(const waveForm_t *wave, vec4_t params) {
-    params[0] = wave->frequency;
-    params[1] = wave->amplitude;
-    params[2] = wave->phase;
-    params[3] = wave->base;
-}
+// VK_SetupWaveParams removed - integrated directly into VK_SetupMaterialPushConstants
 
 /*
 ================

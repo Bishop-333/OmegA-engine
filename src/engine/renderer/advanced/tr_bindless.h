@@ -150,6 +150,7 @@ typedef struct bindlessState_s {
     qboolean                supported;
     qboolean                descriptorIndexingSupported;
     qboolean                runtimeDescriptorArraySupported;
+    qboolean                updateAfterBindSupported;
     
     bindlessPool_t          pool;
     

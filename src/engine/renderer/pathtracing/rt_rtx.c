@@ -8,11 +8,34 @@ Provides hardware acceleration for path tracing using RTX cores
 */
 
 #include "rt_rtx.h"
+#include <stdarg.h>
 #include "rt_pathtracer.h"
 #include "../core/tr_local.h"
+#ifdef USE_VULKAN
+#include "../vulkan/vk.h"
+#endif
+
+#ifdef USE_VULKAN
+extern void RTX_LoadWorldMap(void);
+#endif
 
 // Global RTX state
 rtxState_t rtx;
+static qboolean rtxInitialized = qfalse;
+static char rtxLastStatus[128] = "RTX not initialised";
+
+static void RTX_SetLastStatus(const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    Q_vsnprintf(rtxLastStatus, sizeof(rtxLastStatus), fmt, args);
+    va_end(args);
+}
+
+const char *RTX_GetLastStatus(void)
+{
+    return rtxLastStatus;
+}
 
 // Forward declarations
 void RTX_Status_f(void);
@@ -40,7 +63,13 @@ Initialize RTX hardware raytracing
 ================
 */
 qboolean RTX_Init(void) {
+    if (rtxInitialized) {
+        ri.Printf(PRINT_ALL, "RTX: hardware raytracing already initialized\n");
+        return rtx.available ? qtrue : qfalse;
+    }
+
     Com_Memset(&rtx, 0, sizeof(rtx));
+    RTX_SetLastStatus("RTX initialising");
     
     // Register CVARs
     rtx_enable = ri.Cvar_Get("rtx_enable", "1", CVAR_ARCHIVE | CVAR_LATCH);  // Enable by default
@@ -60,6 +89,7 @@ qboolean RTX_Init(void) {
         ri.Printf(PRINT_ALL, "RTX: Hardware raytracing disabled (rtx_enable = 0)\n");
         ri.Printf(PRINT_ALL, "RTX: Set rtx_enable 1 and vid_restart to enable RTX support\n");
         ri.Printf(PRINT_ALL, "RTX: Use 'rtx_status' command to check GPU capabilities\n");
+        RTX_SetLastStatus("RTX disabled via rtx_enable");
         return qfalse;
     }
     
@@ -69,12 +99,15 @@ qboolean RTX_Init(void) {
     if (RTX_InitVulkanRT()) {
         rtx.available = qtrue;
         ri.Printf(PRINT_ALL, "RTX: Vulkan Ray Tracing initialized successfully\n");
+        RTX_SetLastStatus("Vulkan RT initialised");
     } else {
         ri.Printf(PRINT_WARNING, "RTX: Vulkan RT initialization failed\n");
+        RTX_SetLastStatus("Vulkan RT initialization failed");
     }
     
     if (!rtx.available) {
         ri.Printf(PRINT_WARNING, "RTX: No hardware raytracing support detected\n");
+        RTX_SetLastStatus("RTX unavailable on current hardware");
         return qfalse;
     }
     
@@ -83,6 +116,7 @@ qboolean RTX_Init(void) {
         ri.Printf(PRINT_WARNING, "RTX: Failed to initialize pipeline system\n");
         RTX_ShutdownVulkanRT();
         rtx.available = qfalse;
+        RTX_SetLastStatus("RTX pipeline initialization failed");
         return qfalse;
     }
     
@@ -97,6 +131,13 @@ qboolean RTX_Init(void) {
     // Create main TLAS
     rtx.tlas.instances = ri.Hunk_Alloc(sizeof(rtxInstance_t) * RTX_MAX_INSTANCES, h_low);
     rtx.tlas.numInstances = 0;
+    rtx.tlas.activeHandle = 0;
+    rtx.tlas.handles[0] = NULL;
+    rtx.tlas.handles[1] = NULL;
+    rtx.tlas.dirtyTransforms = qfalse;
+
+    rtx.refitQueueCount = 0;
+    rtx.refitQueueOverflow = qfalse;
     
     // Initialize denoiser if available
     if (rtx_denoise->integer && (rtx.features & RTX_FEATURE_DENOISER)) {
@@ -116,7 +157,10 @@ qboolean RTX_Init(void) {
     }
     
     ri.Printf(PRINT_ALL, "RTX: Initialization complete - use 'rtx_status' for details\n");
-    
+
+    rtxInitialized = qtrue;
+    RTX_SetLastStatus("RTX initialised successfully");
+
     return qtrue;
 }
 
@@ -131,6 +175,8 @@ void RTX_Shutdown(void) {
     if (!rtx.available) {
         return;
     }
+
+    RTX_SetLastStatus("RTX shutdown");
     
     // Cleanup denoiser
     if (rtx.denoiser.enabled) {
@@ -160,6 +206,7 @@ void RTX_Shutdown(void) {
     RTX_ShutdownVulkanRT();
     
     Com_Memset(&rtx, 0, sizeof(rtx));
+    rtxInitialized = qfalse;
 }
 
 /*
@@ -197,6 +244,7 @@ Create Bottom Level Acceleration Structure for a mesh
 */
 rtxBLAS_t* RTX_CreateBLAS(const vec3_t *vertices, int numVerts,
                           const unsigned int *indices, int numIndices,
+                          const uint32_t *triangleMaterials,
                           qboolean isDynamic) {
     rtxBLAS_t *blas;
     
@@ -220,6 +268,13 @@ rtxBLAS_t* RTX_CreateBLAS(const vec3_t *vertices, int numVerts,
     // Allocate and copy index data
     blas->indices = ri.Hunk_Alloc(sizeof(unsigned int) * numIndices, h_low);
     Com_Memcpy(blas->indices, indices, sizeof(unsigned int) * numIndices);
+
+    if (triangleMaterials && blas->numTriangles > 0) {
+        blas->triangleMaterials = ri.Hunk_Alloc(sizeof(uint32_t) * blas->numTriangles, h_low);
+        Com_Memcpy(blas->triangleMaterials, triangleMaterials, sizeof(uint32_t) * blas->numTriangles);
+    } else {
+        blas->triangleMaterials = NULL;
+    }
     
     // Calculate AABB
     VectorCopy(vertices[0], blas->aabbMin);
@@ -331,6 +386,78 @@ void RTX_UpdateBLAS(rtxBLAS_t *blas, const vec3_t *vertices) {
 
 /*
 ================
+RTX_QueueInstanceRefit
+
+Schedule a TLAS instance for transform and/or BLAS rebuild
+================
+*/
+qboolean RTX_QueueInstanceRefit(int instanceIndex, const float *transform, qboolean rebuildBLAS) {
+    if (instanceIndex < 0 || instanceIndex >= rtx.tlas.numInstances) {
+        return qfalse;
+    }
+
+    if (rtx.refitQueueCount >= RTX_MAX_REFIT_QUEUE) {
+        if (!rtx.refitQueueOverflow) {
+            ri.Printf(PRINT_WARNING, "RTX: Refit queue overflow (%d entries)\n", RTX_MAX_REFIT_QUEUE);
+            rtx.refitQueueOverflow = qtrue;
+        }
+        return qfalse;
+    }
+
+    rtxRefitRequest_t *req = &rtx.refitQueue[rtx.refitQueueCount++];
+    req->instanceIndex = instanceIndex;
+    req->rebuildBLAS = rebuildBLAS ? qtrue : qfalse;
+    req->hasTransform = transform ? qtrue : qfalse;
+
+    if (transform) {
+        Com_Memcpy(req->transform, transform, sizeof(req->transform));
+        rtx.tlas.dirtyTransforms = qtrue;
+    }
+
+    rtx.tlas.needsRebuild = qtrue;
+    return qtrue;
+}
+
+/*
+================
+RTX_ProcessPendingRefits
+
+Flush queued dynamic updates before TLAS rebuild
+================
+*/
+void RTX_ProcessPendingRefits(void) {
+    if (rtx.refitQueueCount <= 0) {
+        return;
+    }
+
+    for (int i = 0; i < rtx.refitQueueCount; i++) {
+        const rtxRefitRequest_t *req = &rtx.refitQueue[i];
+
+        if (req->instanceIndex < 0 || req->instanceIndex >= rtx.tlas.numInstances) {
+            continue;
+        }
+
+        rtxInstance_t *instance = &rtx.tlas.instances[req->instanceIndex];
+
+        if (req->hasTransform) {
+            Com_Memcpy(instance->transform, req->transform, sizeof(req->transform));
+        }
+
+        if (req->rebuildBLAS && instance->blas) {
+            RTX_DestroyBLASGPU(instance->blas);
+            if (!RTX_BuildBLASGPU(instance->blas)) {
+                ri.Printf(PRINT_WARNING, "RTX: Failed to rebuild dynamic BLAS for instance %d\n", req->instanceIndex);
+            }
+        }
+    }
+
+    rtx.refitQueueCount = 0;
+    rtx.refitQueueOverflow = qfalse;
+    rtx.tlas.dirtyTransforms = qfalse;
+}
+
+/*
+================
 RTX_AddInstance
 
 Add an instance to the TLAS
@@ -389,7 +516,13 @@ Build/rebuild the TLAS
 ================
 */
 void RTX_BuildTLAS(rtxTLAS_t *tlas) {
-    if (!tlas || !tlas->needsRebuild) {
+    if (!tlas) {
+        return;
+    }
+
+    RTX_ProcessPendingRefits();
+
+    if (!tlas->needsRebuild) {
         return;
     }
     
@@ -397,6 +530,80 @@ void RTX_BuildTLAS(rtxTLAS_t *tlas) {
     RTX_BuildAccelerationStructureVK();
     
     tlas->needsRebuild = qfalse;
+}
+
+void RTX_PrepareForWorld(void) {
+#ifdef USE_VULKAN
+    RTX_ResetTLASGPU();
+#endif
+
+    if (rtx.blasPool && rtx.maxBLAS > 0) {
+        for (int i = 0; i < rtx.numBLAS; i++) {
+            RTX_DestroyBLASGPU(&rtx.blasPool[i]);
+        }
+        Com_Memset(rtx.blasPool, 0, sizeof(rtxBLAS_t) * rtx.maxBLAS);
+    }
+
+    rtx.numBLAS = 0;
+
+    if (rtx.tlas.instances) {
+        Com_Memset(rtx.tlas.instances, 0, sizeof(rtxInstance_t) * RTX_MAX_INSTANCES);
+    }
+
+    rtx.tlas.numInstances = 0;
+    rtx.tlas.needsRebuild = qfalse;
+    rtx.tlas.dirtyTransforms = qfalse;
+    rtx.tlas.handle = NULL;
+    rtx.tlas.handles[0] = NULL;
+    rtx.tlas.handles[1] = NULL;
+    rtx.tlas.activeHandle = 0;
+
+    rtx.refitQueueCount = 0;
+    rtx.refitQueueOverflow = qfalse;
+
+#ifdef USE_VULKAN
+    rt.sceneLightBufferDirty = qtrue;
+    RT_UpdateSceneLightBuffer();
+#endif
+}
+
+void RTX_RequestWorldRefit(void) {
+    if (!rtx.tlas.instances || rtx.tlas.numInstances <= 0) {
+        return;
+    }
+
+    for (int i = 0; i < rtx.tlas.numInstances; i++) {
+        RTX_QueueInstanceRefit(i, rtx.tlas.instances[i].transform, qfalse);
+    }
+
+    rtx.tlas.needsRebuild = qtrue;
+}
+
+void RTX_PopulateWorld(void) {
+#ifdef USE_VULKAN
+    if (!rtx_enable || !rtx_enable->integer) {
+        return;
+    }
+
+    if (!tr.world) {
+        return;
+    }
+
+    if (!RTX_IsAvailable()) {
+        ri.Printf(PRINT_DEVELOPER, "RTX: Skipping world population - hardware backend unavailable\n");
+        return;
+    }
+
+    if (rtx.numBLAS == 0 || rtx.tlas.numInstances == 0) {
+        RTX_LoadWorldMap();
+    } else {
+        RTX_RequestWorldRefit();
+    }
+
+    if (rtx.tlas.numInstances > 0) {
+        rtx.tlas.needsRebuild = qtrue;
+    }
+#endif
 }
 
 // ============================================================================
@@ -796,7 +1003,21 @@ void RTX_Status_f(void) {
     ri.Printf(PRINT_ALL, "  rtx_quality: %d\n", rtx_quality ? rtx_quality->integer : 0);
     ri.Printf(PRINT_ALL, "  rtx_denoise: %d\n", rtx_denoise ? rtx_denoise->integer : 0);
     ri.Printf(PRINT_ALL, "  rtx_dlss: %d\n", rtx_dlss ? rtx_dlss->integer : 0);
-    
+
+    ri.Printf(PRINT_ALL, "\n==== Backend Diagnostics ====\n");
+    ri.Printf(PRINT_ALL, "Backend Status: %s\n", RT_GetBackendStatus());
+    ri.Printf(PRINT_ALL, "RTX Last Event: %s\n", RTX_GetLastStatus());
+    ri.Printf(PRINT_ALL, "RTX Active: %s\n", (rt.useRTX && RTX_IsAvailable()) ? "Yes" : "No");
+    ri.Printf(PRINT_ALL, "Scene Lights: %d (dynamic %d, static %d)\n",
+              rt.numSceneLights, rt.numDynamicLights, rt.numStaticLights);
+    ri.Printf(PRINT_ALL, "BLAS Count: %d / %d\n", rtx.numBLAS, rtx.maxBLAS);
+    ri.Printf(PRINT_ALL, "TLAS Instances: %d\n", rtx.tlas.numInstances);
+    ri.Printf(PRINT_ALL, "GPU Build Time: %.2f ms  Trace Time: %.2f ms  Denoise: %.2f ms\n",
+              rtx.buildTime, rtx.traceTime, rtx.denoiseTime);
+    ri.Printf(PRINT_ALL, "CPU Trace Time: %.2f ms\n", rt.traceTime);
+    ri.Printf(PRINT_ALL, "Light Buffer State: %s\n",
+              rt.sceneLightBufferDirty ? "Pending upload" : "Synced");
+
     if (!rtx.available) {
         ri.Printf(PRINT_ALL, "\nNote: To enable RTX, ensure you have:\n");
         ri.Printf(PRINT_ALL, "  - NVIDIA RTX 20xx/30xx/40xx series GPU\n");

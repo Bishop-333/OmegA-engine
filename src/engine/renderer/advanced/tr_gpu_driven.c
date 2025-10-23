@@ -485,14 +485,14 @@ static void R_CreateHiZBuffer( void ) {
     
     gpuContext.hiZMipLevels = mipLevels;
     
-    // Create HiZ image
+    // Create HiZ image (using color format to store depth values)
     R_CreateGPUImage( &gpuContext.hiZBuffer,
                      &gpuContext.hiZBufferMemory,
                      &gpuContext.hiZBufferView,
                      glConfig.vidWidth, glConfig.vidHeight,
                      VK_FORMAT_R32_SFLOAT,
                      VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-                     VK_IMAGE_ASPECT_DEPTH_BIT );
+                     VK_IMAGE_ASPECT_COLOR_BIT );
 }
 
 /*
@@ -791,7 +791,7 @@ Create GPU culling compute pipeline
 static void R_CreateGPUCullingPipeline( multiDrawIndirect_t *mdi ) {
     // Load compute shader SPIR-V
     size_t codeSize;
-    uint32_t *spirvCode = R_LoadSPIRV( "gpu_culling.comp.spv", &codeSize );
+    uint32_t *spirvCode = R_LoadSPIRV( "shaders/compute/gpu_culling.spv", &codeSize );
     
     if ( !spirvCode ) {
         ri.Printf( PRINT_WARNING, "Failed to load GPU culling compute shader\n" );

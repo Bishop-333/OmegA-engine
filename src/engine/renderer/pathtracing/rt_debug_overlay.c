@@ -23,7 +23,7 @@ rtxDebugOverlay_t rtxDebugOverlay;
 
 // External references
 extern rtxState_t rtx;
-extern cvar_t *rtx_debug;
+extern cvar_t *r_rtx_debug;
 
 // Color palette for debug visualization
 static const vec4_t debugColors[] = {
@@ -33,8 +33,8 @@ static const vec4_t debugColors[] = {
     { 1.0f, 1.0f, 0.0f, 0.8f },    // Yellow - Dynamic
     { 1.0f, 0.5f, 0.0f, 0.8f },    // Orange - Emissive
     { 1.0f, 0.0f, 0.0f, 0.8f },    // Red - Excluded
-    { 0.0f, 0.0f, 1.0f, 0.8f },    // Blue - Lightmap only
-    { 0.5f, 0.0f, 1.0f, 0.8f },    // Purple - Hybrid
+    { 0.0f, 0.3f, 1.0f, 0.8f },    // Blue - Static GI / probe lit
+    { 0.5f, 0.0f, 1.0f, 0.8f },    // Purple - Reserved hybrid
     { 0.5f, 0.5f, 0.5f, 0.8f },    // Gray - No lighting
     { 0.0f, 1.0f, 1.0f, 0.8f },    // Cyan - Reflective
     { 1.0f, 0.0f, 1.0f, 0.8f },    // Magenta - Transparent
@@ -151,16 +151,12 @@ void RTX_GetRTParticipationColor(surfaceRTFlags_t flags, vec4_t outColor) {
         VectorSet(outColor, 1.0f, 1.0f, 0.0f);  // Yellow for dynamic
     } else if (flags & SURF_RT_REFLECTIVE) {
         VectorSet(outColor, 0.0f, 1.0f, 1.0f);  // Cyan for reflective
-    } else if ((flags & SURF_RT_IN_TLAS) && (flags & SURF_RT_LIGHTMAPPED)) {
-        VectorSet(outColor, 0.5f, 0.0f, 1.0f);  // Purple for hybrid (RT + lightmap)
     } else if (flags & SURF_RT_IN_TLAS) {
         if (flags & SURF_RT_LOD) {
             VectorSet(outColor, 0.0f, 0.5f, 0.0f);  // Dark green for LOD
         } else {
             VectorSet(outColor, 0.0f, 1.0f, 0.0f);  // Bright green for full RT
         }
-    } else if (flags & SURF_RT_LIGHTMAPPED) {
-        VectorSet(outColor, 0.0f, 0.0f, 1.0f);  // Blue for lightmap only
     } else if (flags & SURF_RT_VERTEX_LIT) {
         VectorSet(outColor, 0.0f, 0.5f, 1.0f);  // Light blue for vertex lit
     } else {
@@ -197,33 +193,20 @@ RTX_GetLightingContribColor
 Visualize lighting contributions
 ================
 */
-void RTX_GetLightingContribColor(float direct, float indirect, float lightmap, vec4_t outColor) {
-    // Debug logging
-    static int logCounter = 0;
-    if ((logCounter++ % 100) == 0) {  // Log every 100th call
-        ri.Printf(PRINT_ALL, "RTX Debug: Lighting contributions - Direct: %.2f, Indirect: %.2f, Lightmap: %.2f\n",
-                  direct, indirect, lightmap);
-    }
-
+void RTX_GetLightingContribColor(float direct, float indirect, float ambient, vec4_t outColor) {
     // Normalize contributions
-    float total = direct + indirect + lightmap;
+    float total = direct + indirect + ambient;
     if (total > 0.0f) {
         direct /= total;
         indirect /= total;
-        lightmap /= total;
+        ambient /= total;
     }
 
     // Map to colors
     outColor[0] = direct;            // Red = direct lighting
     outColor[1] = indirect;          // Green = indirect/GI
-    outColor[2] = lightmap;          // Blue = lightmap
+    outColor[2] = ambient;           // Blue = probe/ambient contribution
     outColor[3] = rtxDebugOverlay.overlayAlpha;
-
-    // Debug log the output colors
-    if ((logCounter % 100) == 1) {
-        ri.Printf(PRINT_ALL, "RTX Debug: Output colors - R: %.2f, G: %.2f, B: %.2f, A: %.2f\n",
-                  outColor[0], outColor[1], outColor[2], outColor[3]);
-    }
 }
 
 /*
@@ -328,20 +311,15 @@ void RTX_GetDebugColor(const surfaceDebugInfo_t *info, vec4_t outColor) {
                 // Force test values to debug the visualization
                 float testDirect = 0.33f;    // 33% direct (red)
                 float testIndirect = 0.33f;  // 33% indirect/GI (green)
-                float testLightmap = 0.34f;  // 34% lightmap (blue)
+                float testAmbient = 0.34f;   // 34% ambient/probe (blue)
 
-                ri.Printf(PRINT_ALL, "RTX Debug: Mode is LIGHTING_CONTRIB, forcing test values\n");
-
-                RTX_GetLightingContribColor(testDirect, testIndirect, testLightmap, outColor);
+                RTX_GetLightingContribColor(testDirect, testIndirect, testAmbient, outColor);
 
                 // Force override the colors directly for testing
                 outColor[0] = 0.33f;  // Red
                 outColor[1] = 0.33f;  // Green
                 outColor[2] = 0.34f;  // Blue
                 outColor[3] = 1.0f;   // Alpha
-
-                ri.Printf(PRINT_ALL, "RTX Debug: Forced output colors - R: %.2f, G: %.2f, B: %.2f\n",
-                          outColor[0], outColor[1], outColor[2]);
             }
             break;
             
@@ -353,17 +331,22 @@ void RTX_GetDebugColor(const surfaceDebugInfo_t *info, vec4_t outColor) {
             RTX_GetNormalColor(info->avgNormal, outColor);
             break;
             
-        case RTX_DEBUG_LIGHTMAP_COVERAGE:
-            outColor[0] = info->lightmapCoverage;
-            outColor[1] = info->lightmapCoverage;
-            outColor[2] = 0.0f;
-            outColor[3] = rtxDebugOverlay.overlayAlpha;
-            break;
-            
         case RTX_DEBUG_INSTANCE_ID:
             RTX_GetInstanceColor(info->instanceId, outColor);
             break;
-            
+
+        case RTX_DEBUG_RANDOM_NOISE:
+        {
+            uint32_t seed = (uint32_t)(uintptr_t)info ^ (uint32_t)rtxDebugOverlay.frameAccumCount * 1664525u;
+            seed ^= seed >> 13;
+            seed *= 1274126177u;
+            outColor[0] = ((seed >>  0) & 0xFF) / 255.0f;
+            outColor[1] = ((seed >>  8) & 0xFF) / 255.0f;
+            outColor[2] = ((seed >> 16) & 0xFF) / 255.0f;
+            outColor[3] = rtxDebugOverlay.overlayAlpha;
+            break;
+        }
+
         default:
             outColor[0] = 1; outColor[1] = 1; outColor[2] = 1; outColor[3] = 0; // Transparent white
             break;
@@ -383,8 +366,8 @@ void RTX_SetDebugMode(rtxDebugMode_t mode) {
         rtxDebugOverlay.enabled = (mode != RTX_DEBUG_OFF);
         
         // Update the rtx_debug cvar to match
-        if (rtx_debug) {
-            ri.Cvar_SetValue("rtx_debug", (float)mode);
+        if (r_rtx_debug) {
+            ri.Cvar_SetValue("r_rtx_debug", (float)mode);
         }
         
         ri.Printf(PRINT_ALL, "RTX Debug Mode: %s\n", RTX_GetDebugModeName(mode));
@@ -418,8 +401,8 @@ const char* RTX_GetDebugModeName(rtxDebugMode_t mode) {
         case RTX_DEBUG_LIGHTING_CONTRIB:  return "Lighting Contributions";
         case RTX_DEBUG_RAY_DENSITY:       return "Ray Density Heatmap";
         case RTX_DEBUG_SURFACE_NORMALS:   return "Surface Normals";
-        case RTX_DEBUG_LIGHTMAP_COVERAGE: return "Lightmap Coverage";
         case RTX_DEBUG_INSTANCE_ID:       return "Instance IDs";
+        case RTX_DEBUG_RANDOM_NOISE:      return "Random Verification";
         default:                          return "Unknown";
     }
 }
@@ -463,8 +446,7 @@ void RTX_DrawDebugLegend(void) {
                     { "Dynamic", { 1.0f, 1.0f, 0.0f, 1.0f } },
                     { "Emissive", { 1.0f, 0.5f, 0.0f, 1.0f } },
                     { "Excluded", { 1.0f, 0.0f, 0.0f, 1.0f } },
-                    { "Lightmap Only", { 0.0f, 0.0f, 1.0f, 1.0f } },
-                    { "Hybrid", { 0.5f, 0.0f, 1.0f, 1.0f } },
+                    { "Probe Lit (static GI)", { 0.0f, 0.3f, 1.0f, 1.0f } },
                     { "Reflective", { 0.0f, 1.0f, 1.0f, 1.0f } },
                     { "No Lighting", { 0.5f, 0.5f, 0.5f, 1.0f } }
                 };
@@ -484,8 +466,8 @@ void RTX_DrawDebugLegend(void) {
             
         case RTX_DEBUG_LIGHTING_CONTRIB:
             ri.Printf(PRINT_ALL, "  Red: Direct Light\n");
-            ri.Printf(PRINT_ALL, "  Green: Indirect/GI\n");
-            ri.Printf(PRINT_ALL, "  Blue: Lightmap\n");
+            ri.Printf(PRINT_ALL, "  Green: Indirect/GI Bounce\n");
+            ri.Printf(PRINT_ALL, "  Blue: Ambient/Probe Contribution\n");
             break;
             
         case RTX_DEBUG_RAY_DENSITY:
@@ -493,6 +475,10 @@ void RTX_DrawDebugLegend(void) {
             ri.Printf(PRINT_ALL, "  Green: Medium\n");
             ri.Printf(PRINT_ALL, "  Yellow: High\n");
             ri.Printf(PRINT_ALL, "  Red: Very High\n");
+            break;
+
+        case RTX_DEBUG_RANDOM_NOISE:
+            ri.Printf(PRINT_ALL, "  Random per-surface coloration for RTX verification\n");
             break;
     }
     
@@ -534,7 +520,7 @@ void RTX_DebugOverlay_f(void) {
     if (argc < 2) {
         ri.Printf(PRINT_ALL, "Usage: rtx_debug_overlay <mode|cycle|legend|alpha>\n");
         ri.Printf(PRINT_ALL, "Modes: 0=off, 1=rt_participation, 2=materials, 3=lighting\n");
-        ri.Printf(PRINT_ALL, "       4=ray_density, 5=normals, 6=lightmaps, 7=instances\n");
+        ri.Printf(PRINT_ALL, "       4=ray_density, 5=normals, 6=instances, 7=random\n");
         ri.Printf(PRINT_ALL, "Current mode: %s\n", RTX_GetDebugModeName(rtxDebugOverlay.mode));
         return;
     }

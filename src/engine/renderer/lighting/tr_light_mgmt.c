@@ -23,11 +23,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../core/tr_local.h"
 #include "tr_light_dynamic.h"
 
-#ifdef USE_VULKAN
-// Forward declarations for Vulkan shadow rendering
-extern void VK_UpdateLightShadowMap(renderLight_t *light);
-#endif
-
 /*
 ================================================================================
 Phase 5: Dynamic Light Management System
@@ -41,12 +36,8 @@ dynamic lighting system.
 lightSystem_t tr_lightSystem;
 
 // Performance cvars
-cvar_t *r_dynamicLightLimit;
 cvar_t *r_lightCullMethod;
 cvar_t *r_lightInteractionCull;
-cvar_t *r_shadowMapSize;
-cvar_t *r_shadowMapLod;
-
 // Helper function for matrix identity
 static void MatrixIdentity(mat3_t m) {
     m[0] = 1; m[1] = 0; m[2] = 0;
@@ -70,11 +61,8 @@ void R_InitLightSystem(void) {
     Com_Memset(&tr_lightSystem, 0, sizeof(tr_lightSystem));
     
     // Register cvars
-    r_dynamicLightLimit = ri.Cvar_Get("r_dynamicLightLimit", "32", CVAR_ARCHIVE);
     r_lightCullMethod = ri.Cvar_Get("r_lightCullMethod", "2", CVAR_ARCHIVE);
     r_lightInteractionCull = ri.Cvar_Get("r_lightInteractionCull", "1", CVAR_ARCHIVE);
-    r_shadowMapSize = ri.Cvar_Get("r_shadowMapSize", "1024", CVAR_ARCHIVE);
-    r_shadowMapLod = ri.Cvar_Get("r_shadowMapLod", "2", CVAR_ARCHIVE);
     
     // Initialize light pool
     for (i = 0; i < MAX_RENDER_LIGHTS; i++) {
@@ -134,8 +122,6 @@ void R_ClearLights(void) {
     tr_lightSystem.numLights = 0;
     tr_lightSystem.numActiveLights = 0;
     tr_lightSystem.numVisibleLights = 0;
-    tr_lightSystem.numShadowMaps = 0;
-    
     // Clear area lists
     Com_Memset(tr_lightSystem.areaLights, 0, sizeof(tr_lightSystem.areaLights));
 }
@@ -181,12 +167,6 @@ void R_FreeRenderLight(renderLight_t *light) {
     // Remove from area
     R_RemoveLightFromArea(light);
     
-    // Free shadow map
-    if (light->shadowMap) {
-        R_FreeShadowMap(light->shadowMap);
-        light->shadowMap = NULL;
-    }
-    
     // Mark as inactive
     light->isStatic = qfalse;
     light->needsUpdate = qfalse;
@@ -223,7 +203,6 @@ void R_InitRenderLight(renderLight_t *light) {
     light->farClip = 1000.0f;
     
     // Shadow defaults
-    light->shadowLod = 1;
     light->shadowBias = 0.005f;
     light->shadowSoftness = 1.0f;
     
@@ -511,64 +490,6 @@ void R_RemoveLightFromArea(renderLight_t *light) {
 
 /*
 ================
-R_ConvertDlightToRenderLight
-
-Convert legacy dlight to new render light
-================
-*/
-void R_ConvertDlightToRenderLight(dlight_t *dl, renderLight_t *rl) {
-    R_InitRenderLight(rl);
-    
-    rl->type = RL_OMNI;
-    VectorCopy(dl->origin, rl->origin);
-    VectorCopy(dl->color, rl->color);
-    rl->radius = dl->radius;
-    rl->intensity = 1.0f;
-    
-    // Set up attenuation to match old behavior
-    rl->constant = 0.0f;
-    rl->linear = 2.0f / dl->radius;
-    rl->quadratic = 1.0f / (dl->radius * dl->radius);
-    rl->cutoffDistance = dl->radius;
-    
-    if (dl->additive) {
-        rl->flags |= LIGHTFLAG_NOSHADOWS;
-    }
-    
-    R_UpdateRenderLight(rl);
-}
-
-/*
-================
-R_ProcessDynamicLights
-
-Process legacy dynamic lights
-================
-*/
-void R_ProcessDynamicLights(void) {
-    int i;
-    dlight_t *dl;
-    renderLight_t *rl;
-    
-    // Clear previous frame's lights
-    tr_lightSystem.numActiveLights = 0;
-    
-    // Convert dlights to render lights
-    for (i = 0; i < tr.refdef.num_dlights && i < r_dynamicLightLimit->integer; i++) {
-        dl = &tr.refdef.dlights[i];
-        
-        rl = R_AllocRenderLight();
-        if (!rl) {
-            break;
-        }
-        
-        R_ConvertDlightToRenderLight(dl, rl);
-        tr_lightSystem.activeLights[tr_lightSystem.numActiveLights++] = rl;
-    }
-}
-
-/*
-================
 R_UpdateLightSystem
 
 Update the light system for current frame
@@ -579,9 +500,6 @@ void R_UpdateLightSystem(void) {
     
     tr_lightSystem.frameCount++;
     tr_lightSystem.visCount++;
-    
-    // Process legacy lights
-    R_ProcessDynamicLights();
     
     // Update active lights
     for (i = 0; i < tr_lightSystem.numActiveLights; i++) {
@@ -638,157 +556,6 @@ int R_GetVisibleLightCount(void) {
 
 int R_GetInteractionCount(void) {
     return tr_lightSystem.interactionMgr.numInteractions;
-}
-
-int R_GetShadowMapCount(void) {
-    return tr_lightSystem.numShadowMaps;
-}
-
-/*
-================
-Shadow Map Management
-================
-*/
-shadowMapInfo_t* R_AllocShadowMap(renderLight_t *light) {
-    shadowMapInfo_t *shadow;
-    
-    if (tr_lightSystem.numShadowMaps >= MAX_SHADOW_MAPS) {
-        ri.Printf(PRINT_WARNING, "R_AllocShadowMap: MAX_SHADOW_MAPS hit\n");
-        return NULL;
-    }
-    
-    shadow = &tr_lightSystem.shadowMaps[tr_lightSystem.numShadowMaps++];
-    Com_Memset(shadow, 0, sizeof(shadowMapInfo_t));
-    
-    shadow->width = r_shadowMapSize->integer;
-    shadow->height = r_shadowMapSize->integer;
-    shadow->lod = light->shadowLod;
-    shadow->needsUpdate = qtrue;
-    
-    return shadow;
-}
-
-void R_FreeShadowMap(shadowMapInfo_t *shadow) {
-    if (!shadow) {
-        return;
-    }
-    
-    // Free depth texture
-    if (shadow->depthImage) {
-        // Vulkan image cleanup handled elsewhere
-        
-        ri.Free(shadow->depthImage);
-        shadow->depthImage = NULL;
-    }
-    
-    // Free framebuffer if exists (OpenGL only)
-    // Vulkan handles this differently
-    
-    Com_Memset(shadow, 0, sizeof(shadowMapInfo_t));
-}
-
-void R_RenderShadowMap(renderLight_t *light) {
-    shadowMapInfo_t *shadow;
-    
-    if (!light || !light->shadowMap) {
-        return;
-    }
-    
-    shadow = light->shadowMap;
-    
-    // Skip if doesn't need update
-    if (!shadow->needsUpdate) {
-        return;
-    }
-    
-#ifdef USE_VULKAN
-    // Use the Vulkan shadow rendering system
-    VK_UpdateLightShadowMap(light);
-    shadow->needsUpdate = qfalse;
-    return;
-#endif
-    
-    // Calculate and store the light matrices for later use
-    if (light->type == RL_PROJ) {
-        // Projected light matrices are already calculated
-    } else if (light->type == RL_DIRECTIONAL) {
-        // Calculate orthographic matrices for directional light
-        vec3_t forward, right, up;
-        vec3_t viewOrigin;
-        float orthoSize = light->radius;
-        
-        VectorCopy(light->origin, viewOrigin);
-        
-        // Extract forward direction from axis matrix
-        forward[0] = light->axis[0];
-        forward[1] = light->axis[1];
-        forward[2] = light->axis[2];
-        VectorNormalize(forward);
-        
-        // Build orthonormal basis
-        if (fabs(forward[2]) < 0.95f) {
-            vec3_t worldUp = {0, 0, 1};
-            CrossProduct(forward, worldUp, right);
-        } else {
-            vec3_t worldRight = {1, 0, 0};
-            CrossProduct(forward, worldRight, right);
-        }
-        VectorNormalize(right);
-        CrossProduct(right, forward, up);
-        
-        // Build and store view matrix
-        light->viewMatrix[0] = right[0];
-        light->viewMatrix[4] = right[1];
-        light->viewMatrix[8] = right[2];
-        light->viewMatrix[12] = -DotProduct(right, viewOrigin);
-        
-        light->viewMatrix[1] = up[0];
-        light->viewMatrix[5] = up[1];
-        light->viewMatrix[9] = up[2];
-        light->viewMatrix[13] = -DotProduct(up, viewOrigin);
-        
-        light->viewMatrix[2] = -forward[0];
-        light->viewMatrix[6] = -forward[1];
-        light->viewMatrix[10] = -forward[2];
-        light->viewMatrix[14] = DotProduct(forward, viewOrigin);
-        
-        light->viewMatrix[3] = 0;
-        light->viewMatrix[7] = 0;
-        light->viewMatrix[11] = 0;
-        light->viewMatrix[15] = 1;
-        
-        // Build orthographic projection matrix
-        Com_Memset(light->projectionMatrix, 0, sizeof(light->projectionMatrix));
-        light->projectionMatrix[0] = 1.0f / orthoSize;
-        light->projectionMatrix[5] = 1.0f / orthoSize;
-        light->projectionMatrix[10] = 2.0f / (light->farClip - light->nearClip);
-        light->projectionMatrix[14] = -(light->farClip + light->nearClip) / (light->farClip - light->nearClip);
-        light->projectionMatrix[15] = 1.0f;
-    } else {
-        // Perspective projection for point lights
-        float fov = 90.0f;
-        float aspect = 1.0f;
-        float znear = light->nearClip;
-        float zfar = light->farClip;
-        float yScale = 1.0f / tan(DEG2RAD(fov * 0.5f));
-        float xScale = yScale / aspect;
-        
-        Com_Memset(light->projectionMatrix, 0, sizeof(light->projectionMatrix));
-        light->projectionMatrix[0] = xScale;
-        light->projectionMatrix[5] = yScale;
-        light->projectionMatrix[10] = (zfar + znear) / (zfar - znear);
-        light->projectionMatrix[11] = 1.0f;
-        light->projectionMatrix[14] = -(2.0f * zfar * znear) / (zfar - znear);
-    }
-}
-
-void R_BindShadowMap(shadowMapInfo_t *shadow) {
-    if (!shadow || !shadow->depthImage) {
-        return;
-    }
-    
-    // In Vulkan, shadow map binding is done via descriptor sets
-    // Not through direct texture binding like OpenGL
 }
 
 void R_SetLightProjectionTexture(renderLight_t *light, const char *name) {

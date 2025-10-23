@@ -137,12 +137,9 @@ void R_ClearSceneGraph(void) {
         Com_Memset(node, 0, sizeof(*node));
     }
     
-    // Rebuild free list
-    for (i = 0; i < MAX_SCENE_NODES - 1; i++) {
-        sceneGraph.nodes[i].nextSibling = &sceneGraph.nodes[i + 1];
-    }
-    sceneGraph.nodes[MAX_SCENE_NODES - 1].nextSibling = NULL;
-    sceneGraph.freeNodes = &sceneGraph.nodes[0];
+    // Don't use nextSibling for free list as it conflicts with actual usage
+    // Just reset the free nodes pointer
+    sceneGraph.freeNodes = NULL;
     
     sceneGraph.numNodes = 0;
     sceneGraph.numModelNodes = 0;

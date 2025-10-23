@@ -135,14 +135,6 @@ static qboolean Material_StagesCanMerge(materialStage_t *stage1, materialStage_t
         return qfalse;
     }
     
-    // Check for lightmap merge pattern
-    if (stage1->bundle[0].image[0] && stage2->bundle[0].isLightmap) {
-        // Standard diffuse + lightmap pattern
-        if (stage2->stateBits == (GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO)) {
-            return qtrue;
-        }
-    }
-    
     // Check for multi-texture blend
     if (stage1->bundle[0].image[0] && stage2->bundle[0].image[0]) {
         // Both stages have textures, check if blend modes are compatible
@@ -163,21 +155,9 @@ Merge stage2 into stage1
 ================
 */
 static void Material_MergeStageInto(materialStage_t *stage1, materialStage_t *stage2) {
-    // If stage2 is a lightmap, add it as bundle[1]
-    if (stage2->bundle[0].isLightmap) {
+    if (!stage1->bundle[1].image[0]) {
         stage1->bundle[1] = stage2->bundle[0];
-        stage1->isLightmap = qtrue;
-        
-        // Update lighting mode
-        if (stage1->lighting == SL_NONE) {
-            stage1->lighting = SL_DIFFUSE;
-        }
-    }
-    // Otherwise, try to merge as multi-texture
-    else if (!stage1->bundle[1].image[0]) {
-        stage1->bundle[1] = stage2->bundle[0];
-        
-        // Combine blend modes if needed
+
         if (stage2->stateBits & GLS_SRCBLEND_BITS) {
             stage1->stateBits |= stage2->stateBits;
         }
@@ -219,27 +199,8 @@ Detect standard lightmap pattern for optimization
 void Material_DetectLightmapPattern(material_t *material) {
     materialStage_t *stage0, *stage1;
     
-    if (material->numStages != 2) {
-        return;
-    }
-    
-    stage0 = &material->stages[0];
-    stage1 = &material->stages[1];
-    
-    // Check for standard diffuse + lightmap pattern
-    if (stage0->bundle[0].image[0] && 
-        stage1->bundle[0].isLightmap &&
-        stage1->stateBits == (GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO)) {
-        
-        // Mark as lightmapped material
-        material->hasLightmap = qtrue;
-        material->materialFlags |= MATERIAL_LIGHTMAP;
-        
-        // Set optimal stage iterator
-        material->optimalStageIteratorFunc = RB_StageIteratorLightmappedMultitexture;
-        
-        ri.Printf(PRINT_DEVELOPER, "Detected lightmap pattern in material '%s'\n", 
-                  material->name);
+    if (material->numStages >= 2) {
+        R_ReportLegacyLightmapUsage("Material_DetectLightmapPattern");
     }
 }
 
@@ -357,11 +318,6 @@ void Material_ComputeVertexAttribs(material_t *material) {
             }
         }
         
-        // Check for lightmap in bundle[1]
-        if (stage->bundle[1].image[0] && stage->bundle[1].isLightmap) {
-            attribs |= ATTR_LIGHTCOORD;
-        }
-        
         // Check color generation
         switch (stage->rgbGen) {
         case CGEN_EXACT_VERTEX:
@@ -450,11 +406,7 @@ void Material_SelectRenderPath(material_t *material) {
     }
     
     // Multi-stage materials
-    if (material->hasLightmap) {
-        material->optimalStageIteratorFunc = RB_StageIteratorLightmappedMultitexture;
-    } else {
-        material->optimalStageIteratorFunc = RB_StageIteratorGeneric;
-    }
+    material->optimalStageIteratorFunc = RB_StageIteratorGeneric;
 }
 
 /*
@@ -484,12 +436,10 @@ void Material_Validate(material_t *material) {
         
         // Ensure at least one texture
         if (!stage->colorMap && !stage->bundle[0].image[0]) {
-            if (!stage->bundle[0].isLightmap) {
-                ri.Printf(PRINT_WARNING, "WARNING: material '%s' stage %d has no texture\n", 
-                          material->name, i);
-                stage->bundle[0].image[0] = tr.defaultImage;
-                stage->colorMap = tr.defaultImage;
-            }
+            ri.Printf(PRINT_WARNING, "WARNING: material '%s' stage %d has no texture\n", 
+                      material->name, i);
+            stage->bundle[0].image[0] = tr.defaultImage;
+            stage->colorMap = tr.defaultImage;
         }
         
         // Check blend function validity

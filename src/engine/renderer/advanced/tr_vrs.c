@@ -379,7 +379,7 @@ Create compute pipeline for VRS generation
 static void R_CreateVRSGenerationPipeline( void ) {
     // Load compute shader
     size_t codeSize;
-    uint32_t *spirvCode = R_LoadSPIRV( "vrs_generate.comp.spv", &codeSize );
+    uint32_t *spirvCode = R_LoadSPIRV( "compute/vrs_generate.spv", &codeSize );
     
     if ( !spirvCode ) {
         ri.Printf( PRINT_WARNING, "Failed to load VRS generation shader\n" );
@@ -882,4 +882,12 @@ void R_DrawVRSDebugOverlay( void ) {
     ri.Printf( PRINT_ALL, "    2x1: %d\n", vrsState.stats.pixelsShaded[VRS_RATE_2X1] );
     ri.Printf( PRINT_ALL, "    2x2: %d\n", vrsState.stats.pixelsShaded[VRS_RATE_2X2] );
     ri.Printf( PRINT_ALL, "    4x4: %d\n", vrsState.stats.pixelsShaded[VRS_RATE_4X4] );
+}
+
+VkImageView R_GetMotionVectorView( void ) {
+    return vrsState.motionVectorView;
+}
+
+VkImage R_GetMotionVectorImage( void ) {
+    return vrsState.motionVectorImage;
 }

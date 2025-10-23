@@ -65,14 +65,25 @@ typedef struct uberShaderConfig_s {
 #define UBER_FEATURE_PORTAL             0x00004000
 #define UBER_FEATURE_ENVIRONMENT_MAP    0x00008000
 
+// PBR feature flag aliases
+#define FEAT_VERTEX_COLOR  UBER_FEATURE_VERTEX_COLOR
+#define FEAT_ALPHA_TEST    UBER_FEATURE_ALPHA_TEST
+#define FEAT_FOG           UBER_FEATURE_FOG
+#define FEAT_NORMAL_MAP    UBER_FEATURE_NORMALMAP
+#define FEAT_SPECULAR_MAP  UBER_FEATURE_SPECULARMAP
+#define FEAT_ENV_MAP       UBER_FEATURE_ENVIRONMENT_MAP
+#define FEAT_DIFFUSE_MAP   0x00010000u
+#define FEAT_BLOOM         0x00020000u
+#define FEAT_Y_FLIP_POS    0x00040000u
+#define FEAT_PBR_SHADING   0x00080000u
+
 // Texture flag bits
 #define TEXTURE_FLAG_DIFFUSE            0x00000001
-#define TEXTURE_FLAG_LIGHTMAP           0x00000002
-#define TEXTURE_FLAG_NORMAL             0x00000004
-#define TEXTURE_FLAG_SPECULAR           0x00000008
-#define TEXTURE_FLAG_GLOW               0x00000010
-#define TEXTURE_FLAG_DETAIL             0x00000020
-#define TEXTURE_FLAG_ENVIRONMENT        0x00000040
+#define TEXTURE_FLAG_NORMAL             0x00000002
+#define TEXTURE_FLAG_SPECULAR           0x00000004
+#define TEXTURE_FLAG_GLOW               0x00000008
+#define TEXTURE_FLAG_DETAIL             0x00000010
+#define TEXTURE_FLAG_ENVIRONMENT        0x00000020
 
 // Lighting modes
 typedef enum {
@@ -84,43 +95,33 @@ typedef enum {
     LIGHTING_PBR = 5  // Reserved for future
 } uberLightingMode_t;
 
+// Uniform buffer for transform matrices (192 bytes)
+typedef struct vkTransformUBO_s {
+    float               mvpMatrix[16];      // Model-View-Projection
+    float               modelMatrix[16];    // Model to World
+    float               normalMatrix[16];   // Normal transformation
+} vkTransformUBO_t;
+
 // Push constant structure - must match shader layout
 typedef struct vkPushConstants_s {
-    // Uber-shader configuration (16 bytes)
-    uberShaderConfig_t  config;
-    
-    // Transform matrices (192 bytes)
-    mat4_t              mvpMatrix;          // Model-View-Projection
-    mat4_t              modelMatrix;        // Model to World
-    mat4_t              normalMatrix;       // Normal transformation
-    
-    // Material parameters (32 bytes)
-    vec4_t              baseColor;
-    vec4_t              specularColor;
-    float               specularExponent;
-    float               alphaTestValue;
-    float               currentTime;  // Renamed from 'time' to avoid conflict with time() function
-    float               portalRange;
-    
-    // Texture coordinate modifications (32 bytes)
-    vec4_t              tcModParams[2];    // scroll, scale, rotate params
-    
-    // Wave parameters (32 bytes)
-    vec4_t              rgbWaveParams;     // frequency, amplitude, phase, bias
-    vec4_t              alphaWaveParams;
-    
-    // Fog parameters (24 bytes)
-    vec4_t              fogColor;
-    vec2_t              fogParams;         // density, range
-    vec2_t              fogPadding;        // Alignment padding
-    
-    // Lighting parameters (32 bytes) - for future dynamic lighting
-    vec4_t              lightPosition;
-    vec4_t              lightColor;
-    float               lightRadius;
-    float               lightIntensity;
-    float               lightPadding[2];   // Alignment padding
-    
+    // Feature/state flags
+    uint32_t            features;         // Bitmask of FEAT_* flags
+    uint32_t            textureMask;      // Bound texture mask (TEXTURE_FLAG_*)
+    uint32_t            transformIndex;   // Dynamic UBO offset index
+    uint32_t            _pcPad0;          // Padding for alignment
+
+    // Core material parameters
+    float               baseColor[4];     // Fallback/override color
+    float               sunColor[4];      // Directional light color (rgb) and intensity (w)
+    float               fogColor[4];      // Fog RGB (+A unused)
+    float               cameraPos_time[4];// xyz = camera world pos, w = currentTime
+    float               materialParams[4];// x=metallic, y=roughness, z=ao, w=emissive intensity
+    float               sunDirection[4];  // xyz = sun direction, w = intensity multiplier
+
+    // Scalar parameters
+    float               fogParams[2];     // x = density or start, y = end
+    float               alphaTestValue;   // Alpha test threshold (0..1)
+    float               _pcPad1;          // Padding to 16-byte alignment
 } vkPushConstants_t;
 
 // Vertex format for unified pipeline
@@ -171,6 +172,8 @@ typedef struct vkShaderModule_s {
 // Function declarations
 void VK_InitUberShaderSystem(void);
 void VK_ShutdownUberShaderSystem(void);
+void VK_SetUberStage(const shaderStage_t *stage, int stageNum);
+void VK_ResetUberDescriptors(void);
 
 // Pipeline management
 vkPipeline_t* VK_CreateUberPipeline(const char *name, vkPipelineState_t *state);
@@ -199,7 +202,6 @@ void VK_SetupWaveParams(const waveForm_t *wave, vec4_t params);
 
 // Global pipelines
 extern vkPipeline_t *vk_uberPipeline;          // Main uber-shader pipeline
-extern vkPipeline_t *vk_shadowPipeline;        // Shadow volume pipeline
 extern vkPipeline_t *vk_postProcessPipeline;   // Post-processing pipeline
 extern vkPipeline_t *vk_skyboxPipeline;        // Skybox rendering pipeline
 
@@ -207,4 +209,17 @@ extern vkPipeline_t *vk_skyboxPipeline;        // Skybox rendering pipeline
 extern VkShaderModule vk_uberVertexShader;
 extern VkShaderModule vk_uberFragmentShader;
 
+// Uber shader integration
+qboolean VK_UseUberShader(const Vk_Pipeline_Def *def);
+qboolean VK_ShouldUseUberShader(void);
+
 #endif // VK_SHADER_H
+
+
+
+
+
+
+
+
+

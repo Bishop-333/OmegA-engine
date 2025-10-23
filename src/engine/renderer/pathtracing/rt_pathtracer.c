@@ -1,78 +1,310 @@
-/*
-===========================================================================
-Copyright (C) 2024 Quake3e-HD Project
-
-Ultra-Fast Hybrid Path Traced Dynamic Lighting System
-Optimized for real-time performance using BSP acceleration and caching
-===========================================================================
-*/
+#include <limits.h>
+#include <string.h>
+#include <stdint.h>
 
 #include "../core/tr_local.h"
-#include "rt_pathtracer.h"
 #include "rt_rtx.h"
-#include <math.h>
 
-// Helper macros
-#ifndef CLAMP
-#define CLAMP(x, min, max) ((x) < (min) ? (min) : ((x) > (max) ? (max) : (x)))
-#endif
+static qboolean rtBackendActive = qfalse;
+static qboolean rtBackendInitFailureLogged = qfalse;
+static qboolean rtBackendHardwareWarned = qfalse;
+static char rtBackendLastChoice[MAX_QPATH] = "auto";
+static int rtBackendLastEnableState = 0;
+static int rtBackendLastTracerEnableState = 0;
+static uint32_t g_seed = 1u;
 
-#ifndef MIN
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#endif
-
-#ifndef MAX
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-#endif
-
-// Helper functions
-static float VectorDistance(const vec3_t v1, const vec3_t v2) {
-    vec3_t diff;
-    VectorSubtract(v1, v2, diff);
-    return VectorLength(diff);
-}
-
-static void VectorLerp(const vec3_t from, const vec3_t to, float t, vec3_t result) {
-    result[0] = from[0] + t * (to[0] - from[0]);
-    result[1] = from[1] + t * (to[1] - from[1]);
-    result[2] = from[2] + t * (to[2] - from[2]);
-}
-
-// Global path tracer instance
-pathTracer_t rt;
-
-// Forward declarations
-void RT_Status_f(void);
-
-// Path tracing CVARs
-cvar_t *rt_enable;
-cvar_t *rt_mode;
-cvar_t *rt_quality;
-cvar_t *rt_bounces;
-cvar_t *rt_samples;
-cvar_t *rt_denoise;
-cvar_t *rt_temporal;
-cvar_t *rt_probes;
-cvar_t *rt_cache;
-cvar_t *rt_debug;
-cvar_t *rt_staticLights;
-
-// Fast random number generator
-static unsigned int g_seed = 0x12345678;
 static float FastRandom(void) {
-    g_seed = (g_seed * 1103515245 + 12345) & 0x7fffffff;
-    return (float)g_seed / 0x7fffffff;
+	g_seed = 1664525u * g_seed + 1013904223u;
+	return (float)(g_seed & 0x00FFFFFFu) / 16777215.0f;
 }
 
-// Fast approximations for performance
-static ID_INLINE float FastSqrt(float x) {
-    // Quake's fast inverse square root
-    float xhalf = 0.5f * x;
-    int i = *(int*)&x;
-    i = 0x5f3759df - (i >> 1);
-    float y = *(float*)&i;
-    y = y * (1.5f - xhalf * y * y);
-    return x * y;
+#define RT_BACKEND_INDEX_COMPUTE   0
+#define RT_BACKEND_INDEX_HARDWARE  1
+#define RT_BACKEND_RMSE_THRESHOLD  0.0025f
+
+static const char *rtValidationMaps[] = {
+    "q3dm1",
+    "q3dm7",
+    "q3dm17",
+    NULL
+};
+
+static qboolean RT_MapIsValidationTarget(const char *mapName);
+static void RT_GetValidationMapName(char *buffer, size_t bufferSize);
+static void RT_RecordBackendValidation(const float *rgba, int width, int height, qboolean validated);
+static void RT_ReportBackendParity(void);
+
+static void RT_SelectBackend(void) {
+    const char *backendStr = r_rt_backend ? r_rt_backend->string : "auto";
+    if (!backendStr || !backendStr[0]) {
+        backendStr = "auto";
+    }
+
+    if (r_rt_backend && r_rt_backend->modified) {
+        ri.Printf(PRINT_ALL, "r_rt_backend set to '%s'\n", backendStr);
+        r_rt_backend->modified = qfalse;
+        RT_ResetBackendLogs();
+    }
+#ifdef USE_VULKAN
+    if (rtx_enable && rtx_enable->modified) {
+        ri.Printf(PRINT_ALL, "rtx_enable set to %d\n", rtx_enable->integer);
+        rtx_enable->modified = qfalse;
+        RT_ResetBackendLogs();
+    }
+#endif
+
+    if (Q_stricmp(backendStr, rtBackendLastChoice) != 0) {
+        Q_strncpyz(rtBackendLastChoice, backendStr, sizeof(rtBackendLastChoice));
+        RT_ResetBackendLogs();
+    }
+
+    int enableState = ri.Cvar_VariableIntegerValue("rtx_enable");
+    if (enableState != rtBackendLastEnableState) {
+        rtBackendLastEnableState = enableState;
+        RT_ResetBackendLogs();
+    }
+
+    qboolean tracerEnabled = (rt_enable && rt_enable->integer) ? qtrue : qfalse;
+    int tracerState = tracerEnabled ? 1 : 0;
+    if (tracerState != rtBackendLastTracerEnableState) {
+        rtBackendLastTracerEnableState = tracerState;
+        RT_ResetBackendLogs();
+    }
+
+    if (rtBackendActive && rt.useRTX) {
+        RT_SetBackendStatus("RTX hardware backend active (%s)", backendStr);
+    }
+
+    qboolean forceHardware = !Q_stricmp(backendStr, "hardware");
+    qboolean wantHardware = tracerEnabled && (enableState != 0) &&
+        (forceHardware || !Q_stricmp(backendStr, "auto"));
+
+    if (!wantHardware) {
+        if (rtBackendActive) {
+            RT_ShutdownBackend();
+        } else {
+            rt.useRTX = qfalse;
+            RT_SetBackendStatus("Software backend active (backend=%s)", backendStr);
+        }
+        return;
+    }
+
+#ifdef USE_VULKAN
+    if (RTX_IsAvailable()) {
+        if (!rtBackendActive) {
+            ri.Printf(PRINT_ALL, "RTX hardware backend enabled\n");
+            if (tr.world) {
+                if (rtx.numBLAS == 0 || rtx.tlas.numInstances == 0) {
+                    RTX_PopulateWorld();
+                } else {
+                    RTX_RequestWorldRefit();
+                }
+            }
+            rt.sceneLightBufferDirty = qtrue;
+            RT_SetBackendStatus("RTX hardware backend active (%s)", backendStr);
+        }
+        rtBackendActive = qtrue;
+        rt.useRTX = qtrue;
+        RT_ResetBackendLogs();
+        return;
+    }
+
+    if (!rtBackendInitFailureLogged) {
+        if (RTX_Init()) {
+            if (RTX_IsAvailable()) {
+                if (!rtBackendActive) {
+                    ri.Printf(PRINT_ALL, "RTX hardware backend enabled\n");
+                    if (tr.world) {
+                        if (rtx.numBLAS == 0 || rtx.tlas.numInstances == 0) {
+                            RTX_PopulateWorld();
+                        } else {
+                            RTX_RequestWorldRefit();
+                        }
+                    }
+                    rt.sceneLightBufferDirty = qtrue;
+                    RT_SetBackendStatus("RTX hardware backend active (%s)", backendStr);
+                }
+                rtBackendActive = qtrue;
+                rt.useRTX = qtrue;
+                RT_ResetBackendLogs();
+                return;
+            }
+        } else {
+            rtBackendInitFailureLogged = qtrue;
+        }
+    }
+#else
+    if (!rtBackendHardwareWarned) {
+        ri.Printf(PRINT_WARNING, "RTX: hardware backend requested but Vulkan RTX is not available in this build; using software path\n");
+        rtBackendHardwareWarned = qtrue;
+    }
+#endif
+
+    if (rtBackendActive) {
+        RT_ShutdownBackend();
+    } else {
+        rt.useRTX = qfalse;
+        RT_SetBackendStatus("Software backend active (RTX unavailable)");
+    }
+
+#ifdef USE_VULKAN
+    if (forceHardware && !rtBackendHardwareWarned) {
+        ri.Printf(PRINT_WARNING, "RTX: hardware backend requested but RTX initialization failed; using software path\n");
+        rtBackendHardwareWarned = qtrue;
+    }
+#endif
+}
+
+static qboolean RT_MapIsValidationTarget(const char *mapName) {
+    if (!mapName || !mapName[0]) {
+        return qfalse;
+    }
+
+    for (int i = 0; rtValidationMaps[i]; ++i) {
+        if (!Q_stricmp(mapName, rtValidationMaps[i])) {
+            return qtrue;
+        }
+    }
+
+    return qfalse;
+}
+
+static void RT_GetValidationMapName(char *buffer, size_t bufferSize) {
+    if (!buffer || bufferSize == 0) {
+        return;
+    }
+
+    buffer[0] = '\0';
+
+    if (!tr.world || !tr.world->name[0]) {
+        Q_strncpyz(buffer, "unknown", bufferSize);
+        return;
+    }
+
+    const char *name = tr.world->name;
+    const char *slash = strrchr(name, '/');
+    const char *base = slash ? slash + 1 : name;
+
+    Q_strncpyz(buffer, base, bufferSize);
+
+    char *dot = strrchr(buffer, '.');
+    if (dot) {
+        *dot = '\0';
+    }
+}
+
+static void RT_RecordBackendValidation(const float *rgba, int width, int height, qboolean validated) {
+    if (!rt_gpuValidate || rt_gpuValidate->integer <= 0) {
+        rt.backendValidation[RT_BACKEND_INDEX_COMPUTE].valid = qfalse;
+        rt.backendValidation[RT_BACKEND_INDEX_HARDWARE].valid = qfalse;
+        rt.backendRMSEDelta = 0.0;
+        rt.backendMaxErrorDelta = 0.0;
+        rt.backendParityFrame = 0;
+        rt.backendParityMap[0] = '\0';
+        return;
+    }
+
+    if (!rgba || width <= 0 || height <= 0) {
+        return;
+    }
+
+    char mapName[MAX_QPATH];
+    RT_GetValidationMapName(mapName, sizeof(mapName));
+
+    if (!RT_MapIsValidationTarget(mapName)) {
+        return;
+    }
+
+#ifdef USE_VULKAN
+    qboolean hardwareActive = (rt.useRTX && RTX_IsAvailable());
+#else
+    qboolean hardwareActive = qfalse;
+#endif
+
+    int backendIndex = hardwareActive ? RT_BACKEND_INDEX_HARDWARE : RT_BACKEND_INDEX_COMPUTE;
+    rtBackendValidation_t *entry = &rt.backendValidation[backendIndex];
+
+    entry->hardware = hardwareActive;
+    entry->valid = validated;
+    Q_strncpyz(entry->map, mapName, sizeof(entry->map));
+    entry->width = width;
+    entry->height = height;
+    entry->frame = rt.currentFrame;
+    entry->samples = validated ? rt.validationSamples : 0;
+    entry->rmse = validated ? rt.validationRMSE : 0.0;
+    entry->maxError = validated ? rt.validationMaxError : 0.0;
+
+    size_t pixelCount = (size_t)width * (size_t)height;
+    size_t byteCount = pixelCount * 4 * sizeof(float);
+    if (byteCount > (size_t)INT_MAX) {
+        byteCount = (size_t)INT_MAX;
+    }
+    entry->hash = Com_BlockChecksum(rgba, (int)byteCount);
+
+    if (entry->valid) {
+        RT_ReportBackendParity();
+    }
+}
+
+static void RT_ReportBackendParity(void) {
+    rtBackendValidation_t *hardware = &rt.backendValidation[RT_BACKEND_INDEX_HARDWARE];
+    rtBackendValidation_t *compute = &rt.backendValidation[RT_BACKEND_INDEX_COMPUTE];
+
+    if (!hardware->valid || !compute->valid) {
+        return;
+    }
+
+    if (Q_stricmp(hardware->map, compute->map) != 0) {
+        return;
+    }
+
+    if (hardware->width != compute->width || hardware->height != compute->height) {
+        return;
+    }
+
+    int newestFrame = (hardware->frame > compute->frame) ? hardware->frame : compute->frame;
+
+    if (newestFrame == rt.backendParityFrame &&
+        !Q_stricmp(rt.backendParityMap, hardware->map)) {
+        return;
+    }
+
+    double rmseDelta = hardware->rmse - compute->rmse;
+    double maxDelta = hardware->maxError - compute->maxError;
+
+    rt.backendParityFrame = newestFrame;
+    rt.backendRMSEDelta = rmseDelta;
+    rt.backendMaxErrorDelta = maxDelta;
+    Q_strncpyz(rt.backendParityMap, hardware->map, sizeof(rt.backendParityMap));
+
+    if (rmseDelta > RT_BACKEND_RMSE_THRESHOLD) {
+        ri.Printf(PRINT_WARNING,
+                  "rt_gpuValidate: Hardware backend RMSE regression on %s (HW=%.5f, Compute=%.5f, Δ=%.5f)\n",
+                  hardware->map,
+                  (float)hardware->rmse,
+                  (float)compute->rmse,
+                  (float)rmseDelta);
+    } else {
+        ri.Printf(PRINT_DEVELOPER,
+                  "rt_gpuValidate: Backend parity on %s (HW=%.5f, Compute=%.5f, Δ=%.5f, maxΔ=%.5f)\n",
+                  hardware->map,
+                  (float)hardware->rmse,
+                  (float)compute->rmse,
+                  (float)rmseDelta,
+                  (float)maxDelta);
+    }
+}
+
+static qboolean RT_TraceShadowRaySoftware(const vec3_t origin, const vec3_t direction, float maxDist) {
+    ray_t ray;
+    hitInfo_t hit;
+
+    VectorCopy(origin, ray.origin);
+    VectorCopy(direction, ray.direction);
+    ray.tMin = 0.001f;
+    ray.tMax = maxDist;
+
+    return RT_TraceRay(&ray, &hit);
 }
 
 /*
@@ -84,6 +316,7 @@ Initialize the path tracing system
 */
 void RT_InitPathTracer(void) {
     Com_Memset(&rt, 0, sizeof(rt));
+    RT_SetBackendStatus("Software backend initialising");
     
     // Register CVARs
     rt_enable = ri.Cvar_Get("rt_enable", "0", CVAR_ARCHIVE);
@@ -93,12 +326,16 @@ void RT_InitPathTracer(void) {
     rt_samples = ri.Cvar_Get("rt_samples", "1", CVAR_ARCHIVE);
     rt_denoise = ri.Cvar_Get("rt_denoise", "1", CVAR_ARCHIVE);
     rt_temporal = ri.Cvar_Get("rt_temporal", "1", CVAR_ARCHIVE);
+    r_rt_backend = ri.Cvar_Get("r_rt_backend", "auto", CVAR_ARCHIVE);
     rt_probes = ri.Cvar_Get("rt_probes", "1", CVAR_ARCHIVE);
     rt_cache = ri.Cvar_Get("rt_cache", "1", CVAR_ARCHIVE);
     rt_debug = ri.Cvar_Get("rt_debug", "0", CVAR_CHEAT);
     rt_staticLights = ri.Cvar_Get("rt_staticLights", "1", CVAR_ARCHIVE);
+    rt_gpuValidate = ri.Cvar_Get("rt_gpuValidate", "0", CVAR_ARCHIVE);
     
     ri.Cvar_SetDescription(rt_mode, "Path tracing mode: 'off', 'dynamic', or 'all'");
+    ri.Cvar_SetDescription(r_rt_backend, "Ray tracing backend: 'auto', 'hardware', or 'software'");
+    ri.Cvar_SetDescription(rt_gpuValidate, "Frame validation stride for CPU reference and backend parity checks (0 disables validation).");
     
     // Set default quality
     rt.quality = RT_QUALITY_MEDIUM;
@@ -106,6 +343,7 @@ void RT_InitPathTracer(void) {
     rt.maxBounces = 2;
     rt.samplesPerPixel = 1;
     rt.enabled = qfalse;
+    rt.useRTX = qfalse;
     
     // Parse mode CVAR
     if (!Q_stricmp(rt_mode->string, "all")) {
@@ -120,14 +358,44 @@ void RT_InitPathTracer(void) {
     rt.maxStaticLights = RT_MAX_STATIC_LIGHTS;
     rt.staticLights = ri.Hunk_Alloc(sizeof(staticLight_t) * rt.maxStaticLights, h_low);
     rt.numStaticLights = 0;
+    rt.numDynamicLights = 0;
+    rt.numSceneLights = 0;
+    rt.sceneLightHash = 0;
+    rt.temporalWidth = 0;
+    rt.temporalHeight = 0;
+    rt.temporalEnabled = qtrue;
     
     // Initialize random seed
     g_seed = ri.Milliseconds();
     
     // Register console command
     ri.Cmd_AddCommand("rt_status", RT_Status_f);
+
+#ifdef USE_VULKAN
+    RT_InitSceneLightBuffer();
+    RT_UpdateSceneLightBuffer();
+#endif
+
+    RT_InitDenoiser();
+
+    RT_SelectBackend();
     
-    ri.Printf(PRINT_ALL, "Path tracer initialized (mode: %s)\n", rt_mode->string);
+    ri.Printf(PRINT_ALL, "Path tracer initialized (mode: %s, backend: %s)\n",
+        rt_mode->string, (rt.useRTX ? "RTX Hardware" : "Software"));
+}
+
+void RT_ShutdownBackend(void) {
+#ifdef USE_VULKAN
+    if (rtBackendActive) {
+        ri.Printf(PRINT_ALL, "RTX hardware backend disabled\n");
+    }
+    RTX_Shutdown();
+#endif
+    rtBackendActive = qfalse;
+    rt.useRTX = qfalse;
+    RT_ResetBackendLogs();
+    rt.sceneLightBufferDirty = qtrue;
+    RT_SetBackendStatus("Software backend active");
 }
 
 /*
@@ -138,6 +406,12 @@ Shutdown and free resources
 ===============
 */
 void RT_ShutdownPathTracer(void) {
+    RT_ShutdownBackend();
+
+#ifdef USE_VULKAN
+    RT_DestroySceneLightBuffer();
+#endif
+
     if (rt.lightCache) {
         ri.Free(rt.lightCache);
         rt.lightCache = NULL;
@@ -152,7 +426,64 @@ void RT_ShutdownPathTracer(void) {
         ri.Free(rt.accumBuffer);
         rt.accumBuffer = NULL;
     }
+
+    if (rt.varianceBuffer) {
+        ri.Free(rt.varianceBuffer);
+        rt.varianceBuffer = NULL;
+    }
+
+    if (rt.sampleBuffer) {
+        ri.Free(rt.sampleBuffer);
+        rt.sampleBuffer = NULL;
+    }
+
+    if (rt.denoisedBuffer) {
+        ri.Free(rt.denoisedBuffer);
+        rt.denoisedBuffer = NULL;
+    }
 }
+
+#ifdef USE_VULKAN
+void RT_RecordBackendCommands(VkCommandBuffer cmd) {
+    if (!cmd) {
+        return;
+    }
+
+    if (!rt_enable || !rt_enable->integer) {
+        return;
+    }
+
+    if (!rtBackendActive || !rt.useRTX) {
+        return;
+    }
+
+    if (!RTX_IsAvailable()) {
+        return;
+    }
+
+    RTX_RecordCommands(cmd);
+}
+
+void RT_ApplyBackendDebugOverlay(VkCommandBuffer cmd, VkImage colorImage) {
+    if (!cmd) {
+        return;
+    }
+
+    if (!rtBackendActive || !rt.useRTX) {
+        return;
+    }
+
+    if (!rtx_debug || rtx_debug->integer <= 0) {
+        return;
+    }
+
+    if (!RTX_IsAvailable()) {
+        return;
+    }
+
+    RTX_ApplyDebugOverlayCompute(cmd, colorImage);
+}
+#endif
 
 /*
 ===============
@@ -484,7 +815,7 @@ qboolean RT_TraceRay(const ray_t *ray, hitInfo_t *hit) {
     hit->shader = NULL;
     
     // Use RTX hardware acceleration if available
-    if (RTX_IsAvailable()) {
+    if (rt.useRTX && RTX_IsAvailable()) {
         RTX_AcceleratePathTracing(ray, hit);
         if (hit->shader) {
             return qtrue;
@@ -507,21 +838,32 @@ qboolean RT_TraceShadowRay(const vec3_t origin, const vec3_t target, float maxDi
     if (RTX_IsAvailable()) {
         float visibility = 0.0f;
         RTX_ShadowRayQuery(origin, target, &visibility);
-        return (visibility < 1.0f);  // Return true if occluded
+        return (visibility < 1.0f);
+    }
+
+    if (RTX_RayQuerySupported()) {
+        rtShadowQuery_t query;
+        VectorCopy(origin, query.origin);
+        vec3_t dir;
+        VectorSubtract(target, origin, dir);
+        float dist = VectorNormalize(dir);
+        if (dist <= 0.0f) {
+            return qfalse;
+        }
+        VectorCopy(dir, query.direction);
+        query.maxDistance = maxDist > 0.0f ? maxDist : dist;
+        query.occluded = qfalse;
+        if (RTX_DispatchShadowQueries(&query, 1)) {
+            return query.occluded;
+        }
     }
     
     // Fallback to software implementation
-    ray_t ray;
-    hitInfo_t hit;
-    
-    VectorCopy(origin, ray.origin);
-    VectorSubtract(target, origin, ray.direction);
-    VectorNormalize(ray.direction);
-    ray.tMin = 0.001f;
-    ray.tMax = maxDist;
-    
-    // We only care if we hit anything, not what we hit
-    return RT_TraceRay(&ray, &hit);
+    vec3_t dir;
+    VectorSubtract(target, origin, dir);
+    VectorNormalize(dir);
+
+    return RT_TraceShadowRaySoftware(origin, dir, maxDist);
 }
 
 /*
@@ -614,60 +956,134 @@ Optimized with light culling and caching
 void RT_EvaluateDirectLighting(const hitInfo_t *hit, const vec3_t wo, vec3_t result) {
     VectorClear(result);
     
-    if (!hit->shader) {
+    if (!hit->shader || rt.mode == RT_MODE_OFF) {
         return;
     }
     
-    // Get material properties from shader
+    if (rt.numSceneLights <= 0) {
+        return;
+    }
+    
     vec3_t albedo = {1, 1, 1};
     float roughness = 0.5f;
     float metallic = 0.0f;
-    
-    // Check lighting mode
-    if (rt.mode == RT_MODE_OFF) {
-        return;
+    vec3_t shadowOrigin;
+    VectorMA(hit->point, 0.001f, hit->normal, shadowOrigin);
+
+    int totalLights = rt.numSceneLights;
+    rtLightEval_t *evaluations = (rtLightEval_t *)ri.Hunk_AllocateTempMemory(totalLights * sizeof(rtLightEval_t));
+    rtShadowQuery_t *shadowQueries = (rtShadowQuery_t *)ri.Hunk_AllocateTempMemory(totalLights * sizeof(rtShadowQuery_t));
+    int evalCount = 0;
+    int queryCount = 0;
+
+    for (int i = 0; i < totalLights; i++) {
+        const rtSceneLight_t *light = &rt.sceneLights[i];
+        if (light->intensity <= 0.0f) {
+            continue;
+        }
+
+        vec3_t lightDir;
+        float distance = RT_DIRECTIONAL_MAX_DISTANCE;
+        qboolean valid = qtrue;
+
+        switch (light->type) {
+        case RT_LIGHT_TYPE_POINT:
+        case RT_LIGHT_TYPE_SPOT:
+            VectorSubtract(light->origin, hit->point, lightDir);
+            distance = VectorLength(lightDir);
+            if (distance <= 0.0f || distance > light->radius) {
+                valid = qfalse;
+                break;
+            }
+            VectorScale(lightDir, 1.0f / distance, lightDir);
+
+            if (light->type == RT_LIGHT_TYPE_SPOT) {
+                float dot = DotProduct(lightDir, light->direction);
+                if (dot < light->spotCos) {
+                    valid = qfalse;
+                    break;
+                }
+            }
+            break;
+        case RT_LIGHT_TYPE_DIRECTIONAL:
+            VectorCopy(light->direction, lightDir);
+            if (VectorNormalize(lightDir) <= 0.0f) {
+                valid = qfalse;
+            }
+            distance = RT_DIRECTIONAL_MAX_DISTANCE;
+            break;
+        default:
+            valid = qfalse;
+            break;
+        }
+
+        if (!valid) {
+            continue;
+        }
+
+        rtLightEval_t *eval = &evaluations[evalCount];
+        eval->light = light;
+        VectorCopy(lightDir, eval->direction);
+        eval->distance = distance;
+        eval->queryIndex = -1;
+
+        if (light->castsShadows) {
+            rtShadowQuery_t *query = &shadowQueries[queryCount];
+            VectorCopy(shadowOrigin, query->origin);
+            VectorCopy(lightDir, query->direction);
+            query->maxDistance = distance;
+            query->occluded = qfalse;
+            eval->queryIndex = queryCount;
+            queryCount++;
+        }
+
+        evalCount++;
     }
-    
-    // Process dynamic lights
-    if (rt.mode == RT_MODE_DYNAMIC || rt.mode == RT_MODE_ALL) {
-        for (int i = 0; i < tr.refdef.num_dlights; i++) {
-            dlight_t *dl = &tr.refdef.dlights[i];
-            
-            // Calculate light direction and distance
-            vec3_t lightDir;
-            VectorSubtract(dl->origin, hit->point, lightDir);
-            float dist = VectorLength(lightDir);
-            
-            // Skip if out of range
-            if (dist > dl->radius) {
-                continue;
+
+    if (queryCount > 0) {
+        qboolean gpuHandled = qfalse;
+        if (RTX_RayQuerySupported()) {
+            gpuHandled = RTX_DispatchShadowQueries(shadowQueries, queryCount);
+        }
+
+        if (!gpuHandled) {
+            for (int i = 0; i < queryCount; i++) {
+                shadowQueries[i].occluded = RT_TraceShadowRaySoftware(
+                    shadowQueries[i].origin,
+                    shadowQueries[i].direction,
+                    shadowQueries[i].maxDistance);
             }
-            
-            VectorNormalize(lightDir);
-            
-            // Shadow test
-            if (RT_TraceShadowRay(hit->point, dl->origin, dist)) {
-                continue; // In shadow
-            }
-            
-            // Calculate BRDF
-            vec3_t brdf;
-            RT_EvaluateBRDF(lightDir, wo, hit->normal, albedo, roughness, metallic, brdf);
-            
-            // Apply light color and attenuation
-            float atten = 1.0f - (dist / dl->radius);
-            atten = atten * atten; // Quadratic falloff
-            
-            VectorMA(result, atten, dl->color, result);
         }
     }
-    
-    // Process static lights
-    if (rt.mode == RT_MODE_ALL) {
-        vec3_t staticResult;
-        RT_EvaluateStaticLighting(hit, wo, staticResult);
-        VectorAdd(result, staticResult, result);
+
+    for (int i = 0; i < evalCount; i++) {
+        const rtLightEval_t *eval = &evaluations[i];
+        const rtSceneLight_t *light = eval->light;
+
+        if (eval->queryIndex >= 0 && shadowQueries[eval->queryIndex].occluded) {
+            continue;
+        }
+
+        vec3_t brdf;
+        RT_EvaluateBRDF(eval->direction, wo, hit->normal, albedo, roughness, metallic, brdf);
+
+        float attenuation = 1.0f;
+        if (light->type == RT_LIGHT_TYPE_POINT || light->type == RT_LIGHT_TYPE_SPOT) {
+            attenuation = 1.0f - (eval->distance / light->radius);
+            attenuation = attenuation * attenuation;
+        }
+
+        vec3_t lightContrib;
+        VectorCopy(light->color, lightContrib);
+        VectorScale(lightContrib, light->intensity * attenuation, lightContrib);
+
+        result[0] += lightContrib[0] * brdf[0];
+        result[1] += lightContrib[1] * brdf[1];
+        result[2] += lightContrib[2] * brdf[2];
     }
+
+    ri.Hunk_FreeTempMemory(shadowQueries);
+    ri.Hunk_FreeTempMemory(evaluations);
 }
 
 /*
@@ -962,49 +1378,6 @@ void RT_ExtractStaticLights(void) {
             VectorCopy(direction, sl->direction);
             sl->spotAngle = spotAngle;
             sl->castShadows = qtrue;
-        }
-    }
-    
-    // Also extract from lightmap data if available
-    if (tr.world->lightGridData && rt.numStaticLights < rt.maxStaticLights - 100) {
-        // Sample light grid at regular intervals
-        int gridSize = tr.world->lightGridSize[0] * tr.world->lightGridSize[1] * tr.world->lightGridSize[2];
-        int step = MAX(1, gridSize / 100); // Sample up to 100 grid points
-        
-        for (int i = 0; i < gridSize && rt.numStaticLights < rt.maxStaticLights - 1; i += step) {
-            byte *data = tr.world->lightGridData + i * 8;
-            
-            // Extract ambient light
-            float ambient[3];
-            ambient[0] = data[0] / 255.0f;
-            ambient[1] = data[1] / 255.0f;
-            ambient[2] = data[2] / 255.0f;
-            
-            // Skip if too dark
-            if (ambient[0] + ambient[1] + ambient[2] < 0.1f) {
-                continue;
-            }
-            
-            // Calculate grid position
-            int x = i % (int)tr.world->lightGridSize[0];
-            int y = (i / (int)tr.world->lightGridSize[0]) % (int)tr.world->lightGridSize[1];
-            int z = i / ((int)tr.world->lightGridSize[0] * (int)tr.world->lightGridSize[1]);
-            
-            staticLight_t *sl = &rt.staticLights[rt.numStaticLights++];
-            // Use lightGridBounds to estimate step size
-            float stepX = (tr.world->lightGridBounds[0] > 0) ? (tr.world->lightGridBounds[3] - tr.world->lightGridBounds[0]) / tr.world->lightGridSize[0] : 64.0f;
-            float stepY = (tr.world->lightGridBounds[1] > 0) ? (tr.world->lightGridBounds[4] - tr.world->lightGridBounds[1]) / tr.world->lightGridSize[1] : 64.0f;
-            float stepZ = (tr.world->lightGridBounds[2] > 0) ? (tr.world->lightGridBounds[5] - tr.world->lightGridBounds[2]) / tr.world->lightGridSize[2] : 128.0f;
-            
-            sl->origin[0] = tr.world->lightGridOrigin[0] + x * stepX;
-            sl->origin[1] = tr.world->lightGridOrigin[1] + y * stepY;
-            sl->origin[2] = tr.world->lightGridOrigin[2] + z * stepZ;
-            
-            VectorCopy(ambient, sl->color);
-            sl->intensity = 0.5f; // Ambient contribution
-            sl->radius = 200.0f; // Affect nearby surfaces
-            sl->type = 0; // Point light
-            sl->castShadows = qfalse; // No shadows for ambient
         }
     }
     
@@ -1337,30 +1710,210 @@ void RT_GenerateRay(int x, int y, int sample, ray_t *ray) {
 }
 
 void RT_GetAccumulatedColor(int x, int y, vec3_t result) {
-    // Get accumulated color from temporal buffer
-    if (!rt.accumBuffer) {
+    if (!rt.accumBuffer || !rt.sampleBuffer ||
+        x < 0 || y < 0 ||
+        x >= rt.temporalWidth || y >= rt.temporalHeight) {
         VectorClear(result);
         return;
     }
-    
-    int index = (y * glConfig.vidWidth + x) * 3;
-    result[0] = rt.accumBuffer[index + 0];
-    result[1] = rt.accumBuffer[index + 1];
-    result[2] = rt.accumBuffer[index + 2];
+
+    int pixelIndex = y * rt.temporalWidth + x;
+    int base = pixelIndex * 3;
+    int samples = rt.sampleBuffer[pixelIndex];
+
+    if (samples <= 0) {
+        VectorClear(result);
+        return;
+    }
+
+    result[0] = rt.accumBuffer[base + 0];
+    result[1] = rt.accumBuffer[base + 1];
+    result[2] = rt.accumBuffer[base + 2];
+}
+
+void RT_BuildCameraRay(int x, int y, int width, int height, ray_t *ray) {
+    if (!ray || width <= 0 || height <= 0) {
+        return;
+    }
+
+    const viewParms_t *vp = &backEnd.viewParms;
+    vec3_t forward, right, up;
+
+    VectorCopy(vp->or.axis[0], forward);
+    VectorCopy(vp->or.axis[1], right);
+    VectorCopy(vp->or.axis[2], up);
+
+    float ndcX = ((2.0f * ((float)x + 0.5f)) / (float)width) - 1.0f;
+    float ndcY = 1.0f - ((2.0f * ((float)y + 0.5f)) / (float)height);
+
+    float tanHalfFov = tanf(DEG2RAD(vp->fovX * 0.5f));
+    float aspectRatio = (height > 0) ? ((float)width / (float)height) : 1.0f;
+
+    ndcX *= tanHalfFov * aspectRatio;
+    ndcY *= tanHalfFov;
+
+    VectorCopy(vp->or.origin, ray->origin);
+
+    ray->direction[0] = forward[0] + ndcX * right[0] + ndcY * up[0];
+    ray->direction[1] = forward[1] + ndcX * right[1] + ndcY * up[1];
+    ray->direction[2] = forward[2] + ndcX * right[2] + ndcY * up[2];
+    VectorNormalize(ray->direction);
+
+    ray->tMin = 0.001f;
+    ray->tMax = 10000.0f;
+    ray->depth = 0;
+    ray->ior = 1.0f;
 }
 
 void RT_AccumulateSample(int x, int y, const vec3_t color) {
-    if (!rt.accumBuffer) {
+    if (!rt.accumBuffer || !rt.varianceBuffer || !rt.sampleBuffer ||
+        x < 0 || y < 0 ||
+        x >= rt.temporalWidth || y >= rt.temporalHeight) {
         return;
     }
-    
-    int index = (y * glConfig.vidWidth + x) * 3;
-    
-    // Temporal accumulation with exponential moving average
-    float blend = 0.1f;
-    rt.accumBuffer[index + 0] = rt.accumBuffer[index + 0] * (1-blend) + color[0] * blend;
-    rt.accumBuffer[index + 1] = rt.accumBuffer[index + 1] * (1-blend) + color[1] * blend;
-    rt.accumBuffer[index + 2] = rt.accumBuffer[index + 2] * (1-blend) + color[2] * blend;
+
+    int pixelIndex = y * rt.temporalWidth + x;
+    int base = pixelIndex * 3;
+
+    if (!rt.temporalEnabled) {
+        rt.accumBuffer[base + 0] = color[0];
+        rt.accumBuffer[base + 1] = color[1];
+        rt.accumBuffer[base + 2] = color[2];
+        rt.varianceBuffer[base + 0] = 0.0f;
+        rt.varianceBuffer[base + 1] = 0.0f;
+        rt.varianceBuffer[base + 2] = 0.0f;
+        rt.sampleBuffer[pixelIndex] = 1;
+        return;
+    }
+
+    int samples = ++rt.sampleBuffer[pixelIndex];
+
+    for (int c = 0; c < 3; c++) {
+        float mean = rt.accumBuffer[base + c];
+        float delta = color[c] - mean;
+        mean += delta / samples;
+        float delta2 = color[c] - mean;
+
+        rt.accumBuffer[base + c] = mean;
+        rt.varianceBuffer[base + c] += delta * delta2;
+    }
+}
+
+void RT_ProcessGpuFrame(const float *rgba, int width, int height) {
+    if (!rgba || width <= 0 || height <= 0) {
+        return;
+    }
+
+    if (width != glConfig.vidWidth || height != glConfig.vidHeight) {
+        static qboolean warned = qfalse;
+        if (!warned) {
+            ri.Printf(PRINT_DEVELOPER, "RT_ProcessGpuFrame: Skipping validation/temporal integration due to resolution mismatch (%dx%d vs %dx%d)\n",
+                      width, height, glConfig.vidWidth, glConfig.vidHeight);
+            warned = qtrue;
+        }
+        return;
+    }
+
+    RT_InitTemporalBuffers();
+
+    if (!rt.accumBuffer || !rt.varianceBuffer || !rt.sampleBuffer) {
+        return;
+    }
+
+    if (rt.temporalWidth != width || rt.temporalHeight != height) {
+        RT_ResetAccumulation();
+        if (rt.temporalWidth != width || rt.temporalHeight != height) {
+            return;
+        }
+    }
+
+    const qboolean validate = (rt_gpuValidate && rt_gpuValidate->integer > 0);
+    const int validationStride = validate ? MAX(1, rt_gpuValidate->integer) : 0;
+
+    size_t pixelCount = (size_t)width * (size_t)height;
+
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            size_t idx = (size_t)y * width + x;
+            size_t base = idx * 4;
+
+            vec3_t sample = {
+                rgba[base + 0],
+                rgba[base + 1],
+                rgba[base + 2]
+            };
+
+            for (int c = 0; c < 3; ++c) {
+                if (!isfinite(sample[c]) || fabsf(sample[c]) > 1e6f) {
+                    sample[c] = 0.0f;
+                }
+            }
+
+            RT_AccumulateSample(x, y, sample);
+        }
+    }
+
+    if (rt_denoise && rt_denoise->integer && rt.denoisedBuffer) {
+        RT_DenoiseFrame(rt.accumBuffer, rt.denoisedBuffer, width, height);
+    } else if (rt.denoisedBuffer) {
+        size_t bytes = pixelCount * 3 * sizeof(float);
+        Com_Memcpy(rt.denoisedBuffer, rt.accumBuffer, bytes);
+    }
+
+    rt.currentFrame++;
+
+    if (validate && validationStride > 0) {
+        double sumSq = 0.0;
+        double maxErr = 0.0;
+        int samples = 0;
+        vec3_t cpuColor;
+
+        for (int y = 0; y < height; y += validationStride) {
+            for (int x = 0; x < width; x += validationStride) {
+                ray_t ray;
+                RT_BuildCameraRay(x, y, width, height, &ray);
+                RT_TracePath(&ray, 0, cpuColor);
+
+                size_t idx = (size_t)y * width + x;
+                size_t base = idx * 4;
+                float gpuColor[3] = {
+                    rgba[base + 0],
+                    rgba[base + 1],
+                    rgba[base + 2]
+                };
+
+                for (int c = 0; c < 3; ++c) {
+                    if (!isfinite(gpuColor[c]) || fabsf(gpuColor[c]) > 1e6f) {
+                        gpuColor[c] = 0.0f;
+                    }
+                    double diff = (double)cpuColor[c] - (double)gpuColor[c];
+                    sumSq += diff * diff;
+                    double absDiff = fabs(diff);
+                    if (absDiff > maxErr) {
+                        maxErr = absDiff;
+                    }
+                }
+                samples++;
+            }
+        }
+
+        if (samples > 0) {
+            rt.validationRMSE = sqrt(sumSq / (double)(samples * 3));
+            rt.validationMaxError = maxErr;
+            rt.validationSamples = samples;
+        } else {
+            rt.validationRMSE = 0.0;
+            rt.validationMaxError = 0.0;
+            rt.validationSamples = 0;
+        }
+    } else {
+        rt.validationRMSE = 0.0;
+        rt.validationMaxError = 0.0;
+        rt.validationSamples = 0;
+    }
+
+    qboolean backendValidated = (validate && validationStride > 0 && rt.validationSamples > 0);
+    RT_RecordBackendValidation(rgba, width, height, backendValidated);
 }
 
 /*
@@ -1406,31 +1959,183 @@ void RT_Status_f(void) {
     
     ri.Printf(PRINT_ALL, "\n==== Path Tracing Status ====\n");
     ri.Printf(PRINT_ALL, "Enabled: %s\n", rt.enabled ? "Yes" : "No");
+    ri.Printf(PRINT_ALL, "Backend: %s\n", RT_GetBackendStatus());
+    ri.Printf(PRINT_ALL, "RTX Active: %s\n", (rt.useRTX && RTX_IsAvailable()) ? "Yes" : "No");
+    ri.Printf(PRINT_ALL, "Scene Lights: %d (dynamic %d, static %d)\n",
+              rt.numSceneLights, rt.numDynamicLights, rt.numStaticLights);
+    ri.Printf(PRINT_ALL, "Light Buffer: %s\n",
+              rt.sceneLightBufferDirty ? "Pending upload" : "Synced");
     ri.Printf(PRINT_ALL, "Mode: %s\n", modeStr);
     ri.Printf(PRINT_ALL, "Quality: %s\n", qualityStr);
     ri.Printf(PRINT_ALL, "Max Bounces: %d\n", rt.maxBounces);
     ri.Printf(PRINT_ALL, "Samples Per Pixel: %d\n", rt.samplesPerPixel);
+    ri.Printf(PRINT_ALL, "Backend: %s\n", (rt.useRTX && RTX_IsAvailable()) ? "RTX Hardware" : "Software");
+    ri.Printf(PRINT_ALL, "RTX Available: %s\n", RTX_IsAvailable() ? "Yes" : "No");
     ri.Printf(PRINT_ALL, "Static Lights: %d / %d\n", rt.numStaticLights, rt.maxStaticLights);
     ri.Printf(PRINT_ALL, "Frame: %d\n", rt.currentFrame);
+    ri.Printf(PRINT_ALL, "Temporal Accumulation: %s (%dx%d)\n",
+              rt.temporalEnabled ? "On" : "Off", rt.temporalWidth, rt.temporalHeight);
     ri.Printf(PRINT_ALL, "\nCVARs:\n");
     ri.Printf(PRINT_ALL, "  rt_enable: %d\n", rt_enable ? rt_enable->integer : 0);
     ri.Printf(PRINT_ALL, "  rt_mode: %s\n", rt_mode ? rt_mode->string : "not set");
     ri.Printf(PRINT_ALL, "  rt_quality: %d\n", rt_quality ? rt_quality->integer : 0);
     ri.Printf(PRINT_ALL, "  rt_bounces: %d\n", rt_bounces ? rt_bounces->integer : 0);
     ri.Printf(PRINT_ALL, "  rt_samples: %d\n", rt_samples ? rt_samples->integer : 0);
+    ri.Printf(PRINT_ALL, "  rt_temporal: %d\n", rt_temporal ? rt_temporal->integer : 0);
+    ri.Printf(PRINT_ALL, "  rt_backend: %s\n", r_rt_backend ? r_rt_backend->string : "auto");
     ri.Printf(PRINT_ALL, "  rt_staticLights: %d\n", rt_staticLights ? rt_staticLights->integer : 0);
     ri.Printf(PRINT_ALL, "  rt_debug: %d\n", rt_debug ? rt_debug->integer : 0);
+
+    if (rt_gpuValidate && rt_gpuValidate->integer > 0) {
+        int stride = MAX(1, rt_gpuValidate->integer);
+#ifdef USE_VULKAN
+        qboolean hardwareActive = (rt.useRTX && RTX_IsAvailable());
+#else
+        qboolean hardwareActive = qfalse;
+#endif
+        const char *backendLabel = hardwareActive ? "RTX HW" : "Compute";
+
+        ri.Printf(PRINT_ALL, "\nValidation (stride=%d, active=%s)\n", stride, backendLabel);
+        ri.Printf(PRINT_ALL, "  Last frame RMSE: %.5f  Max: %.5f  Samples: %d\n",
+                  (float)rt.validationRMSE,
+                  (float)rt.validationMaxError,
+                  rt.validationSamples);
+
+        const rtBackendValidation_t *compute = &rt.backendValidation[RT_BACKEND_INDEX_COMPUTE];
+        const rtBackendValidation_t *hardware = &rt.backendValidation[RT_BACKEND_INDEX_HARDWARE];
+
+        if (compute->hash) {
+            ri.Printf(PRINT_ALL,
+                      "  Compute backend: hash=%08X map=%s RMSE=%.5f Max=%.5f Samples=%d\n",
+                      compute->hash,
+                      compute->map[0] ? compute->map : "unknown",
+                      (float)compute->rmse,
+                      (float)compute->maxError,
+                      compute->samples);
+        }
+
+        if (hardware->hash) {
+            ri.Printf(PRINT_ALL,
+                      "  RTX backend:     hash=%08X map=%s RMSE=%.5f Max=%.5f Samples=%d\n",
+                      hardware->hash,
+                      hardware->map[0] ? hardware->map : "unknown",
+                      (float)hardware->rmse,
+                      (float)hardware->maxError,
+                      hardware->samples);
+        }
+
+        if (rt.backendParityMap[0] && hardware->valid && compute->valid) {
+            ri.Printf(PRINT_ALL,
+                      "  ΔRMSE=%.5f  ΔMax=%.5f (map=%s)\n",
+                      (float)rt.backendRMSEDelta,
+                      (float)rt.backendMaxErrorDelta,
+                      rt.backendParityMap);
+        }
+    } else {
+        ri.Printf(PRINT_ALL, "\nValidation: disabled\n");
+    }
+
     ri.Printf(PRINT_ALL, "=============================\n");
 }
 
 /*
 ===============
-Stub functions for remaining features
-These would be implemented as needed
+Temporal accumulation helpers
 ===============
 */
-void RT_InitTemporalBuffers(void) {}
-void RT_ResetAccumulation(void) {}
+void RT_InitTemporalBuffers(void) {
+    const int width = glConfig.vidWidth;
+    const int height = glConfig.vidHeight;
+
+    if (width <= 0 || height <= 0) {
+        return;
+    }
+
+    if (rt.temporalWidth == width && rt.temporalHeight == height &&
+        rt.accumBuffer && rt.varianceBuffer && rt.sampleBuffer && rt.denoisedBuffer) {
+        return;
+    }
+
+    if (rt.accumBuffer) {
+        ri.Free(rt.accumBuffer);
+        rt.accumBuffer = NULL;
+    }
+    if (rt.varianceBuffer) {
+        ri.Free(rt.varianceBuffer);
+        rt.varianceBuffer = NULL;
+    }
+    if (rt.sampleBuffer) {
+        ri.Free(rt.sampleBuffer);
+        rt.sampleBuffer = NULL;
+    }
+    if (rt.denoisedBuffer) {
+        ri.Free(rt.denoisedBuffer);
+        rt.denoisedBuffer = NULL;
+    }
+
+    size_t pixelCount = (size_t)width * height;
+    size_t colorBytes = pixelCount * 3 * sizeof(float);
+    size_t sampleBytes = pixelCount * sizeof(int);
+
+    rt.accumBuffer = ri.Malloc(colorBytes);
+    rt.varianceBuffer = ri.Malloc(colorBytes);
+    rt.denoisedBuffer = ri.Malloc(colorBytes);
+    rt.sampleBuffer = ri.Malloc(sampleBytes);
+
+    if (!rt.accumBuffer || !rt.varianceBuffer || !rt.denoisedBuffer || !rt.sampleBuffer) {
+        ri.Printf(PRINT_WARNING, "RT_InitTemporalBuffers: failed to allocate %dx%d buffers\n", width, height);
+
+        if (rt.accumBuffer) { ri.Free(rt.accumBuffer); rt.accumBuffer = NULL; }
+        if (rt.varianceBuffer) { ri.Free(rt.varianceBuffer); rt.varianceBuffer = NULL; }
+        if (rt.denoisedBuffer) { ri.Free(rt.denoisedBuffer); rt.denoisedBuffer = NULL; }
+        if (rt.sampleBuffer) { ri.Free(rt.sampleBuffer); rt.sampleBuffer = NULL; }
+        rt.temporalWidth = rt.temporalHeight = 0;
+        return;
+    }
+
+    rt.temporalWidth = width;
+    rt.temporalHeight = height;
+
+    RT_ResetAccumulation();
+}
+
+void RT_ResetAccumulation(void) {
+    int width = glConfig.vidWidth;
+    int height = glConfig.vidHeight;
+
+    if (!rt.accumBuffer || !rt.sampleBuffer || width <= 0 || height <= 0) {
+        rt.temporalWidth = width > 0 ? width : 0;
+        rt.temporalHeight = height > 0 ? height : 0;
+        rt.currentFrame = 0;
+        rt.validationRMSE = 0.0;
+        rt.validationMaxError = 0.0;
+        rt.validationSamples = 0;
+        return;
+    }
+
+    size_t pixelCount = (size_t)width * height;
+
+    if (rt.accumBuffer) {
+        Com_Memset(rt.accumBuffer, 0, pixelCount * 3 * sizeof(float));
+    }
+    if (rt.varianceBuffer) {
+        Com_Memset(rt.varianceBuffer, 0, pixelCount * 3 * sizeof(float));
+    }
+    if (rt.sampleBuffer) {
+        Com_Memset(rt.sampleBuffer, 0, pixelCount * sizeof(int));
+    }
+    if (rt.denoisedBuffer) {
+        Com_Memset(rt.denoisedBuffer, 0, pixelCount * 3 * sizeof(float));
+    }
+
+    rt.temporalWidth = width;
+    rt.temporalHeight = height;
+    rt.currentFrame = 0;
+    rt.validationRMSE = 0.0;
+    rt.validationMaxError = 0.0;
+    rt.validationSamples = 0;
+    RT_ResetScreenProgress();
+}
 /*
 ===============
 RT_BeginFrame
@@ -1439,7 +2144,9 @@ Prepare path tracer for new frame
 ===============
 */
 void RT_BeginFrame(void) {
-    if (!rt_enable->integer) {
+    RT_SelectBackend();
+
+    if (!rt_enable || !rt_enable->integer) {
         rt.enabled = qfalse;
         return;
     }
@@ -1477,12 +2184,43 @@ void RT_BeginFrame(void) {
     rt.quality = (rtQuality_t)rt_quality->integer;
     rt.maxBounces = rt_bounces->integer;
     rt.samplesPerPixel = rt_samples->integer;
+
+    RT_InitTemporalBuffers();
+    rt.validationRMSE = 0.0;
+    rt.validationMaxError = 0.0;
+    rt.validationSamples = 0;
+
+    static qboolean firstFrame = qtrue;
+    static rtMode_t lastMode = RT_MODE_DYNAMIC;
+    static int lastSamples = -1;
+    static int lastBounces = -1;
+    static rtQuality_t lastQualitySetting = RT_QUALITY_MEDIUM;
+    static qboolean lastTemporalEnabled = qtrue;
+
+    rt.temporalEnabled = (rt_temporal && rt_temporal->integer) ? qtrue : qfalse;
+
+    if (lastTemporalEnabled != rt.temporalEnabled) {
+        RT_ResetAccumulation();
+        lastTemporalEnabled = rt.temporalEnabled;
+    }
+
+    if (firstFrame || lastMode != rt.mode) {
+        RT_ResetAccumulation();
+        lastMode = rt.mode;
+        firstFrame = qfalse;
+    }
+
+    if (lastSamples != rt.samplesPerPixel || lastBounces != rt.maxBounces || lastQualitySetting != rt.quality) {
+        RT_ResetAccumulation();
+        lastSamples = rt.samplesPerPixel;
+        lastBounces = rt.maxBounces;
+        lastQualitySetting = rt.quality;
+    }
     
     // Reset frame statistics
     rt.raysTraced = 0;
     rt.triangleTests = 0;
     rt.boxTests = 0;
-    rt.currentFrame++;
 }
 /*
 ===============
@@ -1509,12 +2247,443 @@ void RT_EndFrame(void) {
         ri.Printf(PRINT_ALL, "Path Tracing: Mode=%s, Static Lights=%d, Rays=%d\n",
                   modeStr, rt.numStaticLights, rt.raysTraced);
     }
+
+    if (rt.enabled && rt_gpuValidate && rt_gpuValidate->integer > 0 &&
+        rt.validationSamples > 0) {
+        int stride = MAX(1, rt_gpuValidate->integer);
+#ifdef USE_VULKAN
+        qboolean hardwareActive = (rt.useRTX && RTX_IsAvailable());
+#else
+        qboolean hardwareActive = qfalse;
+#endif
+        const char *backendLabel = hardwareActive ? "RTX HW" : "Compute";
+        ri.Printf(PRINT_ALL,
+                  "rt_gpuValidate (%s): stride=%d RMSE=%.5f max=%.5f (%d samples)\n",
+                  backendLabel,
+                  stride,
+                  (float)rt.validationRMSE,
+                  (float)rt.validationMaxError,
+                  rt.validationSamples);
+    }
+
+    if (rt.backendParityMap[0] &&
+        rt.backendValidation[RT_BACKEND_INDEX_COMPUTE].valid &&
+        rt.backendValidation[RT_BACKEND_INDEX_HARDWARE].valid &&
+        rt.backendParityFrame == rt.currentFrame) {
+        ri.Printf(PRINT_DEVELOPER,
+                  "rt_gpuValidate parity %s: ΔRMSE=%.5f ΔMax=%.5f (RTX=%08X, Compute=%08X)\n",
+                  rt.backendParityMap,
+                  (float)rt.backendRMSEDelta,
+                  (float)rt.backendMaxErrorDelta,
+                  rt.backendValidation[RT_BACKEND_INDEX_HARDWARE].hash,
+                  rt.backendValidation[RT_BACKEND_INDEX_COMPUTE].hash);
+    }
 }
-void RT_UpdateDynamicLights(void) {}
-void RT_InitDenoiser(void) {}
-void RT_DenoiseFrame(float *input, float *output, int width, int height) {}
-void RT_ApplyTemporalFilter(float *current, float *history, float *output, int width, int height) {}
-void RT_ApplySpatialFilter(float *input, float *output, int width, int height) {}
+
+static qboolean RT_BuildDynamicFromRenderLight(const renderLight_t *light, rtDynamicLight_t *out) {
+    if (!light || !out) {
+        return qfalse;
+    }
+
+    vec3_t color;
+    VectorCopy(light->color, color);
+    float intensity = (light->intensity > 0.0f) ? light->intensity : 1.0f;
+    float brightness = color[0] + color[1] + color[2];
+
+    if (brightness <= 0.0f) {
+        return qfalse;
+    }
+
+    out->type = RT_LIGHT_TYPE_POINT;
+    VectorCopy(light->origin, out->origin);
+    VectorCopy(color, out->color);
+    VectorClear(out->direction);
+    out->radius = RT_SafeRadius((light->cutoffDistance > 0.0f) ? light->cutoffDistance : light->radius);
+    out->intensity = intensity;
+    out->spotCos = -1.0f;
+    out->castsShadows = (light->flags & LIGHTFLAG_NOSHADOWS) ? qfalse : qtrue;
+    out->isStatic = light->isStatic ? qtrue : qfalse;
+    out->additive = qfalse;
+
+    switch (light->type) {
+    case RL_OMNI:
+        out->type = RT_LIGHT_TYPE_POINT;
+        break;
+    case RL_PROJ:
+        out->type = RT_LIGHT_TYPE_SPOT;
+        VectorSubtract(light->target, light->origin, out->direction);
+        if (VectorNormalize(out->direction) <= 0.0f) {
+            VectorSet(out->direction, 0.0f, 0.0f, -1.0f);
+        }
+        out->spotCos = RT_ComputeSpotCosFromFov(light->fovX);
+        break;
+    case RL_DIRECTIONAL:
+        out->type = RT_LIGHT_TYPE_DIRECTIONAL;
+        VectorCopy(light->target, out->direction);
+        if (VectorNormalize(out->direction) <= 0.0f) {
+            VectorSet(out->direction, 0.0f, 0.0f, -1.0f);
+        }
+        out->radius = RT_DIRECTIONAL_MAX_DISTANCE;
+        out->spotCos = -1.0f;
+        out->isStatic = qtrue;
+        break;
+    case RL_AMBIENT:
+        out->type = RT_LIGHT_TYPE_POINT;
+        out->castsShadows = qfalse;
+        out->isStatic = qtrue;
+        if (out->radius < 2048.0f) {
+            out->radius = 2048.0f;
+        }
+        break;
+    case RL_FOG:
+    default:
+        return qfalse;
+    }
+
+    out->radius = RT_SafeRadius(out->radius);
+    return qtrue;
+}
+
+static qboolean RT_BuildDynamicFromLegacyDlight(const dlight_t *dlight, rtDynamicLight_t *out) {
+    if (!dlight || !out) {
+        return qfalse;
+    }
+
+    float brightness = dlight->color[0] + dlight->color[1] + dlight->color[2];
+    if (brightness <= 0.0f) {
+        return qfalse;
+    }
+
+    out->type = RT_LIGHT_TYPE_POINT;
+    VectorCopy(dlight->origin, out->origin);
+    VectorCopy(dlight->color, out->color);
+    VectorClear(out->direction);
+    out->radius = RT_SafeRadius(dlight->radius);
+    out->intensity = 1.0f;
+    out->spotCos = -1.0f;
+    out->castsShadows = dlight->additive ? qfalse : qtrue;
+    out->isStatic = qfalse;
+    out->additive = dlight->additive ? qtrue : qfalse;
+
+    return qtrue;
+}
+
+static void RT_RebuildSceneLights(void) {
+    if (rt.mode == RT_MODE_OFF) {
+        rt.numSceneLights = 0;
+        return;
+    }
+
+    int combined = 0;
+
+    for (int i = 0; i < rt.numDynamicLights && combined < RT_MAX_SCENE_LIGHTS; i++) {
+        const rtDynamicLight_t *src = &rt.dynamicLights[i];
+        rtSceneLight_t *dst = &rt.sceneLights[combined++];
+
+        dst->type = src->type;
+        VectorCopy(src->origin, dst->origin);
+        VectorCopy(src->color, dst->color);
+        VectorCopy(src->direction, dst->direction);
+        dst->radius = RT_SafeRadius(src->radius);
+        dst->intensity = src->intensity;
+        dst->spotCos = Com_Clamp(-1.0f, 1.0f, src->spotCos);
+        dst->castsShadows = src->castsShadows;
+        dst->isStatic = src->isStatic;
+
+        if (dst->type == RT_LIGHT_TYPE_DIRECTIONAL) {
+            if (VectorNormalize(dst->direction) <= 0.0f) {
+                VectorSet(dst->direction, 0.0f, 0.0f, -1.0f);
+            }
+            dst->radius = RT_DIRECTIONAL_MAX_DISTANCE;
+        } else if (dst->type == RT_LIGHT_TYPE_SPOT) {
+            if (VectorNormalize(dst->direction) <= 0.0f) {
+                VectorSet(dst->direction, 0.0f, 0.0f, -1.0f);
+            }
+        } else {
+            VectorClear(dst->direction);
+        }
+    }
+
+    if (rt.mode == RT_MODE_ALL) {
+        for (int i = 0; i < rt.numStaticLights && combined < RT_MAX_SCENE_LIGHTS; i++) {
+            const staticLight_t *sl = &rt.staticLights[i];
+            rtSceneLight_t *dst = &rt.sceneLights[combined++];
+
+            dst->type = (sl->type == 1) ? RT_LIGHT_TYPE_SPOT : RT_LIGHT_TYPE_POINT;
+            VectorCopy(sl->origin, dst->origin);
+            VectorCopy(sl->color, dst->color);
+            dst->radius = RT_SafeRadius(sl->radius);
+            dst->intensity = sl->intensity;
+            dst->castsShadows = sl->castShadows;
+            dst->isStatic = qtrue;
+
+            if (dst->type == RT_LIGHT_TYPE_SPOT) {
+                VectorCopy(sl->direction, dst->direction);
+                if (VectorNormalize(dst->direction) <= 0.0f) {
+                    VectorSet(dst->direction, 0.0f, 0.0f, -1.0f);
+                }
+                dst->spotCos = RT_ComputeSpotCosFromFov(sl->spotAngle);
+            } else {
+                VectorClear(dst->direction);
+                dst->spotCos = -1.0f;
+            }
+        }
+    }
+
+    rt.numSceneLights = combined;
+
+    uint32_t newHash = RT_ComputeSceneLightHash(rt.sceneLights, rt.numSceneLights);
+    if (newHash != rt.sceneLightHash) {
+        rt.sceneLightHash = newHash;
+        RT_ResetAccumulation();
+    }
+#ifdef USE_VULKAN
+    rt.sceneLightBufferDirty = qtrue;
+    RT_UpdateSceneLightBuffer();
+#endif
+}
+
+void RT_UpdateDynamicLights(void) {
+    rt.numDynamicLights = 0;
+
+    if (rt.mode == RT_MODE_OFF) {
+        RT_RebuildSceneLights();
+        return;
+    }
+
+    qboolean appendedFromLightSystem = qfalse;
+
+    R_UpdateLightSystem();
+
+    if (tr_lightSystem.numVisibleLights > 0) {
+        int limit = MIN(tr_lightSystem.numVisibleLights, RT_MAX_LIGHTS);
+        for (int i = 0; i < limit && rt.numDynamicLights < RT_MAX_LIGHTS; i++) {
+            renderLight_t *light = tr_lightSystem.visibleLights[i];
+            if (!light) {
+                continue;
+            }
+
+            if (light->viewCount && light->viewCount != tr.viewCount) {
+                continue;
+            }
+
+            if (RT_BuildDynamicFromRenderLight(light, &rt.dynamicLights[rt.numDynamicLights])) {
+                appendedFromLightSystem = qtrue;
+                rt.numDynamicLights++;
+            }
+        }
+    }
+
+    if (!appendedFromLightSystem && tr.refdef.num_dlights > 0) {
+        int legacyCount = MIN(tr.refdef.num_dlights, RT_MAX_LIGHTS);
+        for (int i = 0; i < legacyCount && rt.numDynamicLights < RT_MAX_LIGHTS; i++) {
+            if (RT_BuildDynamicFromLegacyDlight(&tr.refdef.dlights[i], &rt.dynamicLights[rt.numDynamicLights])) {
+                rt.numDynamicLights++;
+            }
+        }
+    }
+
+    RT_RebuildSceneLights();
+}
+
+static ID_INLINE float RT_Luminance(const float *rgb) {
+    return 0.299f * rgb[0] + 0.587f * rgb[1] + 0.114f * rgb[2];
+}
+
+void RT_InitDenoiser(void) {
+    rt.denoiseSigma = 0.25f;
+    rt.denoiseThreshold = 0.5f;
+}
+
+void RT_ApplyTemporalFilter(float *current, float *history, float *output, int width, int height) {
+    if (!current || !output || width <= 0 || height <= 0) {
+        return;
+    }
+
+    size_t pixelCount = (size_t)width * height;
+    const float minAlpha = 0.05f;
+
+    for (size_t i = 0; i < pixelCount; i++) {
+        int base = (int)(i * 3);
+        int samples = (rt.sampleBuffer) ? rt.sampleBuffer[i] : 0;
+
+        if (samples <= 0) {
+            if (history) {
+                output[base + 0] = history[base + 0];
+                output[base + 1] = history[base + 1];
+                output[base + 2] = history[base + 2];
+            } else {
+                output[base + 0] = current[base + 0];
+                output[base + 1] = current[base + 1];
+                output[base + 2] = current[base + 2];
+            }
+            continue;
+        }
+
+        float alpha = 1.0f / (float)samples;
+        alpha = Com_Clamp(minAlpha, 1.0f, alpha);
+
+        for (int c = 0; c < 3; c++) {
+            float prev = history ? history[base + c] : current[base + c];
+            float curr = current[base + c];
+            output[base + c] = prev + alpha * (curr - prev);
+        }
+    }
+}
+
+void RT_ApplySpatialFilter(float *input, float *output, int width, int height) {
+    if (!input || !output || width <= 0 || height <= 0) {
+        return;
+    }
+
+    const int radius = 1;
+    const float sigmaSpatial = 1.0f;
+    const float sigmaColor = 0.25f;
+    const float varianceInfluence = 0.5f;
+
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            int index = y * width + x;
+            int base = index * 3;
+
+            if (!rt.sampleBuffer || rt.sampleBuffer[index] <= 0) {
+                output[base + 0] = input[base + 0];
+                output[base + 1] = input[base + 1];
+                output[base + 2] = input[base + 2];
+                continue;
+            }
+
+            float centerColor[3] = {
+                input[base + 0],
+                input[base + 1],
+                input[base + 2]
+            };
+
+            float centerLuma = RT_Luminance(centerColor);
+            float centerVariance = 0.0f;
+
+            if (rt.varianceBuffer && rt.sampleBuffer[index] > 1) {
+                float varianceSum = rt.varianceBuffer[base + 0] +
+                                    rt.varianceBuffer[base + 1] +
+                                    rt.varianceBuffer[base + 2];
+                centerVariance = varianceSum / (3.0f * (rt.sampleBuffer[index] - 1));
+            }
+
+            vec3_t accum = {0.0f, 0.0f, 0.0f};
+            float weightSum = 0.0f;
+
+            for (int dy = -radius; dy <= radius; dy++) {
+                int ny = y + dy;
+                if (ny < 0) ny = 0;
+                if (ny >= height) ny = height - 1;
+
+                for (int dx = -radius; dx <= radius; dx++) {
+                    int nx = x + dx;
+                    if (nx < 0) nx = 0;
+                    if (nx >= width) nx = width - 1;
+
+                    int nIndex = ny * width + nx;
+                    int nBase = nIndex * 3;
+
+                    if (!rt.sampleBuffer || rt.sampleBuffer[nIndex] <= 0) {
+                        continue;
+                    }
+
+                    float neighborColor[3] = {
+                        input[nBase + 0],
+                        input[nBase + 1],
+                        input[nBase + 2]
+                    };
+                    float neighborLuma = RT_Luminance(neighborColor);
+
+                    float neighborVariance = 0.0f;
+                    if (rt.varianceBuffer && rt.sampleBuffer[nIndex] > 1) {
+                        float nVarianceSum = rt.varianceBuffer[nBase + 0] +
+                                             rt.varianceBuffer[nBase + 1] +
+                                             rt.varianceBuffer[nBase + 2];
+                        neighborVariance = nVarianceSum / (3.0f * (rt.sampleBuffer[nIndex] - 1));
+                    }
+
+                    float spatialDist2 = (float)(dx * dx + dy * dy);
+                    float wSpatial = expf(-spatialDist2 / (2.0f * sigmaSpatial * sigmaSpatial));
+
+                    float colorDiff = neighborLuma - centerLuma;
+                    float wColor = expf(-(colorDiff * colorDiff) / (2.0f * sigmaColor * sigmaColor + 1e-6f));
+
+                    float varianceTerm = centerVariance + neighborVariance + 1e-6f;
+                    float wVariance = 1.0f / (1.0f + varianceTerm * varianceInfluence);
+
+                    float weight = wSpatial * wColor * wVariance;
+
+                    accum[0] += neighborColor[0] * weight;
+                    accum[1] += neighborColor[1] * weight;
+                    accum[2] += neighborColor[2] * weight;
+                    weightSum += weight;
+                }
+            }
+
+            if (weightSum > 1e-5f) {
+                output[base + 0] = accum[0] / weightSum;
+                output[base + 1] = accum[1] / weightSum;
+                output[base + 2] = accum[2] / weightSum;
+            } else {
+                output[base + 0] = centerColor[0];
+                output[base + 1] = centerColor[1];
+                output[base + 2] = centerColor[2];
+            }
+        }
+    }
+}
+
+void RT_DenoiseFrame(float *input, float *output, int width, int height) {
+    if (!input || !output || width <= 0 || height <= 0) {
+        return;
+    }
+
+    size_t pixelCount = (size_t)width * height;
+    size_t bytes = pixelCount * 3 * sizeof(float);
+
+    int denoiseLevel = rt_denoise ? rt_denoise->integer : 0;
+    if (denoiseLevel <= 0 || !rt.temporalEnabled) {
+        if (output != input) {
+            Com_Memcpy(output, input, bytes);
+        }
+        return;
+    }
+
+    float *historyCopy = NULL;
+    if (output) {
+        historyCopy = (float *)ri.Hunk_AllocateTempMemory(bytes);
+        if (historyCopy) {
+            Com_Memcpy(historyCopy, output, bytes);
+        }
+    }
+
+    float *temp = (float *)ri.Hunk_AllocateTempMemory(bytes);
+    if (!temp) {
+        if (historyCopy) {
+            ri.Hunk_FreeTempMemory(historyCopy);
+        }
+        if (output != input) {
+            Com_Memcpy(output, input, bytes);
+        }
+        return;
+    }
+
+    RT_ApplyTemporalFilter(input, historyCopy, temp, width, height);
+
+    if (denoiseLevel > 1) {
+        RT_ApplySpatialFilter(temp, output, width, height);
+    } else {
+        Com_Memcpy(output, temp, bytes);
+    }
+
+    ri.Hunk_FreeTempMemory(temp);
+    if (historyCopy) {
+        ri.Hunk_FreeTempMemory(historyCopy);
+    }
+}
+
 void RT_ClearLightCache(void) {}
 /*
 ===============
@@ -1590,13 +2759,6 @@ void RT_ComputeLightingAtPoint(const vec3_t point, vec3_t result) {
             
             // Evaluate direct lighting at hit point
             RT_EvaluateDirectLighting(&hit, sampleDir, lighting);
-            
-            // Add static lighting if in ALL mode
-            if (rt.mode == RT_MODE_ALL) {
-                vec3_t staticLight;
-                RT_EvaluateStaticLighting(&hit, sampleDir, staticLight);
-                VectorAdd(lighting, staticLight, lighting);
-            }
             
             // Accumulate with cosine weighting
             float cosTheta = DotProduct(hit.normal, sampleDir);

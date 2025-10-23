@@ -93,7 +93,6 @@ typedef struct renderLight_s {
     image_t             *falloffImage;      // Falloff texture
     
     // Shadow properties
-    int                 shadowLod;          // Shadow detail level (0-3)
     float               shadowBias;         // Shadow depth bias
     float               shadowSoftness;     // Soft shadow radius
     
@@ -122,9 +121,6 @@ typedef struct renderLight_s {
     qboolean            needsUpdate;        // Interactions need rebuilding
     int                 lastUpdateFrame;    // Frame of last update
     
-    // Shadow mapping
-    struct shadowMapInfo_s  *shadowMap;     // Shadow map data
-    
     // Screen-space optimization
     int                 scissorRect[4];     // Screen-space scissor bounds
     
@@ -148,7 +144,6 @@ void R_ShutdownLightingSystem(void);
 
 // Conversion from old system
 void RE_AddDynamicLight(const vec3_t origin, float radius, float r, float g, float b);
-void R_ConvertDlights(void);
 
 // Debug visualization
 void R_DrawLightVolumes(void);
@@ -166,5 +161,7 @@ typedef struct lightGrid_s {
 void R_BuildLightGrid(void);
 void R_ClearLightGrid(void);
 renderLight_t** R_GetLightsInCell(vec3_t point);
+int R_GetNearbyLights(vec3_t point, renderLight_t **lightList, int maxLights);
+void R_ComputeSceneLighting(const vec3_t point, vec3_t ambientLight, vec3_t directedLight, vec3_t lightDir);
 
 #endif // TR_LIGHT_H

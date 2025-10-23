@@ -26,7 +26,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 // External references
 extern lightSystem_t tr_lightSystem;
-extern cvar_t *r_lightGridSize;
+
+// Default grid cell size in world units
+static const float LIGHT_GRID_CELL_SIZE = 64.0f;
 
 // Light grid for spatial queries
 static lightGrid_t *s_lightGrid = NULL;
@@ -108,7 +110,7 @@ void R_BuildLightGrid(void) {
     }
     
     // Initialize grid
-    cellSize = r_lightGridSize ? r_lightGridSize->value : 64.0f;
+    cellSize = LIGHT_GRID_CELL_SIZE;
     R_InitLightGrid(s_lightGrid, worldMins, worldMaxs, cellSize);
     
     // Add lights to grid cells
@@ -360,6 +362,156 @@ int R_GetNearbyLights(vec3_t point, renderLight_t **lightList, int maxLights) {
     }
     
     return numLights;
+}
+
+/*
+===============
+R_ComputeSceneLighting
+
+Accumulates lighting at a point using the probe/light system
+===============
+*/
+void R_ComputeSceneLighting(const vec3_t point, vec3_t ambientLight, vec3_t directedLight, vec3_t lightDir) {
+    const int maxNearby = 32;
+    renderLight_t *nearby[32];
+    vec3_t directionAccum;
+    float directionWeight = 0.0f;
+    int numLights;
+    int i;
+
+    // Default baseline so scenes without probes still have some light
+    VectorSet(ambientLight,
+              tr.identityLight * 16.0f,
+              tr.identityLight * 16.0f,
+              tr.identityLight * 16.0f);
+    VectorClear(directedLight);
+    VectorClear(lightDir);
+    VectorClear(directionAccum);
+
+    // Ensure the spatial grid is ready before sampling
+    R_BuildLightGrid();
+    numLights = R_GetNearbyLights(point, nearby, maxNearby);
+
+    if (numLights <= 0) {
+        float fallback = tr.identityLight * 150.0f;
+        VectorSet(ambientLight, fallback, fallback, fallback);
+        VectorSet(directedLight, fallback, fallback, fallback);
+
+        if (VectorLengthSquared(tr.sunDirection) > 0.0f) {
+            VectorCopy(tr.sunDirection, lightDir);
+        } else {
+            VectorSet(lightDir, 0.0f, 0.0f, 1.0f);
+        }
+        return;
+    }
+
+    for (i = 0; i < numLights; ++i) {
+        renderLight_t *light = nearby[i];
+        float brightness = 0.0f;
+        float ambientRatio = 0.0f;
+        float directRatio = 0.0f;
+        vec3_t dirToLight;
+        VectorClear(dirToLight);
+
+        if (!light) {
+            continue;
+        }
+
+        switch (light->type) {
+            case RL_DIRECTIONAL: {
+                vec3_t dir;
+                VectorCopy(light->target, dir);
+                if (VectorNormalize(dir) == 0.0f) {
+                    VectorCopy(tr.sunDirection, dir);
+                    if (VectorNormalize(dir) == 0.0f) {
+                        VectorSet(dir, 0.0f, 0.0f, -1.0f);
+                    }
+                }
+                VectorScale(dir, -1.0f, dirToLight);
+
+                brightness = light->intensity > 0.0f ? light->intensity : 0.0f;
+                ambientRatio = 0.15f;
+                directRatio = 0.85f;
+                break;
+            }
+
+            case RL_OMNI:
+            case RL_PROJ: {
+                vec3_t delta;
+                float distance;
+                float denom;
+                float radius;
+
+                VectorSubtract(light->origin, point, delta);
+                distance = VectorLength(delta);
+                if (distance > 0.0f) {
+                    VectorScale(delta, 1.0f / distance, dirToLight);
+                } else {
+                    VectorSet(dirToLight, 0.0f, 0.0f, 1.0f);
+                }
+
+                radius = (light->cutoffDistance > 0.0f) ? light->cutoffDistance : light->radius;
+                if (radius > 0.0f && distance > radius) {
+                    continue;
+                }
+
+                denom = light->constant +
+                        light->linear * distance +
+                        light->quadratic * distance * distance;
+                if (denom <= 0.0001f) {
+                    denom = 0.0001f;
+                }
+
+                brightness = (light->intensity > 0.0f ? light->intensity : 0.0f) * (1.0f / denom);
+                ambientRatio = 0.35f;
+                directRatio = 0.65f;
+                break;
+            }
+
+            case RL_AMBIENT:
+                brightness = light->intensity > 0.0f ? light->intensity : 0.0f;
+                ambientRatio = 1.0f;
+                directRatio = 0.0f;
+                break;
+
+            default:
+                continue;
+        }
+
+        if (brightness <= 0.0f) {
+            continue;
+        }
+
+        // Convert brightness into 0..255 scale contributions
+        {
+            float ambientScale = brightness * ambientRatio * tr.identityLightByte;
+            float directScale = brightness * directRatio * tr.identityLightByte;
+
+            if (ambientScale > 0.0f) {
+                VectorMA(ambientLight, ambientScale, light->color, ambientLight);
+            }
+
+            if (directScale > 0.0f) {
+                VectorMA(directedLight, directScale, light->color, directedLight);
+                VectorMA(directionAccum, directScale, dirToLight, directionAccum);
+                directionWeight += directScale;
+            }
+        }
+    }
+
+    if (directionWeight > 0.0f && VectorNormalize2(directionAccum, lightDir) != 0.0f) {
+        // normalised above
+    } else if (VectorLengthSquared(tr.sunDirection) > 0.0f) {
+        VectorCopy(tr.sunDirection, lightDir);
+    } else {
+        VectorSet(lightDir, 0.0f, 0.0f, 1.0f);
+    }
+
+    // Clamp outputs to byte range
+    for (i = 0; i < 3; ++i) {
+        ambientLight[i] = Com_Clamp(0.0f, (float)tr.identityLightByte, ambientLight[i]);
+        directedLight[i] = Com_Clamp(0.0f, (float)tr.identityLightByte, directedLight[i]);
+    }
 }
 
 /*

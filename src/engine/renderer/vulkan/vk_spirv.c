@@ -34,20 +34,34 @@ uint32_t* R_LoadSPIRV( const char *filename, uint32_t *codeSize ) {
     }
     
     // Construct full path to shader file
-    Com_sprintf( fullPath, sizeof(fullPath), "%s/shaders/%s", ri.Cvar_Get( "fs_basepath", "", 0 )->string, filename );
-    
-    // Open the SPIR-V binary file
-    file = fopen( fullPath, "rb" );
+    const char *searchRoots[] = {
+        ri.Cvar_Get( "fs_homepath", "", 0 )->string,
+        ri.Cvar_Get( "fs_basepath", "", 0 )->string,
+        ""
+    };
+    const size_t rootCount = sizeof(searchRoots) / sizeof(searchRoots[0]);
+
+    file = NULL;
+    for (size_t i = 0; i < rootCount && !file; ++i) {
+        if (searchRoots[i] && searchRoots[i][0]) {
+            Com_sprintf( fullPath, sizeof(fullPath), "%s/shaders/%s", searchRoots[i], filename );
+            file = fopen( fullPath, "rb" );
+            if ( !file ) {
+                Com_sprintf( fullPath, sizeof(fullPath), "%s/baseq3/shaders/%s", searchRoots[i], filename );
+                file = fopen( fullPath, "rb" );
+            }
+        }
+    }
+
     if ( !file ) {
-        // Try alternative paths
         Com_sprintf( fullPath, sizeof(fullPath), "shaders/%s", filename );
         file = fopen( fullPath, "rb" );
-        
-        if ( !file ) {
-            ri.Printf( PRINT_WARNING, "R_LoadSPIRV: Failed to open shader file '%s'\n", filename );
-            *codeSize = 0;
-            return NULL;
-        }
+    }
+
+    if ( !file ) {
+        ri.Printf( PRINT_WARNING, "R_LoadSPIRV: Failed to open shader file '%s'\n", filename );
+        *codeSize = 0;
+        return NULL;
     }
     
     // Get file size

@@ -102,6 +102,9 @@ sceneNode_t* R_AddEntityToSceneGraph( const trRefEntity_t *ent ) {
     node->nodeId = sceneGraph.numNodes - 1;
     node->type = NODE_TYPE_ENTITY;
     node->flags = NODE_FLAG_VISIBLE | NODE_FLAG_DYNAMIC;
+    node->nextSibling = NULL;  // Ensure sibling pointer is NULL
+    node->firstChild = NULL;   // Ensure child pointer is NULL
+    node->parent = NULL;       // Ensure parent pointer is NULL
     
     // Store entity reference (we'll just store the origin for now)
     // In a full implementation, we'd keep a reference to the entity
@@ -129,19 +132,12 @@ sceneNode_t* R_AddEntityToSceneGraph( const trRefEntity_t *ent ) {
         sceneGraph.entityNodes[sceneGraph.numEntityNodes++] = node;
     }
     
-    // Add as child of root
+    // Add as child of root - simplified to avoid traversing potentially corrupted lists
     if ( sceneGraph.root && sceneGraph.root != node ) {
         node->parent = sceneGraph.root;
-        if ( sceneGraph.root->firstChild ) {
-            // Find last sibling
-            sceneNode_t *sibling = sceneGraph.root->firstChild;
-            while ( sibling->nextSibling ) {
-                sibling = sibling->nextSibling;
-            }
-            sibling->nextSibling = node;
-        } else {
-            sceneGraph.root->firstChild = node;
-        }
+        // Just add as first child instead of finding the last sibling
+        node->nextSibling = sceneGraph.root->firstChild;
+        sceneGraph.root->firstChild = node;
         sceneGraph.root->numChildren++;
     }
     

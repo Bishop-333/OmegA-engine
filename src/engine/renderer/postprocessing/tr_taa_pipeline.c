@@ -154,7 +154,7 @@ qboolean R_CreateTAAComputePipelines( void ) {
     }
     
     // Load TAA compute shader
-    taaShaderCode = R_LoadSPIRV( "taa_resolve.comp.spv", &taaShaderSize );
+    taaShaderCode = R_LoadSPIRV( "shaders/compute/taa_resolve.spv", &taaShaderSize );
     if ( !taaShaderCode ) {
         ri.Printf( PRINT_WARNING, "R_CreateTAAComputePipelines: Failed to load TAA shader\n" );
         // Use fallback or skip TAA
@@ -202,7 +202,7 @@ qboolean R_CreateTAAComputePipelines( void ) {
     }
     
     // Load sharpening shader (optional)
-    sharpenShaderCode = R_LoadSPIRV( "taa_sharpen.comp.spv", &sharpenShaderSize );
+    sharpenShaderCode = R_LoadSPIRV( "shaders/compute/taa_sharpen.spv", &sharpenShaderSize );
     if ( sharpenShaderCode ) {
         shaderModuleInfo.codeSize = sharpenShaderSize;
         shaderModuleInfo.pCode = sharpenShaderCode;

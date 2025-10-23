@@ -454,15 +454,10 @@ void Material_ParseMap(material_t *material, materialStage_t *stage, char **text
     
     // Check for special maps
     if (!Q_stricmp(token, "$lightmap")) {
-        stage->bundle[0].isLightmap = qtrue;
-        stage->bundle[0].image[0] = tr.lightmaps[0];
-        stage->lighting = SL_DIFFUSE;
-        stage->isLightmap = qtrue;
-        material->hasLightmap = qtrue;
-        material->materialFlags |= MATERIAL_LIGHTMAP;
+        R_ReportLegacyLightmapUsage("Material_ParseMap");
+        stage->active = qfalse;
         return;
-    }
-    else if (!Q_stricmp(token, "$whiteimage")) {
+    } else if (!Q_stricmp(token, "$whiteimage")) {
         stage->bundle[0].image[0] = tr.whiteImage;
         stage->colorMap = tr.whiteImage;
         return;
@@ -654,10 +649,10 @@ Material_CreateDefault
 Create a default material for a texture
 ================
 */
-material_t* Material_CreateDefault(const char *name, int lightmapIndex) {
+material_t* Material_CreateDefault(const char *name) {
     material_t *material;
     materialStage_t *stage;
-    
+
     if (numMaterials >= MAX_MATERIALS) {
         ri.Printf(PRINT_WARNING, "WARNING: MAX_MATERIALS reached\n");
         return NULL;
@@ -688,23 +683,8 @@ material_t* Material_CreateDefault(const char *name, int lightmapIndex) {
     stage->stateBits = GLS_DEFAULT;
     material->numStages = 1;
     
-    // Add lightmap stage if needed
-    if (lightmapIndex >= 0 && lightmapIndex < tr.numLightmaps) {
-        stage = &material->stages[1];
-        stage->active = qtrue;
-        stage->bundle[0].image[0] = tr.lightmaps[lightmapIndex];
-        stage->bundle[0].isLightmap = qtrue;
-        stage->isLightmap = qtrue;
-        stage->rgbGen = CGEN_IDENTITY;
-        stage->alphaGen = AGEN_IDENTITY;
-        stage->stateBits = GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO;
-        material->numStages = 2;
-        material->hasLightmap = qtrue;
-        material->materialFlags |= MATERIAL_LIGHTMAP;
-    }
-    
     Material_AddToHashTable(material);
-    
+
     return material;
 }
 
@@ -1082,3 +1062,4 @@ void Material_ParseSpecular(material_t *material, char **text) {
         material->specularExponent = 32.0f;
     }
 }
+

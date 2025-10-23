@@ -143,29 +143,16 @@ void RB_RenderLightingPasses(void) {
             continue;
         }
         
-        // Check if light should cast shadows (Phase 9)
-        if (r_shadows->integer >= 4 && !(light->flags & LIGHTFLAG_NOSHADOWS)) {
-            // Debug output
-            static int debugCounter = 0;
-            if ((debugCounter++ % 60) == 0) {
-                ri.Printf(PRINT_ALL, "Shadow Mode 4 Active: r_shadows=%d, processing light %d\n", 
-                          r_shadows->integer, i);
+        // Regular lighting without legacy shadow volumes
+        RB_SetupLightingShader(light);
+        
+        // Process all interactions for this light
+        inter = light->firstInteraction;
+        while (inter) {
+            if (!inter->culled && inter->receivesLight && !inter->isEmpty) {
+                RB_DrawInteraction(inter);
             }
-            // Use stencil shadows for this light
-            extern void RB_RenderShadowedLight(renderLight_t *light);
-            RB_RenderShadowedLight(light);
-        } else {
-            // Regular lighting without shadows
-            RB_SetupLightingShader(light);
-            
-            // Process all interactions for this light
-            inter = light->firstInteraction;
-            while (inter) {
-                if (!inter->culled && inter->receivesLight && !inter->isEmpty) {
-                    RB_DrawInteraction(inter);
-                }
-                inter = inter->lightNext;
-            }
+            inter = inter->lightNext;
         }
     }
 }
@@ -178,45 +165,23 @@ Calculate lighting from light grid for a position
 ================
 */
 void RB_CalcLightGridColor(const vec3_t position, vec3_t color) {
+    vec3_t ambient, directed, dummyDir;
     int i;
-    renderLight_t *light;
-    vec3_t lightDir;
-    float distance;
-    float attenuation;
-    float intensity;
-    
-    // Start with ambient
-    VectorSet(color, 0.2f, 0.2f, 0.2f);
-    
-    // Add contribution from each light
-    for (i = 0; i < tr_lightSystem.numVisibleLights; i++) {
-        light = tr_lightSystem.visibleLights[i];
-        
-        if (light->type == RL_DIRECTIONAL) {
-            // Directional light
-            intensity = light->intensity;
-            VectorMA(color, intensity, light->color, color);
-        } else if (light->type == RL_OMNI) {
-            // Point light with attenuation
-            VectorSubtract(light->origin, position, lightDir);
-            distance = VectorLength(lightDir);
-            
-            if (distance < light->cutoffDistance) {
-                attenuation = 1.0f / (light->constant + 
-                                     light->linear * distance + 
-                                     light->quadratic * distance * distance);
-                
-                intensity = light->intensity * attenuation;
-                VectorMA(color, intensity, light->color, color);
-            }
-        }
+
+    R_ComputeSceneLighting(position, ambient, directed, dummyDir);
+
+    // Convert from byte scale to 0..1 range expected by the backend
+    if (tr.identityLightByte > 0) {
+        float invByte = 1.0f / (float)tr.identityLightByte;
+        VectorScale(ambient, invByte, ambient);
+        VectorScale(directed, invByte, directed);
     }
-    
-    // Clamp color values
+
+    VectorCopy(ambient, color);
+    VectorMA(color, 1.0f, directed, color);
+
     for (i = 0; i < 3; i++) {
-        if (color[i] > 1.0f) {
-            color[i] = 1.0f;
-        }
+        color[i] = Com_Clamp(0.0f, 1.0f, color[i]);
     }
 }
 

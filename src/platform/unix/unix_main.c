@@ -54,9 +54,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // FIXME TTimo should we gard this? most *nix system should comply?
 #include <termios.h>
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
-#include "../renderercommon/tr_public.h"
+#include "../../engine/common/q_shared.h"
+#include "../../engine/core/qcommon.h"
+#include "../../engine/renderer/core/tr_public.h"
 
 #include "linux_local.h" // bk001204
 

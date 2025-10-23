@@ -1,0 +1,69 @@
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+// Input images
+layout(set = 0, binding = 0) uniform sampler2D rtImage;        // Ray-traced result
+layout(set = 0, binding = 1) uniform sampler2D albedoImage;    // Rasterized albedo/base color
+layout(set = 0, binding = 2, rgba8) uniform image2D outputImage; // Final composite output
+
+// Push constant for blend intensity
+layout(push_constant) uniform PushConstants {
+    float intensity; // Blend factor between RT and rasterized [0,1]
+} pc;
+
+void main() {
+    ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
+
+    // Get output dimensions
+    ivec2 imageSize = imageSize(outputImage);
+
+    // Check bounds
+    if (coord.x >= imageSize.x || coord.y >= imageSize.y) {
+        return;
+    }
+
+    // Calculate UV coordinates
+    vec2 uv = (vec2(coord) + 0.5) / vec2(imageSize);
+
+    // Sample ray-traced result
+    vec4 rtColor = texture(rtImage, uv);
+
+    // Sample rasterized albedo
+    vec4 rasterColor = texture(albedoImage, uv);
+
+    // Perform hybrid composition
+    vec4 finalColor;
+
+    if (pc.intensity >= 1.0) {
+        // Full RT mode
+        finalColor = rtColor;
+    } else if (pc.intensity <= 0.0) {
+        // Full raster mode
+        finalColor = rasterColor;
+    } else {
+        // Hybrid mode - blend between RT and rasterized
+        // Use RT for lighting/GI, preserve rasterized detail
+        vec3 rtLighting = rtColor.rgb / max(rtColor.a, 0.001);
+
+        // Apply RT lighting to rasterized albedo
+        vec3 litColor = rasterColor.rgb * rtLighting;
+
+        // Blend between original raster and RT-lit result based on intensity
+        finalColor.rgb = mix(rasterColor.rgb, litColor, pc.intensity);
+        finalColor.a = rasterColor.a;
+
+        // Optional: Add RT reflections/GI on top
+        if (rtColor.a > 0.5) {
+            // Areas with strong RT contribution (reflections, GI)
+            float rtContribution = (rtColor.a - 0.5) * 2.0 * pc.intensity;
+            finalColor.rgb = mix(finalColor.rgb, rtColor.rgb, rtContribution * 0.5);
+        }
+    }
+
+    // Clamp to valid range
+    finalColor = clamp(finalColor, 0.0, 1.0);
+
+    // Write final composited result
+    imageStore(outputImage, coord, finalColor);
+}

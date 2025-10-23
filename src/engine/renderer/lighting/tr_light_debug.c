@@ -28,7 +28,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // External references
 extern lightSystem_t tr_lightSystem;
 extern cvar_t *r_showLightVolumes;
-extern cvar_t *r_showInteractions;
 
 // Forward declarations for missing functions
 void R_DrawLightGrid(void);
@@ -307,7 +306,7 @@ void R_DrawInteractions(void) {
     interaction_t *inter;
     vec4_t color;
     
-    if (!r_showInteractions || !r_showInteractions->integer) {
+    if (!r_showLightVolumes || r_showLightVolumes->integer < 3) {
         return;
     }
     
@@ -352,8 +351,8 @@ void R_DrawShadowFrusta(void) {
     for (i = 0; i < tr_lightSystem.numVisibleLights; i++) {
         light = tr_lightSystem.visibleLights[i];
         
-        if (light->shadowMap) {
-            // Draw shadow frustum in red
+        if (light->type == RL_PROJ || light->type == RL_DIRECTIONAL) {
+            // Visualize projected/directional light volumes
             R_DebugFrustum(light, colorRed);
         }
     }
@@ -397,9 +396,6 @@ void R_DrawLightStats(int x, int y) {
                 tr_lightSystem.interactionMgr.numStaticCached);
     R_DrawString(x, y, str, color);
     
-    y += 20;
-    Com_sprintf(str, sizeof(str), "Shadow Maps: %d", tr_lightSystem.numShadowMaps);
-    R_DrawString(x, y, str, color);
 }
 
 /*

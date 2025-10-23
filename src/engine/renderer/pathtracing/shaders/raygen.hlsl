@@ -226,47 +226,63 @@ void ClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttribut
     payload.albedo = albedo;
     payload.distance = RayTCurrent();
     payload.hit = true;
-    
-    // Path tracing
-    if (payload.recursionDepth < g_MaxBounces) {
-        // Generate random bounce direction (diffuse)
-        uint seed = g_RandomSeed ^ (instanceID * 73856093) ^ (primitiveID * 19349663);
-        float3 randomDir = normalize(normal + RandomInUnitSphere(seed));
-        
-        // Ensure direction is in hemisphere
-        if (dot(randomDir, normal) < 0.0f) {
-            randomDir = -randomDir;
+
+    bool debugMode = (g_SurfaceDebugMode != 0);
+
+    if (!debugMode) {
+        if (payload.recursionDepth < g_MaxBounces) {
+            // Generate random bounce direction (diffuse)
+            uint seed = g_RandomSeed ^ (instanceID * 73856093) ^ (primitiveID * 19349663);
+            float3 randomDir = normalize(normal + RandomInUnitSphere(seed));
+
+            // Ensure direction is in hemisphere
+            if (dot(randomDir, normal) < 0.0f) {
+                randomDir = -randomDir;
+            }
+
+            // Create secondary ray
+            RayDesc secondaryRay;
+            secondaryRay.Origin = hitPos + normal * 0.001f;
+            secondaryRay.Direction = randomDir;
+            secondaryRay.TMin = 0.001f;
+            secondaryRay.TMax = 10000.0f;
+
+            // Trace secondary ray
+            RayPayload secondaryPayload;
+            secondaryPayload.color = float3(0, 0, 0);
+            secondaryPayload.recursionDepth = payload.recursionDepth + 1;
+            secondaryPayload.hit = false;
+
+            TraceRay(
+                g_SceneTLAS,
+                RAY_FLAG_NONE,
+                0xFF,
+                0, 0, 0,
+                secondaryRay,
+                secondaryPayload
+            );
+
+            // Combine with albedo
+            payload.color = albedo * secondaryPayload.color;
+        } else {
+            // Terminal bounce - just use albedo
+            payload.color = albedo * 0.5f; // Ambient term
         }
-        
-        // Create secondary ray
-        RayDesc secondaryRay;
-        secondaryRay.Origin = hitPos + normal * 0.001f;
-        secondaryRay.Direction = randomDir;
-        secondaryRay.TMin = 0.001f;
-        secondaryRay.TMax = 10000.0f;
-        
-        // Trace secondary ray
-        RayPayload secondaryPayload;
-        secondaryPayload.color = float3(0, 0, 0);
-        secondaryPayload.recursionDepth = payload.recursionDepth + 1;
-        secondaryPayload.hit = false;
-        
-        TraceRay(
-            g_SceneTLAS,
-            RAY_FLAG_NONE,
-            0xFF,
-            0, 0, 0,
-            secondaryRay,
-            secondaryPayload
-        );
-        
-        // Combine with albedo
-        payload.color = albedo * secondaryPayload.color;
-    } else {
-        // Terminal bounce - just use albedo
-        payload.color = albedo * 0.5f; // Ambient term
     }
-    
+
+    float3 directLighting = CalculateDirectLighting(hitPos, normal, albedo);
+
+    if (debugMode) {
+        float luminance = saturate(dot(directLighting, float3(0.299f, 0.587f, 0.114f)));
+        float3 grayscale = float3(luminance, luminance, luminance);
+        float3 normalColor = normal * 0.5f + 0.5f;
+        payload.color = saturate(grayscale * 0.6f + normalColor * 0.4f);
+        payload.albedo = grayscale;
+        payload.normal = normal;
+        payload.distance = RayTCurrent();
+        return;
+    }
+
     // Add direct lighting
-    payload.color += CalculateDirectLighting(hitPos, normal, albedo);
+    payload.color += directLighting;
 }

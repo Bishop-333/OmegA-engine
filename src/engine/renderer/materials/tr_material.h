@@ -56,7 +56,6 @@ typedef struct materialStage_s materialStage_t;
 #define MATERIAL_NEEDSTANGENT      0x00000080
 #define MATERIAL_NEEDSCOLOR        0x00000100
 #define MATERIAL_AUTOSPRITE        0x00000200
-#define MATERIAL_LIGHTMAP          0x00000400
 #define MATERIAL_VERTEXLIT         0x00000800
 #define MATERIAL_NOSHADOWS         0x00001000
 #define MATERIAL_NOSELFSHADOW      0x00002000
@@ -169,7 +168,6 @@ struct materialStage_s {
     
     // Stage-specific flags
     qboolean            isDetail;
-    qboolean            isLightmap;
 };
 
 // Main material structure
@@ -239,7 +237,6 @@ struct material_s {
     // Optimization
     int                 vertexAttribs;      // Required vertex attributes
     qboolean            isStaticMaterial;   // No dynamic content
-    qboolean            hasLightmap;        // Uses lightmap
     
     // Compatibility
     void                (*optimalStageIteratorFunc)(void);  // Legacy
@@ -269,7 +266,7 @@ void R_ShutdownMaterialSystem(void);
 // Material management
 material_t* Material_Find(const char *name);
 material_t* Material_Parse(char *name, char **text);
-material_t* Material_CreateDefault(const char *name, int lightmapIndex);
+material_t* Material_CreateDefault(const char *name);
 void Material_AddToHashTable(material_t *material);
 
 // Stage parsing

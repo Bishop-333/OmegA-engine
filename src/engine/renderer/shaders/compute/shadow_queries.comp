@@ -1,0 +1,111 @@
+#version 460 core
+#extension GL_EXT_ray_query : require
+
+struct ShadowQueryGPU {
+    vec4 origin;
+    vec4 direction; // w stores max distance
+    uint occluded;
+    uint pad0;
+    uint pad1;
+    uint pad2;
+};
+
+struct MaterialData {
+    vec4 albedo;
+    vec4 specular;
+    vec4 emission;
+    float roughness;
+    float metallic;
+    float normalScale;
+    float occlusionStrength;
+    uint albedoTexture;
+    uint normalTexture;
+    uint roughnessTexture;
+    uint metallicTexture;
+    uint emissionTexture;
+    uint occlusionTexture;
+    uint lightmapTexture;
+    uint flags;
+};
+
+layout(set = 0, binding = 0) uniform accelerationStructureEXT g_SceneTLAS;
+
+layout(set = 0, binding = 19, std430) buffer ShadowQueries {
+    ShadowQueryGPU queries[];
+};
+
+layout(set = 0, binding = 11, std430) readonly buffer MaterialBuffer {
+    MaterialData materials[];
+};
+
+layout(set = 0, binding = 20, std430) readonly buffer TriangleMaterialBuffer {
+    uint triangleMaterials[];
+};
+
+layout(push_constant) uniform QueryConstants {
+    uint queryCount;
+} pc;
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+const uint MATERIAL_FLAG_ALPHA_BLEND = 1u << 2;
+const uint MATERIAL_FLAG_WATER       = 1u << 4;
+const uint MATERIAL_FLAG_GLASS       = 1u << 5;
+const uint MATERIAL_FLAG_NO_SHADOWS  = 1u << 8;
+
+void main()
+{
+    uint index = gl_GlobalInvocationID.x;
+    if (index >= pc.queryCount) {
+        return;
+    }
+
+    ShadowQueryGPU query = queries[index];
+
+    vec3 origin = query.origin.xyz;
+    vec3 direction = normalize(query.direction.xyz);
+    float maxDistance = max(0.001, query.direction.w);
+
+    rayQueryEXT rq;
+    rayQueryInitializeEXT(rq, g_SceneTLAS,
+                          gl_RayFlagsTerminateOnFirstHitEXT,
+                          0xFF,
+                          origin, 0.001,
+                          direction, maxDistance);
+
+    const uint shadowBlockFlags = MATERIAL_FLAG_NO_SHADOWS |
+                                  MATERIAL_FLAG_ALPHA_BLEND |
+                                  MATERIAL_FLAG_GLASS |
+                                  MATERIAL_FLAG_WATER;
+
+    while (rayQueryProceedEXT(rq)) {
+        if (rayQueryGetIntersectionTypeEXT(rq, false) ==
+            gl_RayQueryCandidateIntersectionTriangleEXT) {
+            uint baseOffset = rayQueryGetIntersectionInstanceCustomIndexEXT(rq, false);
+            uint primitiveIndex = rayQueryGetIntersectionPrimitiveIndexEXT(rq, false);
+            uint triangleIndex = baseOffset + primitiveIndex;
+
+            if (triangleIndex >= triangleMaterials.length()) {
+                rayQueryConfirmIntersectionEXT(rq);
+                continue;
+            }
+
+            uint materialIndex = triangleMaterials[triangleIndex];
+            if (materialIndex >= materials.length()) {
+                rayQueryConfirmIntersectionEXT(rq);
+                continue;
+            }
+
+            MaterialData material = materials[materialIndex];
+
+            if ((material.flags & shadowBlockFlags) != 0u) {
+                continue;
+            }
+
+            rayQueryConfirmIntersectionEXT(rq);
+        }
+    }
+
+    bool hit = rayQueryGetIntersectionTypeEXT(rq, true) != gl_RayQueryCommittedIntersectionNoneEXT;
+    queries[index].occluded = hit ? 1u : 0u;
+}

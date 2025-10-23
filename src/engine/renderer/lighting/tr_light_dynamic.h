@@ -47,32 +47,13 @@ lighting, shadows, and multiple light types.
 
 // Forward declarations
 typedef struct interaction_s interaction_t;
-typedef struct shadowMapInfo_s shadowMapInfo_t;
-
-// Shadow map structure alias
-#define shadowMap_s shadowMapInfo_s
-
 // renderLight_t is defined in tr_light.h
 
 // interaction_s and interactionManager_t are defined in tr_interaction.h
 
-// Shadow map information
-struct shadowMapInfo_s {
-    int                 width;              // Shadow map width
-    int                 height;             // Shadow map height
-    int                 lod;                // Level of detail
-    image_t             *depthImage;        // Depth texture
-    mat4_t              lightViewMatrix;    // Light view matrix
-    mat4_t              lightProjMatrix;    // Light projection matrix
-    float               zNear;              // Near plane
-    float               zFar;               // Far plane
-    qboolean            needsUpdate;        // Needs re-rendering
-};
-
 // Light management constants
-#define MAX_RENDER_LIGHTS   256
-#define MAX_INTERACTIONS    4096
-#define MAX_SHADOW_MAPS     32
+#define MAX_RENDER_LIGHTS   4096
+#define MAX_INTERACTIONS    30000
 
 // Light system management
 typedef struct lightSystem_s {
@@ -91,10 +72,6 @@ typedef struct lightSystem_s {
     
     // Interaction management
     interactionManager_t interactionMgr;
-    
-    // Shadow map pool
-    shadowMapInfo_t     shadowMaps[MAX_SHADOW_MAPS];
-    int                 numShadowMaps;
     
     // Frame counters
     int                 frameCount;
@@ -148,14 +125,6 @@ void R_DrawLightInteractions(void);
 void R_DrawShadowFrusta(void);
 
 // Legacy compatibility
-void R_ConvertDlightToRenderLight(dlight_t *dl, renderLight_t *rl);
-void R_ProcessDynamicLights(void);
-
-// Shadow mapping
-shadowMapInfo_t* R_AllocShadowMap(renderLight_t *light);
-void R_FreeShadowMap(shadowMapInfo_t *shadow);
-void R_RenderShadowMap(renderLight_t *light);
-void R_BindShadowMap(shadowMapInfo_t *shadow);
 
 // Light properties
 void R_SetLightColor(renderLight_t *light, float r, float g, float b);
@@ -168,7 +137,6 @@ void R_SetLightProjectionTexture(renderLight_t *light, const char *name);
 int R_GetActiveLightCount(void);
 int R_GetVisibleLightCount(void);
 int R_GetInteractionCount(void);
-int R_GetShadowMapCount(void);
 
 // Backend rendering functions (Phase 6)
 void RB_SetupLightingShader(renderLight_t *light);
@@ -178,12 +146,5 @@ void RB_RenderLightingPasses(void);
 void RB_CalcLightGridColor(const vec3_t position, vec3_t color);
 void RB_SetupEntityLighting(trRefEntity_t *ent);
 void RB_LightingDebugVisualization(void);
-
-// Scissoring optimization (Phase 7)
-void R_CalcLightScissorRectangle(renderLight_t *light, viewParms_t *view, int *scissor);
-void R_GetInteractionDepthBounds(interaction_t *inter, float *minDepth, float *maxDepth);
-void R_SetDepthBoundsTest(interaction_t *inter);
-void R_OptimizeLightScissors(void);
-void R_ScissorStatistics(void);
 
 #endif // TR_LIGHT_DYNAMIC_H
