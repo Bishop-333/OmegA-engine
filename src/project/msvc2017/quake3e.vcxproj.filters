@@ -202,23 +202,50 @@
     <ClCompile Include="..\..\platform\windows\win_gamma.c">
       <Filter>platform\windows</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\engine\renderer\tr_animation.c">
-      <Filter>engine\renderer</Filter>
+    <ClCompile Include="..\..\engine\renderer\geometry\tr_animation.c">
+      <Filter>engine\renderer\geometry</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\engine\renderer\tr_backend.c">
-      <Filter>engine\renderer</Filter>
+    <ClCompile Include="..\..\engine\renderer\core\backend\tr_backend.c">
+      <Filter>engine\renderer\core\backend</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\core\backend\tr_backend_thread.c">
+      <Filter>engine\renderer\core\backend</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\core\backend\tr_sync.c">
+      <Filter>engine\renderer\core\backend</Filter>
     </ClCompile>
     <ClCompile Include="..\..\engine\renderer\world\tr_bsp.c">
       <Filter>engine\renderer\world</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\engine\renderer\tr_cmds.c">
-      <Filter>engine\renderer</Filter>
+    <ClCompile Include="..\..\engine\renderer\core\command\tr_cmds.c">
+      <Filter>engine\renderer\core\command</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\engine\renderer\tr_curve.c">
-      <Filter>engine\renderer</Filter>
+    <ClCompile Include="..\..\engine\renderer\core\command\tr_cmdbuf.c">
+      <Filter>engine\renderer\core\command</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\engine\renderer\text\tr_font.c">
-      <Filter>engine\renderer\text</Filter>
+    <ClCompile Include="..\..\engine\renderer\core\memory\tr_resource.c">
+      <Filter>engine\renderer\core\memory</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\scene\tr_portal.c">
+      <Filter>engine\renderer\scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\scene\tr_scene_graph.c">
+      <Filter>engine\renderer\scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\scene\tr_spatial_tree.c">
+      <Filter>engine\renderer\scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\scene\tr_scene_utils.c">
+      <Filter>engine\renderer\scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\core\tr_globals.c">
+      <Filter>engine\renderer\core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\geometry\tr_curve.c">
+      <Filter>engine\renderer\geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\core\text\tr_font.c">
+      <Filter>engine\renderer\core\text</Filter>
     </ClCompile>
     <ClCompile Include="..\..\engine\renderer\images\tr_image.c">
       <Filter>engine\renderer\images</Filter>
@@ -238,20 +265,122 @@
     <ClCompile Include="..\..\engine\renderer\images\tr_image_tga.c">
       <Filter>engine\renderer\images</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\engine\renderer\tr_init.c">
-      <Filter>engine\renderer</Filter>
+    <ClCompile Include="..\..\engine\renderer\core\tr_init.c">
+      <Filter>engine\renderer\core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\lighting\tr_light_mgmt.c">
+      <Filter>engine\renderer\lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\lighting\tr_interaction.c">
+      <Filter>engine\renderer\lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\lighting\tr_light_backend.c">
+      <Filter>engine\renderer\lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\lighting\tr_light_create.c">
+      <Filter>engine\renderer\lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\lighting\tr_light_cull.c">
+      <Filter>engine\renderer\lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\lighting\tr_light_cvars.c">
+      <Filter>engine\renderer\lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\lighting\tr_light_grid.c">
+      <Filter>engine\renderer\lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\lighting\tr_light_debug.c">
+      <Filter>engine\renderer\lighting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\core\memory\tr_frame_memory.c">
+      <Filter>engine\renderer\core\memory</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\optimization\tr_simd.c">
+      <Filter>engine\renderer\optimization</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\optimization\tr_performance.c">
+      <Filter>engine\renderer\optimization</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\pathtracing\rt_pathtracer.c">
+      <Filter>engine\renderer\pathtracing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\pathtracing\rt_debug_output.c">
+      <Filter>engine\renderer\pathtracing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\pathtracing\rt_screen_dispatch.c">
+      <Filter>engine\renderer\pathtracing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\pathtracing\rt_rtx.c">
+      <Filter>engine\renderer\pathtracing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\pathtracing\rt_rtx_diagnostic.c">
+      <Filter>engine\renderer\pathtracing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\postprocessing\tr_ssr.c">
+      <Filter>engine\renderer\postprocessing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\pathtracing\rt_rtx_impl.c">
+      <Filter>engine\renderer\pathtracing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\pathtracing\rt_rtx_denoiser.c">
+      <Filter>engine\renderer\pathtracing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\pathtracing\rt_rtx_dlss.c">
+      <Filter>engine\renderer\pathtracing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\pathtracing\rt_rtx_pipeline.c">
+      <Filter>engine\renderer\pathtracing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\pathtracing\rt_rtx_material.c">
+      <Filter>engine\renderer\pathtracing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\pathtracing\rt_debug_overlay.c">
+      <Filter>engine\renderer\pathtracing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\pathtracing\rt_debug_render.c">
+      <Filter>engine\renderer\pathtracing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\pathtracing\rt_bsp_loader.c">
+      <Filter>engine\renderer\pathtracing</Filter>
     </ClCompile>
     <ClCompile Include="..\..\engine\renderer\lighting\tr_light.c">
       <Filter>engine\renderer\lighting</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\engine\renderer\tr_main.c">
-      <Filter>engine\renderer</Filter>
+    <ClCompile Include="..\..\engine\renderer\core\tr_main.c">
+      <Filter>engine\renderer\core</Filter>
     </ClCompile>
     <ClCompile Include="..\..\engine\renderer\effects\tr_marks.c">
       <Filter>engine\renderer\effects</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\engine\renderer\tr_mesh.c">
-      <Filter>engine\renderer</Filter>
+    <ClCompile Include="..\..\engine\renderer\core\profiling\tr_profile.c">
+      <Filter>engine\renderer\core\profiling</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\core\profiling\tr_profile_utils.c">
+      <Filter>engine\renderer\core\profiling</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\core\profiling\tr_stats.c">
+      <Filter>engine\renderer\core\profiling</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\core\profiling\tr_perf.c">
+      <Filter>engine\renderer\core\profiling</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\core\tr_debug.c">
+      <Filter>engine\renderer\core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\core\tr_init_utils.c">
+      <Filter>engine\renderer\core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\core\profiling\tr_timing.c">
+      <Filter>engine\renderer\core\profiling</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\core\memory\tr_memory.c">
+      <Filter>engine\renderer\core\memory</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\core\sorting\tr_sort.c">
+      <Filter>engine\renderer\core\sorting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\geometry\tr_mesh.c">
+      <Filter>engine\renderer\geometry</Filter>
     </ClCompile>
     <ClCompile Include="..\..\engine\renderer\models\tr_model.c">
       <Filter>engine\renderer\models</Filter>
@@ -259,8 +388,41 @@
     <ClCompile Include="..\..\engine\renderer\models\tr_model_iqm.c">
       <Filter>engine\renderer\models</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\engine\renderer\tr_scene.c">
-      <Filter>engine\renderer</Filter>
+    <ClCompile Include="..\..\engine\renderer\scene\tr_scene.c">
+      <Filter>engine\renderer\scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\advanced\tr_gpu_driven.c">
+      <Filter>engine\renderer\advanced</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\advanced\tr_mesh_shading.c">
+      <Filter>engine\renderer\advanced</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\advanced\tr_vrs.c">
+      <Filter>engine\renderer\advanced</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\advanced\tr_bindless.c">
+      <Filter>engine\renderer\advanced</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\postprocessing\tr_taa.c">
+      <Filter>engine\renderer\postprocessing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\postprocessing\tr_taa_pipeline.c">
+      <Filter>engine\renderer\postprocessing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\postprocessing\tr_volumetric.c">
+      <Filter>engine\renderer\postprocessing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\postprocessing\tr_hdr.c">
+      <Filter>engine\renderer\postprocessing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\postprocessing\tr_postprocess.c">
+      <Filter>engine\renderer\postprocessing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\postprocessing\tr_postprocess_pipelines.c">
+      <Filter>engine\renderer\postprocessing</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\postprocessing\tr_postprocess_descriptors.c">
+      <Filter>engine\renderer\postprocessing</Filter>
     </ClCompile>
     <ClCompile Include="..\..\engine\renderer\shading\tr_shade.c">
       <Filter>engine\renderer\shading</Filter>
@@ -271,20 +433,38 @@
     <ClCompile Include="..\..\engine\renderer\shading\tr_shader.c">
       <Filter>engine\renderer\shading</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\engine\renderer\lighting\tr_shadows.c">
-      <Filter>engine\renderer\lighting</Filter>
+    <ClCompile Include="..\..\engine\renderer\materials\tr_material.c">
+      <Filter>engine\renderer\materials</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\materials\tr_material_opt.c">
+      <Filter>engine\renderer\materials</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\materials\tr_expression.c">
+      <Filter>engine\renderer\materials</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\materials\tr_shader_compat.c">
+      <Filter>engine\renderer\materials</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\materials\tr_material_override.c">
+      <Filter>engine\renderer\materials</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\materials\tr_material_override_cmds.c">
+      <Filter>engine\renderer\materials</Filter>
     </ClCompile>
     <ClCompile Include="..\..\engine\renderer\world\tr_sky.c">
       <Filter>engine\renderer\world</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\engine\renderer\tr_surface.c">
-      <Filter>engine\renderer</Filter>
+    <ClCompile Include="..\..\engine\renderer\geometry\tr_surface.c">
+      <Filter>engine\renderer\geometry</Filter>
     </ClCompile>
     <ClCompile Include="..\..\engine\renderer\world\tr_world.c">
       <Filter>engine\renderer\world</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\engine\renderer\tr_noise.c">
-      <Filter>engine\renderer</Filter>
+    <ClCompile Include="..\..\engine\renderer\geometry\tr_noise.c">
+      <Filter>engine\renderer\geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\effects\tr_ultrawide.c">
+      <Filter>engine\renderer\effects</Filter>
     </ClCompile>
     <ClCompile Include="..\..\engine\renderer\vulkan\vk.c">
       <Filter>engine\renderer\vulkan</Filter>
@@ -292,71 +472,68 @@
     <ClCompile Include="..\..\engine\renderer\vulkan\vk_flares.c">
       <Filter>engine\renderer\vulkan</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\vulkan\vk_backend_thread.c">
+      <Filter>engine\renderer\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\vulkan\vk_spirv.c">
+      <Filter>engine\renderer\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\vulkan\vk_staging.c">
+      <Filter>engine\renderer\vulkan</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\engine\renderer\vulkan\vk_vbo.c">
+      <Filter>engine\renderer\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\vulkan\vk_uber.c">
+      <Filter>engine\renderer\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\vulkan\vk_uber_adapter.c">
+      <Filter>engine\renderer\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\vulkan\vk_uber_integration.c">
+      <Filter>engine\renderer\vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\vulkan\vk_descriptors.c">
       <Filter>engine\renderer\vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\..\engine\ai\ai_interface.c">
       <Filter>engine\ai</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\engine\ai\behavior\ai_char.c">
-      <Filter>engine\ai\behavior</Filter>
+    <ClCompile Include="..\..\game\ai\ai_main.c">
+      <Filter>game\ai</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\engine\ai\behavior\ai_chat.c">
-      <Filter>engine\ai\behavior</Filter>
+    <ClCompile Include="..\..\game\ai\ai_implementation.c">
+      <Filter>game\ai</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\engine\ai\behavior\ai_ea.c">
-      <Filter>engine\ai\behavior</Filter>
+    <ClCompile Include="..\..\game\ai\character\bot_character.c">
+      <Filter>game\ai\character</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\engine\ai\behavior\ai_gen.c">
-      <Filter>engine\ai\behavior</Filter>
+    <ClCompile Include="..\..\game\ai\neural\nn_core.c">
+      <Filter>game\ai\neural</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\engine\ai\behavior\ai_goal.c">
-      <Filter>engine\ai\behavior</Filter>
+    <ClCompile Include="..\..\game\ai\learning\rl_ppo.c">
+      <Filter>game\ai\learning</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\engine\ai\behavior\ai_move.c">
-      <Filter>engine\ai\behavior</Filter>
+    <ClCompile Include="..\..\game\ai\learning\skill_adaptation.c">
+      <Filter>game\ai\learning</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\engine\ai\behavior\ai_weap.c">
-      <Filter>engine\ai\behavior</Filter>
+    <ClCompile Include="..\..\game\ai\tactical\tactical_combat.c">
+      <Filter>game\ai\tactical</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\engine\ai\behavior\ai_weight.c">
-      <Filter>engine\ai\behavior</Filter>
+    <ClCompile Include="..\..\game\ai\tactical\cover_system.c">
+      <Filter>game\ai\tactical</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\engine\ai\navigation\aas_bspq3.c">
-      <Filter>engine\ai\navigation</Filter>
+    <ClCompile Include="..\..\game\ai\tactical\movement_tactics.c">
+      <Filter>game\ai\tactical</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\engine\ai\navigation\aas_cluster.c">
-      <Filter>engine\ai\navigation</Filter>
+    <ClCompile Include="..\..\game\ai\strategic\strategic_planning.c">
+      <Filter>game\ai\strategic</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\engine\ai\navigation\aas_debug.c">
-      <Filter>engine\ai\navigation</Filter>
+    <ClCompile Include="..\..\game\ai\team\team_coordination.c">
+      <Filter>game\ai\team</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\engine\ai\navigation\aas_entity.c">
-      <Filter>engine\ai\navigation</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\engine\ai\navigation\aas_file.c">
-      <Filter>engine\ai\navigation</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\engine\ai\navigation\aas_main.c">
-      <Filter>engine\ai\navigation</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\engine\ai\navigation\aas_move.c">
-      <Filter>engine\ai\navigation</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\engine\ai\navigation\aas_optimize.c">
-      <Filter>engine\ai\navigation</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\engine\ai\navigation\aas_reach.c">
-      <Filter>engine\ai\navigation</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\engine\ai\navigation\aas_route.c">
-      <Filter>engine\ai\navigation</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\engine\ai\navigation\aas_routealt.c">
-      <Filter>engine\ai\navigation</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\engine\ai\navigation\aas_sample.c">
-      <Filter>engine\ai\navigation</Filter>
+    <ClCompile Include="..\..\game\ai\perception\ai_perception.c">
+      <Filter>game\ai\perception</Filter>
     </ClCompile>
     <ClCompile Include="..\..\engine\ai\util\crc.c">
       <Filter>engine\ai\util</Filter>
@@ -379,7 +556,10 @@
     <ClCompile Include="..\..\engine\ai\util\struct.c">
       <Filter>engine\ai\util</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\platform\windows\win_glimp.c" />
+    <ClCompile Include="..\..\platform\windows\win_glimp.c">
+      <Filter>platform\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\engine\renderer\effects\tr_volumetric_explosions.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\game\api\cg_public.h">
@@ -445,17 +625,125 @@
     <ClInclude Include="..\..\engine\vm\vm_local.h">
       <Filter>engine\vm</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\engine\renderer\tr_common.h">
-      <Filter>engine\renderer</Filter>
+    <ClInclude Include="..\..\engine\renderer\core\tr_common.h">
+      <Filter>engine\renderer\core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\engine\renderer\tr_local.h">
-      <Filter>engine\renderer</Filter>
+    <ClInclude Include="..\..\engine\renderer\core\command\tr_cmdbuf.h">
+      <Filter>engine\renderer\core\command</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\engine\renderer\tr_public.h">
-      <Filter>engine\renderer</Filter>
+    <ClInclude Include="..\..\engine\renderer\core\memory\tr_resource.h">
+      <Filter>engine\renderer\core\memory</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\engine\renderer\tr_types.h">
-      <Filter>engine\renderer</Filter>
+    <ClInclude Include="..\..\engine\renderer\scene\tr_portal.h">
+      <Filter>engine\renderer\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\scene\tr_scene_graph.h">
+      <Filter>engine\renderer\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\scene\tr_scene.h">
+      <Filter>engine\renderer\scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\advanced\tr_gpu_driven.h">
+      <Filter>engine\renderer\advanced</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\advanced\tr_mesh_shading.h">
+      <Filter>engine\renderer\advanced</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\advanced\tr_vrs.h">
+      <Filter>engine\renderer\advanced</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\advanced\tr_bindless.h">
+      <Filter>engine\renderer\advanced</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\postprocessing\tr_taa.h">
+      <Filter>engine\renderer\postprocessing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\postprocessing\tr_ssr.h">
+      <Filter>engine\renderer\postprocessing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\postprocessing\tr_volumetric.h">
+      <Filter>engine\renderer\postprocessing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\postprocessing\tr_hdr.h">
+      <Filter>engine\renderer\postprocessing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\postprocessing\tr_postprocess.h">
+      <Filter>engine\renderer\postprocessing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\materials\tr_material.h">
+      <Filter>engine\renderer\materials</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\materials\tr_material_override.h">
+      <Filter>engine\renderer\materials</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\lighting\tr_light_dynamic.h">
+      <Filter>engine\renderer\lighting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\lighting\tr_light.h">
+      <Filter>engine\renderer\lighting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\lighting\tr_interaction.h">
+      <Filter>engine\renderer\lighting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\pathtracing\rt_pathtracer.h">
+      <Filter>engine\renderer\pathtracing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\pathtracing\rt_rtx.h">
+      <Filter>engine\renderer\pathtracing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\pathtracing\rt_debug_overlay.h">
+      <Filter>engine\renderer\pathtracing</Filter>
+    </ClInclude>
+    <None Include="..\..\engine\renderer\pathtracing\shaders\raygen.hlsl">
+      <Filter>engine\renderer\shaders</Filter>
+    </None>
+    <None Include="..\..\engine\renderer\pathtracing\shaders\common.hlsli">
+      <Filter>engine\renderer\shaders</Filter>
+    </None>
+    <ClInclude Include="..\..\engine\renderer\core\profiling\tr_profile.h">
+      <Filter>engine\renderer\core\profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\core\profiling\tr_stats.h">
+      <Filter>engine\renderer\core\profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\core\profiling\tr_perf.h">
+      <Filter>engine\renderer\core\profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\core\profiling\tr_timing.h">
+      <Filter>engine\renderer\core\profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\core\memory\tr_memory.h">
+      <Filter>engine\renderer\core\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\optimization\tr_optimize.h">
+      <Filter>engine\renderer\optimization</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\optimization\tr_query.h">
+      <Filter>engine\renderer\optimization</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\core\profiling\tr_debug.h">
+      <Filter>engine\renderer\core\profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\core\tr_local.h">
+      <Filter>engine\renderer\core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\core\tr_public.h">
+      <Filter>engine\renderer\core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\core\tr_types.h">
+      <Filter>engine\renderer\core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\effects\tr_ultrawide.h">
+      <Filter>engine\renderer\effects</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\vulkan\vk.h">
+      <Filter>engine\renderer\vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\vulkan\vk_shader.h">
+      <Filter>engine\renderer\vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\engine\renderer\vulkan\vk_uber_adapter.h">
+      <Filter>engine\renderer\vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\..\engine\renderer\vulkan\vk.h">
       <Filter>engine\renderer\vulkan</Filter>
@@ -521,6 +809,9 @@
     <Filter Include="engine\audio\codecs">
       <UniqueIdentifier>{B3995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
     </Filter>
+    <Filter Include="engine\audio\asm">
+      <UniqueIdentifier>{B3A95380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+    </Filter>
     <Filter Include="engine\collision">
       <UniqueIdentifier>{C3995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
     </Filter>
@@ -581,17 +872,81 @@
     <Filter Include="engine\renderer\world">
       <UniqueIdentifier>{F3A95380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
     </Filter>
+    <Filter Include="engine\renderer\advanced">
+      <UniqueIdentifier>{04B95380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\renderer\core">
+      <UniqueIdentifier>{14B95380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\renderer\core\backend">
+      <UniqueIdentifier>{24B95380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\renderer\core\command">
+      <UniqueIdentifier>{34B95380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\renderer\core\memory">
+      <UniqueIdentifier>{44B95380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\renderer\core\profiling">
+      <UniqueIdentifier>{54B95380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\renderer\core\sorting">
+      <UniqueIdentifier>{64B95380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\renderer\core\text">
+      <UniqueIdentifier>{74B95380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\renderer\geometry">
+      <UniqueIdentifier>{84B95380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\renderer\materials">
+      <UniqueIdentifier>{94B95380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\renderer\optimization">
+      <UniqueIdentifier>{A4B95380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\renderer\pathtracing">
+      <UniqueIdentifier>{B4B95380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\renderer\postprocessing">
+      <UniqueIdentifier>{C4B95380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\renderer\scene">
+      <UniqueIdentifier>{D4B95380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\renderer\shadows">
+      <UniqueIdentifier>{E4B95380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+    </Filter>
     <Filter Include="engine\ai">
       <UniqueIdentifier>{04A95380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
     </Filter>
-    <Filter Include="engine\ai\behavior">
-      <UniqueIdentifier>{14A95380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="engine\ai\navigation">
-      <UniqueIdentifier>{24A95380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-    </Filter>
     <Filter Include="engine\ai\util">
       <UniqueIdentifier>{34A95380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+    </Filter>
+    <!-- Game AI Filters -->
+    <Filter Include="game\ai">
+      <UniqueIdentifier>{A5B7C8F1-1234-4567-8901-234567890123}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="game\ai\character">
+      <UniqueIdentifier>{B6C8D9E2-2345-5678-9012-345678901234}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="game\ai\neural">
+      <UniqueIdentifier>{C7D9EAF3-3456-6789-0123-456789012345}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="game\ai\learning">
+      <UniqueIdentifier>{D8EAFB04-4567-7890-1234-567890123456}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="game\ai\tactical">
+      <UniqueIdentifier>{E9FB0C15-5678-8901-2345-678901234567}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="game\ai\strategic">
+      <UniqueIdentifier>{FA0C1D26-6789-9012-3456-789012345678}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="game\ai\team">
+      <UniqueIdentifier>{0B1D2E37-7890-0123-4567-890123456789}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="game\ai\perception">
+      <UniqueIdentifier>{1C2E3F48-8901-1234-5678-901234567890}</UniqueIdentifier>
     </Filter>
     <!-- Platform Filters -->
     <Filter Include="platform">
@@ -618,6 +973,22 @@
     <CustomBuild Include="..\..\platform\asm\common_x64.asm">
       <Filter>platform\asm</Filter>
     </CustomBuild>
-    <CustomBuild Include="..\..\engine\audio\asm\snd_mix_x64.asm" />
+    <CustomBuild Include="..\..\engine\audio\asm\snd_mix_x64.asm">
+      <Filter>engine\audio\asm</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\engine\renderer\shaders\rtx\raygen.rgen">
+      <Filter>engine\renderer\shaders</Filter>
+    </None>
+    <None Include="..\..\engine\renderer\shaders\rtx\miss.rmiss">
+      <Filter>engine\renderer\shaders</Filter>
+    </None>
+    <None Include="..\..\engine\renderer\shaders\rtx\shadow.rmiss">
+      <Filter>engine\renderer\shaders</Filter>
+    </None>
+    <None Include="..\..\engine\renderer\shaders\rtx\closesthit.rchit">
+      <Filter>engine\renderer\shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

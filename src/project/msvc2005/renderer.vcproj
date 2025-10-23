@@ -371,7 +371,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\renderer\tr_shadows.c"
 				>
 			</File>
 			<File

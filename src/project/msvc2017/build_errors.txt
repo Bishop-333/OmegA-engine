@@ -1,0 +1,4 @@
+Microsoft Windows [Version 10.0.22631.5768]
+(c) Microsoft Corporation. All rights reserved.
+
+F:\Development\Quake3e-HD\src\project\msvc2017>

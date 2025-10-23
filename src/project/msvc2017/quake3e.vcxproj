@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|ARM64">
@@ -53,6 +53,9 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
   </ImportGroup>
+  <Target Name="BuildShaders" BeforeTargets="ClCompile">
+    <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(ProjectDir)build\build_shaders.ps1&quot;" />
+  </Target>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
@@ -375,29 +378,29 @@
     <ClCompile Include="..\..\engine\renderer\lighting\tr_light.c" />
     <ClCompile Include="..\..\engine\renderer\lighting\tr_light_mgmt.c" />
     <ClCompile Include="..\..\engine\renderer\lighting\tr_interaction.c" />
-    <ClCompile Include="..\..\engine\renderer\lighting\tr_light_scissor.c" />
     <ClCompile Include="..\..\engine\renderer\lighting\tr_light_backend.c" />
     <ClCompile Include="..\..\engine\renderer\lighting\tr_light_create.c" />
     <ClCompile Include="..\..\engine\renderer\lighting\tr_light_cull.c" />
     <ClCompile Include="..\..\engine\renderer\lighting\tr_light_cvars.c" />
     <ClCompile Include="..\..\engine\renderer\lighting\tr_light_grid.c" />
     <ClCompile Include="..\..\engine\renderer\lighting\tr_light_debug.c" />
-    <ClCompile Include="..\..\engine\renderer\shadows\tr_shadow_volume.c" />
-    <ClCompile Include="..\..\engine\renderer\shadows\tr_stencil_shadow.c" />
     <ClCompile Include="..\..\engine\renderer\core\memory\tr_frame_memory.c" />
-    <ClCompile Include="..\..\engine\renderer\optimization\tr_parallel.c" />
     <ClCompile Include="..\..\engine\renderer\optimization\tr_simd.c" />
     <ClCompile Include="..\..\engine\renderer\optimization\tr_performance.c" />
     <ClCompile Include="..\..\engine\renderer\pathtracing\rt_pathtracer.c" />
     <ClCompile Include="..\..\engine\renderer\pathtracing\rt_debug_output.c" />
     <ClCompile Include="..\..\engine\renderer\pathtracing\rt_screen_dispatch.c" />
     <ClCompile Include="..\..\engine\renderer\pathtracing\rt_rtx.c" />
+    <ClCompile Include="..\..\engine\renderer\pathtracing\rt_rtx_diagnostic.c" />
     <ClCompile Include="..\..\engine\renderer\postprocessing\tr_ssr.c" />
     <ClCompile Include="..\..\engine\renderer\pathtracing\rt_rtx_impl.c" />
     <ClCompile Include="..\..\engine\renderer\pathtracing\rt_rtx_denoiser.c" />
     <ClCompile Include="..\..\engine\renderer\pathtracing\rt_rtx_dlss.c" />
     <ClCompile Include="..\..\engine\renderer\pathtracing\rt_rtx_pipeline.c" />
     <ClCompile Include="..\..\engine\renderer\pathtracing\rt_rtx_material.c" />
+    <ClCompile Include="..\..\engine\renderer\pathtracing\rt_debug_overlay.c" />
+    <ClCompile Include="..\..\engine\renderer\pathtracing\rt_debug_render.c" />
+    <ClCompile Include="..\..\engine\renderer\pathtracing\rt_bsp_loader.c" />
     <ClCompile Include="..\..\engine\renderer\core\tr_main.c" />
     <ClCompile Include="..\..\engine\renderer\effects\tr_marks.c" />
     <ClCompile Include="..\..\engine\renderer\geometry\tr_mesh.c" />
@@ -412,7 +415,10 @@
     <ClCompile Include="..\..\engine\renderer\postprocessing\tr_taa_pipeline.c" />
     <ClCompile Include="..\..\engine\renderer\postprocessing\tr_volumetric.c" />
     <ClCompile Include="..\..\engine\renderer\postprocessing\tr_hdr.c" />
+    <ClCompile Include="..\..\engine\renderer\effects\tr_volumetric_explosions.c" />
     <ClCompile Include="..\..\engine\renderer\postprocessing\tr_postprocess.c" />
+    <ClCompile Include="..\..\engine\renderer\postprocessing\tr_postprocess_pipelines.c" />
+    <ClCompile Include="..\..\engine\renderer\postprocessing\tr_postprocess_descriptors.c" />
     <ClCompile Include="..\..\engine\renderer\core\profiling\tr_profile.c" />
     <ClCompile Include="..\..\engine\renderer\core\profiling\tr_profile_utils.c" />
     <ClCompile Include="..\..\engine\renderer\core\profiling\tr_stats.c" />
@@ -431,7 +437,6 @@
     <ClCompile Include="..\..\engine\renderer\materials\tr_shader_compat.c" />
     <ClCompile Include="..\..\engine\renderer\materials\tr_material_override.c" />
     <ClCompile Include="..\..\engine\renderer\materials\tr_material_override_cmds.c" />
-    <ClCompile Include="..\..\engine\renderer\lighting\tr_shadows.c" />
     <ClCompile Include="..\..\engine\renderer\world\tr_sky.c" />
     <ClCompile Include="..\..\engine\renderer\geometry\tr_surface.c" />
     <ClCompile Include="..\..\engine\renderer\world\tr_world.c" />
@@ -445,33 +450,24 @@
     <ClCompile Include="..\..\engine\renderer\vulkan\vk_flares.c" />
     <ClCompile Include="..\..\engine\renderer\vulkan\vk_vbo.c" />
     <ClCompile Include="..\..\engine\renderer\vulkan\vk_uber.c" />
+    <ClCompile Include="..\..\engine\renderer\vulkan\vk_uber_adapter.c" />
+    <ClCompile Include="..\..\engine\renderer\vulkan\vk_uber_integration.c" />
     <ClCompile Include="..\..\engine\renderer\vulkan\vk_descriptors.c" />
-    <ClCompile Include="..\..\engine\renderer\vulkan\vk_scissor.c" />
-    <ClCompile Include="..\..\engine\renderer\vulkan\vk_shadows.c" />
-    <ClCompile Include="..\..\engine\renderer\vulkan\vk_shadows_impl.c" />
     <!-- Corner Grit Files -->
     <!-- AI Files -->
     <ClCompile Include="..\..\engine\ai\ai_interface.c" />
-    <ClCompile Include="..\..\engine\ai\behavior\ai_char.c" />
-    <ClCompile Include="..\..\engine\ai\behavior\ai_chat.c" />
-    <ClCompile Include="..\..\engine\ai\behavior\ai_ea.c" />
-    <ClCompile Include="..\..\engine\ai\behavior\ai_gen.c" />
-    <ClCompile Include="..\..\engine\ai\behavior\ai_goal.c" />
-    <ClCompile Include="..\..\engine\ai\behavior\ai_move.c" />
-    <ClCompile Include="..\..\engine\ai\behavior\ai_weap.c" />
-    <ClCompile Include="..\..\engine\ai\behavior\ai_weight.c" />
-    <ClCompile Include="..\..\engine\ai\navigation\aas_bspq3.c" />
-    <ClCompile Include="..\..\engine\ai\navigation\aas_cluster.c" />
-    <ClCompile Include="..\..\engine\ai\navigation\aas_debug.c" />
-    <ClCompile Include="..\..\engine\ai\navigation\aas_entity.c" />
-    <ClCompile Include="..\..\engine\ai\navigation\aas_file.c" />
-    <ClCompile Include="..\..\engine\ai\navigation\aas_main.c" />
-    <ClCompile Include="..\..\engine\ai\navigation\aas_move.c" />
-    <ClCompile Include="..\..\engine\ai\navigation\aas_optimize.c" />
-    <ClCompile Include="..\..\engine\ai\navigation\aas_reach.c" />
-    <ClCompile Include="..\..\engine\ai\navigation\aas_route.c" />
-    <ClCompile Include="..\..\engine\ai\navigation\aas_routealt.c" />
-    <ClCompile Include="..\..\engine\ai\navigation\aas_sample.c" />
+    <ClCompile Include="..\..\game\ai\ai_main.c" />
+    <ClCompile Include="..\..\game\ai\ai_implementation.c" />
+    <ClCompile Include="..\..\game\ai\character\bot_character.c" />
+    <ClCompile Include="..\..\game\ai\neural\nn_core.c" />
+    <ClCompile Include="..\..\game\ai\learning\rl_ppo.c" />
+    <ClCompile Include="..\..\game\ai\learning\skill_adaptation.c" />
+    <ClCompile Include="..\..\game\ai\tactical\tactical_combat.c" />
+    <ClCompile Include="..\..\game\ai\tactical\cover_system.c" />
+    <ClCompile Include="..\..\game\ai\tactical\movement_tactics.c" />
+    <ClCompile Include="..\..\game\ai\strategic\strategic_planning.c" />
+    <ClCompile Include="..\..\game\ai\team\team_coordination.c" />
+    <ClCompile Include="..\..\game\ai\perception\ai_perception.c" />
     <ClCompile Include="..\..\engine\ai\util\crc.c" />
     <ClCompile Include="..\..\engine\ai\util\libvar.c" />
     <ClCompile Include="..\..\engine\ai\util\log.c" />
@@ -538,9 +534,9 @@
     <ClInclude Include="..\..\engine\renderer\lighting\tr_light_dynamic.h" />
     <ClInclude Include="..\..\engine\renderer\lighting\tr_light.h" />
     <ClInclude Include="..\..\engine\renderer\lighting\tr_interaction.h" />
-    <ClInclude Include="..\..\engine\renderer\lighting\tr_light_scissor.h" />
     <ClInclude Include="..\..\engine\renderer\pathtracing\rt_pathtracer.h" />
     <ClInclude Include="..\..\engine\renderer\pathtracing\rt_rtx.h" />
+    <ClInclude Include="..\..\engine\renderer\pathtracing\rt_debug_overlay.h" />
     <None Include="..\..\engine\renderer\pathtracing\shaders\raygen.hlsl" />
     <None Include="..\..\engine\renderer\pathtracing\shaders\common.hlsli" />
     <ClInclude Include="..\..\engine\renderer\core\profiling\tr_profile.h" />
@@ -557,6 +553,7 @@
     <ClInclude Include="..\..\engine\renderer\effects\tr_ultrawide.h" />
     <ClInclude Include="..\..\engine\renderer\vulkan\vk.h" />
     <ClInclude Include="..\..\engine\renderer\vulkan\vk_shader.h" />
+    <ClInclude Include="..\..\engine\renderer\vulkan\vk_uber_adapter.h" />
     <ClInclude Include="..\..\game\server\server.h" />
     <ClInclude Include="..\..\game\api\ui_public.h" />
     <ClInclude Include="..\..\platform\windows\resource.h" />
@@ -638,16 +635,38 @@
     <MakeDir Directories="$(ShaderOutputDir)\compute" />
     
     <!-- Compile TAA resolve shader -->
-    <Exec Command="&quot;$(GlslangValidator)&quot; -V --target-env vulkan1.2 -S comp &quot;$(ShaderRootDir)\compute\taa_resolve.comp&quot; -o &quot;$(ShaderOutputDir)\compute\taa_resolve.spv&quot;"
+    <Exec Command="&quot;$(GlslangValidator)&quot; -V --target-env vulkan1.1 -S comp &quot;$(ShaderRootDir)\compute\taa_resolve.comp&quot; -o &quot;$(ShaderOutputDir)\compute\taa_resolve.spv&quot;"
           ContinueOnError="false" />
     
     <!-- Compile TAA sharpen shader -->
-    <Exec Command="&quot;$(GlslangValidator)&quot; -V --target-env vulkan1.2 -S comp &quot;$(ShaderRootDir)\compute\taa_sharpen.comp&quot; -o &quot;$(ShaderOutputDir)\compute\taa_sharpen.spv&quot;"
+    <Exec Command="&quot;$(GlslangValidator)&quot; -V --target-env vulkan1.1 -S comp &quot;$(ShaderRootDir)\compute\taa_sharpen.comp&quot; -o &quot;$(ShaderOutputDir)\compute\taa_sharpen.spv&quot;"
           ContinueOnError="false" />
     
     <!-- Compile GPU culling shader -->
-    <Exec Command="&quot;$(GlslangValidator)&quot; -V --target-env vulkan1.2 -S comp &quot;$(ShaderRootDir)\compute\gpu_culling.comp&quot; -o &quot;$(ShaderOutputDir)\compute\gpu_culling.spv&quot;"
+    <Exec Command="&quot;$(GlslangValidator)&quot; -V --target-env vulkan1.1 -S comp &quot;$(ShaderRootDir)\compute\gpu_culling.comp&quot; -o &quot;$(ShaderOutputDir)\compute\gpu_culling.spv&quot;"
           ContinueOnError="false" />
+
+    <!-- Compile RTX debug overlay shader -->
+    <Exec Command="&quot;$(GlslangValidator)&quot; -V --target-env vulkan1.2 -S comp &quot;$(ShaderRootDir)\compute\rtx_debug_overlay.comp&quot; -o &quot;$(ShaderOutputDir)\compute\rtx_debug_overlay.spv&quot;"
+          ContinueOnError="false" />
+  </Target>
+
+  <!-- Post-Processing Shaders -->
+  <Target Name="CompilePostProcessShaders" BeforeTargets="Build">
+    <Message Text="Compiling post-processing shaders..." Importance="high" />
+    <MakeDir Directories="$(ShaderOutputDir)\postprocess" />
+    
+    <!-- Vertex shaders -->
+    <Exec Command="&quot;$(GlslangValidator)&quot; -V --target-env vulkan1.1 -S vert &quot;$(ShaderRootDir)\postprocess\fullscreen.vert&quot; -o &quot;$(ShaderOutputDir)\postprocess\fullscreen_vert.spv&quot;" ContinueOnError="false" />
+    <Exec Command="&quot;$(GlslangValidator)&quot; -V --target-env vulkan1.1 -S vert &quot;$(ShaderRootDir)\postprocess\dof.vert&quot; -o &quot;$(ShaderOutputDir)\postprocess\dof_vert.spv&quot;" ContinueOnError="false" />
+    
+    <!-- Fragment shaders -->
+    <Exec Command="&quot;$(GlslangValidator)&quot; -V --target-env vulkan1.1 -S frag &quot;$(ShaderRootDir)\postprocess\dof.frag&quot; -o &quot;$(ShaderOutputDir)\postprocess\dof_frag.spv&quot;" ContinueOnError="false" />
+    <Exec Command="&quot;$(GlslangValidator)&quot; -V --target-env vulkan1.1 -S frag &quot;$(ShaderRootDir)\postprocess\motion_blur.frag&quot; -o &quot;$(ShaderOutputDir)\postprocess\motion_blur_frag.spv&quot;" ContinueOnError="false" />
+    <Exec Command="&quot;$(GlslangValidator)&quot; -V --target-env vulkan1.1 -S frag &quot;$(ShaderRootDir)\postprocess\chromatic_aberration.frag&quot; -o &quot;$(ShaderOutputDir)\postprocess\chromatic_aberration_frag.spv&quot;" ContinueOnError="false" />
+    <Exec Command="&quot;$(GlslangValidator)&quot; -V --target-env vulkan1.1 -S frag &quot;$(ShaderRootDir)\postprocess\vignette.frag&quot; -o &quot;$(ShaderOutputDir)\postprocess\vignette_frag.spv&quot;" ContinueOnError="false" />
+    <Exec Command="&quot;$(GlslangValidator)&quot; -V --target-env vulkan1.1 -S frag &quot;$(ShaderRootDir)\postprocess\film_grain.frag&quot; -o &quot;$(ShaderOutputDir)\postprocess\film_grain_frag.spv&quot;" ContinueOnError="false" />
+    <Exec Command="&quot;$(GlslangValidator)&quot; -V --target-env vulkan1.1 -S frag &quot;$(ShaderRootDir)\postprocess\god_rays.frag&quot; -o &quot;$(ShaderOutputDir)\postprocess\god_rays_frag.spv&quot;" ContinueOnError="false" />
   </Target>
 
   <!-- GLSL Vertex and Fragment Shaders -->
@@ -676,6 +695,8 @@
     <MakeDir Directories="$(OutDir)baseq3\shaders\rtx" />
     <MakeDir Directories="$(OutDir)baseq3\shaders\compute" />
     <MakeDir Directories="$(OutDir)baseq3\shaders\glsl" />
+    <MakeDir Directories="$(OutDir)baseq3\shaders\postprocess" />
+    <MakeDir Directories="$(OutDir)baseq3\shaders\effects" />
     
     <!-- Copy RTX shaders -->
     <ItemGroup>
@@ -694,6 +715,18 @@
       <GLSLShaders Include="$(ProjectDir)..\..\..\baseq3\shaders\glsl\*.spv" />
     </ItemGroup>
     <Copy SourceFiles="@(GLSLShaders)" DestinationFolder="$(OutDir)baseq3\shaders\glsl" SkipUnchangedFiles="true" ContinueOnError="true" />
+    
+    <!-- Copy Post-Processing shaders -->
+    <ItemGroup>
+      <PostProcessShaders Include="$(ProjectDir)..\..\..\baseq3\shaders\postprocess\*.spv" />
+    </ItemGroup>
+    <Copy SourceFiles="@(PostProcessShaders)" DestinationFolder="$(OutDir)baseq3\shaders\postprocess" SkipUnchangedFiles="true" />
+    
+    <!-- Copy Effects shaders -->
+    <ItemGroup>
+      <EffectsShaders Include="$(ProjectDir)..\..\..\baseq3\shaders\effects\*.spv" />
+    </ItemGroup>
+    <Copy SourceFiles="@(EffectsShaders)" DestinationFolder="$(OutDir)baseq3\shaders\effects" SkipUnchangedFiles="true" ContinueOnError="true" />
     
     <Message Text="Shader copy complete." Importance="high" />
   </Target>
