@@ -1,0 +1,5 @@
+qboolean VK_ShouldUseUberShader(void) {
+    // Initialize cvar if needed
+    if (!r_useUberShader) {
+        r_useUberShader = ri.Cvar_Get("r_useUberShader", "0", CVAR_ARCHIVE | CVAR_LATCH);  // Disabled by default until fixed
+    }

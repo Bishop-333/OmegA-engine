@@ -803,7 +803,6 @@ Q3RENDVOBJ = \
   $(B)/rendv/shading/tr_shade_calc.o \
   $(B)/rendv/shading/tr_shader.o \
   $(B)/rendv/materials/tr_shader_compat.o \
-  $(B)/rendv/lighting/tr_shadows.o \
   $(B)/rendv/world/tr_sky.o \
   $(B)/rendv/tr_surface.o \
   $(B)/rendv/threading/tr_sync.o \
@@ -964,27 +963,6 @@ Q3OBJ = \
   $(B)/client/common/compression/puff.o \
   $(B)/client/vm/vm.o \
   $(B)/client/vm/vm_interpreted.o \
-  \
-  $(B)/client/ai/navigation/aas_bspq3.o \
-  $(B)/client/ai/navigation/aas_cluster.o \
-  $(B)/client/ai/navigation/aas_debug.o \
-  $(B)/client/ai/navigation/aas_entity.o \
-  $(B)/client/ai/navigation/aas_file.o \
-  $(B)/client/ai/navigation/aas_main.o \
-  $(B)/client/ai/navigation/aas_move.o \
-  $(B)/client/ai/navigation/aas_optimize.o \
-  $(B)/client/ai/navigation/aas_reach.o \
-  $(B)/client/ai/navigation/aas_route.o \
-  $(B)/client/ai/navigation/aas_routealt.o \
-  $(B)/client/ai/navigation/aas_sample.o \
-  $(B)/client/ai/behavior/ai_char.o \
-  $(B)/client/ai/behavior/ai_chat.o \
-  $(B)/client/ai/behavior/ai_gen.o \
-  $(B)/client/ai/behavior/ai_goal.o \
-  $(B)/client/ai/behavior/ai_move.o \
-  $(B)/client/ai/behavior/ai_weap.o \
-  $(B)/client/ai/behavior/ai_weight.o \
-  $(B)/client/ai/behavior/ai_ea.o \
   $(B)/client/ai/ai_interface.o \
   $(B)/client/ai/util/crc.o \
   $(B)/client/ai/util/libvar.o \
@@ -1161,27 +1139,6 @@ Q3DOBJ = \
   $(B)/ded/filesystem/unzip.o \
   $(B)/ded/vm/vm.o \
   $(B)/ded/vm/vm_interpreted.o \
-  \
-  $(B)/ded/ai/navigation/aas_bspq3.o \
-  $(B)/ded/ai/navigation/aas_cluster.o \
-  $(B)/ded/ai/navigation/aas_debug.o \
-  $(B)/ded/ai/navigation/aas_entity.o \
-  $(B)/ded/ai/navigation/aas_file.o \
-  $(B)/ded/ai/navigation/aas_main.o \
-  $(B)/ded/ai/navigation/aas_move.o \
-  $(B)/ded/ai/navigation/aas_optimize.o \
-  $(B)/ded/ai/navigation/aas_reach.o \
-  $(B)/ded/ai/navigation/aas_route.o \
-  $(B)/ded/ai/navigation/aas_routealt.o \
-  $(B)/ded/ai/navigation/aas_sample.o \
-  $(B)/ded/ai/behavior/ai_char.o \
-  $(B)/ded/ai/behavior/ai_chat.o \
-  $(B)/ded/ai/behavior/ai_gen.o \
-  $(B)/ded/ai/behavior/ai_goal.o \
-  $(B)/ded/ai/behavior/ai_move.o \
-  $(B)/ded/ai/behavior/ai_weap.o \
-  $(B)/ded/ai/behavior/ai_weight.o \
-  $(B)/ded/ai/behavior/ai_ea.o \
   $(B)/ded/ai/ai_interface.o \
   $(B)/ded/ai/util/crc.o \
   $(B)/ded/ai/util/libvar.o \

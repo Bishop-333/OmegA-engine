@@ -1,0 +1,5 @@
+diff --git a/src/engine/renderer/pathtracing/rt_rtx_impl.c b/src/engine/renderer/pathtracing/rt_rtx_impl.c
+index 87c5e82e..87c5e82e 100644
+--- a/src/engine/renderer/pathtracing/rt_rtx_impl.c
++++ b/src/engine/renderer/pathtracing/rt_rtx_impl.c
+@@ -474,6 +474,7 @@ static VkAccelerationStructureKHR RTX_CreateBLASVulkan(const VkAccelerationStruc" "> geometry, const VkAccelerationStructureBuildRangeInfoKHR '* range, VkBuffer '*'* blasBuffer, VkDeviceMemory '*'* blasMemory)

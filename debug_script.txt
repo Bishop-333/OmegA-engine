@@ -1,0 +1,11 @@
+.sympath srv*c:\symbols*https://msdl.microsoft.com/download/symbols
+.sympath+ F:\Development\Quake3e-HD\src\project\msvc2017\x64\Debug
+.reload
+sxe av
+sxe c0000005
+.lastevent
+g
+!analyze -v
+k
+~*k
+q

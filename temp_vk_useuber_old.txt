@@ -1,0 +1,258 @@
+qboolean VK_UseUberShader(const Vk_Pipeline_Def *def) {
+    vkPushConstants_t pc;
+    uberShaderConfig_t config;
+    static uint32_t currentTransformIndex = 0;
+    uint32_t vertexOffset;
+    uint32_t convertedVertexCount;
+
+    if (!vk_uberPipeline || !vk_uberPipeline->pipeline || !transformData || transformAlignedSize == 0) {
+        return qfalse;  // Uber shader not available or UBO not initialized
+    }
+
+    // Check if we have valid rendering state
+    // Skip uber shader for 2D rendering (UI/HUD) for now
+    // The vertices are already in screen space for 2D mode
+    if (backEnd.projection2D) {
+        return qfalse;  // Fall back to classic pipeline for 2D
+    }
+
+    // Require stage context so textures/features map correctly
+    if (!uberCurrentStage) {
+        return qfalse;
+    }
+
+    // Ensure descriptor pool is available
+    VK_EnsureUberDescriptorSet();
+
+    uberDescriptorState_t *state = VK_GetActiveUberDescriptorState();
+    if (!state || state->pool == VK_NULL_HANDLE) {
+        return qfalse;
+    }
+
+    if (state->nextIndex >= MAX_UBER_DESCRIPTOR_SETS) {
+        if (!state->overflowLogged) {
+            ri.Printf(PRINT_WARNING, "Uber shader descriptor exhaustion, falling back to classic pipeline\n");
+            state->overflowLogged = qtrue;
+        }
+        return qfalse;
+    }
+
+    VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+    VkDescriptorSetAllocateInfo allocInfo;
+    Com_Memset(&allocInfo, 0, sizeof(allocInfo));
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = state->pool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &vk_uberDescriptorSetLayout;
+
+    VkResult allocResult = vkAllocateDescriptorSets(vk.device, &allocInfo, &descriptorSet);
+    if (allocResult != VK_SUCCESS || descriptorSet == VK_NULL_HANDLE) {
+        if (!state->overflowLogged) {
+            ri.Printf(PRINT_WARNING, "Uber shader descriptor allocation failed (%d)\n", allocResult);
+            state->overflowLogged = qtrue;
+        }
+        return qfalse;
+    }
+
+    state->nextIndex++;
+
+    // Update texture descriptors for the active stage
+    VK_UpdateUberTexturesForStage(uberCurrentStage, descriptorSet);
+
+    // Convert pipeline definition to uber shader configuration
+    ConvertPipelineDefToUberConfig(def, &config);
+
+    // Augment feature flags based on the active stage information
+    if (uberCurrentStage) {
+        if (uberCurrentStage->numTexBundles > 1) {
+            const textureBundle_t *lmBundle = &uberCurrentStage->bundle[1];
+            if (lmBundle->image[0] &&
+                (lmBundle->lightmap != LIGHTMAP_INDEX_NONE || lmBundle->isLightmap)) {
+                config.features |= FEAT_LIGHTMAP;
+            }
+        }
+
+        if (uberCurrentStage->numTexBundles > 2) {
+            const textureBundle_t *extraBundle = &uberCurrentStage->bundle[2];
+            if (extraBundle->image[0]) {
+                config.features |= FEAT_NORMAL_MAP;
+                config.features |= FEAT_SPECULAR_MAP;
+            }
+        }
+
+        if (uberCurrentStage->tessFlags & TESS_ENV) {
+            config.features |= FEAT_ENV_MAP;
+        }
+
+        if (uberCurrentStage->tessFlags & TESS_RGBA0) {
+            config.features |= FEAT_VERTEX_COLOR;
+        }
+    }
+
+    // Setup push constants with new layout
+    Com_Memset(&pc, 0, sizeof(pc));
+    pc.features = config.features;  // Use features from config
+    pc.config = 0;  // Reserved
+
+    // Set up matrices in uniform buffer
+    uint32_t maxTransforms = transformBufferSize / transformAlignedSize;
+    uint32_t transformIndex = currentTransformIndex++ % maxTransforms;
+
+    // Calculate the aligned offset for this transform
+    uint8_t *bufferBase = (uint8_t*)transformData;
+    vkTransformUBO_t *transform = (vkTransformUBO_t*)(bufferBase + (transformIndex * transformAlignedSize));
+
+    // Get the MVP matrix - this handles both 2D and 3D cases
+    // vk_get_mvp_transform will use projection2D or modelview_transform as appropriate
+    vk_get_mvp_transform(transform->mvpMatrix);
+
+    // Build the model matrix from the current orientation so we keep world transforms intact
+    {
+        const orientationr_t *or = &backEnd.or;
+        float modelMatrix[16];
+        float normalMatrix[16];
+        int axisIdx;
+
+        // Column-major layout matches how R_RotateForEntity builds glMatrix
+        modelMatrix[0] = or->axis[0][0];
+        modelMatrix[1] = or->axis[0][1];
+        modelMatrix[2] = or->axis[0][2];
+        modelMatrix[3] = 0.0f;
+
+        modelMatrix[4] = or->axis[1][0];
+        modelMatrix[5] = or->axis[1][1];
+        modelMatrix[6] = or->axis[1][2];
+        modelMatrix[7] = 0.0f;
+
+        modelMatrix[8] = or->axis[2][0];
+        modelMatrix[9] = or->axis[2][1];
+        modelMatrix[10] = or->axis[2][2];
+        modelMatrix[11] = 0.0f;
+
+        modelMatrix[12] = or->origin[0];
+        modelMatrix[13] = or->origin[1];
+        modelMatrix[14] = or->origin[2];
+        modelMatrix[15] = 1.0f;
+
+        Com_Memcpy(transform->modelMatrix, modelMatrix, sizeof(modelMatrix));
+
+        // Start the normal matrix from the rotation portion and strip translation
+        Com_Memcpy(normalMatrix, modelMatrix, sizeof(modelMatrix));
+        normalMatrix[3] = normalMatrix[7] = normalMatrix[11] = 0.0f;
+        normalMatrix[12] = normalMatrix[13] = normalMatrix[14] = 0.0f;
+        normalMatrix[15] = 1.0f;
+
+        // Compensate for non-uniform scale so normals stay normalized
+        if (backEnd.currentEntity && backEnd.currentEntity->e.nonNormalizedAxes) {
+            for (axisIdx = 0; axisIdx < 3; axisIdx++) {
+                float len = VectorLength(or->axis[axisIdx]);
+                if (len > 0.0f) {
+                    float invLen = 1.0f / len;
+                    int base = axisIdx * 4;
+                    normalMatrix[base + 0] *= invLen;
+                    normalMatrix[base + 1] *= invLen;
+                    normalMatrix[base + 2] *= invLen;
+                }
+            }
+        }
+
+        Com_Memcpy(transform->normalMatrix, normalMatrix, sizeof(normalMatrix));
+    }
+
+    // Set transform index in push constants
+    pc.transformIndex = transformIndex;
+
+    // Set color from pipeline definition
+    // Default to white if color is not set
+    if (def->color.rgb == 0 && def->color.alpha == 0) {
+        pc.baseColor[0] = 1.0f;  // Red
+        pc.baseColor[1] = 1.0f;  // Green
+        pc.baseColor[2] = 1.0f;  // Blue
+        pc.baseColor[3] = 1.0f;  // Alpha
+    } else {
+        float colorValue = def->color.rgb / 255.0f;
+        pc.baseColor[0] = colorValue;  // Red
+        pc.baseColor[1] = colorValue;  // Green
+        pc.baseColor[2] = colorValue;  // Blue
+        pc.baseColor[3] = def->color.alpha / 255.0f;
+    }
+
+    // Set camera position and time
+    VectorCopy(backEnd.refdef.vieworg, pc.cameraPos_time);
+    pc.cameraPos_time[3] = backEnd.refdef.floatTime;  // w = currentTime
+
+    // Set default values
+    pc.alphaTestValue = 0.5f;
+    pc.specularExponent = 16.0f;
+    VectorSet(pc.specularColor, 1.0f, 1.0f, 1.0f);
+    pc.specularColor[3] = 1.0f;
+
+    // Set fog parameters if fog is enabled
+    if (def->fog_stage) {
+        // TODO: Get actual fog parameters from the fog system
+        VectorSet(pc.fogColor, 0.5f, 0.5f, 0.5f);
+        pc.fogColor[3] = 1.0f;
+        pc.fogParams[0] = 0.01f;  // density
+        pc.fogParams[1] = 1000.0f;  // range
+    } else {
+        VectorSet(pc.fogColor, 0.0f, 0.0f, 0.0f);
+        pc.fogColor[3] = 0.0f;
+        pc.fogParams[0] = 0.0f;  // density
+        pc.fogParams[1] = 0.0f;  // range
+    }
+
+    // Bind uber shader pipeline
+    VkPipeline pipeline = vk_uberPipeline->pipeline;
+    if (pipeline != vk.cmd->last_pipeline) {
+        qvkCmdBindPipeline(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+        vk.cmd->last_pipeline = pipeline;
+    }
+
+    // Mark uber shader as active
+    vk.cmd->uber_shader_active = qtrue;
+
+    // Don't set viewport/scissor here - let the regular rendering path handle it
+    // This ensures consistent viewport/scissor handling between classic and uber paths
+
+    // Update push constants
+    vkCmdPushConstants(vk.cmd->command_buffer,
+                      vk_uberPipeline->layout,
+                      VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                      0,
+                      sizeof(vkPushConstants_t),
+                      &pc);
+
+    // Bind uber shader descriptor set
+    // The uniform buffer offset must be aligned
+    uint32_t uniformOffset = transformIndex * transformAlignedSize;
+    qvkCmdBindDescriptorSets(vk.cmd->command_buffer,
+                            VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            vk_uberPipeline->layout,
+                            0,  // First set
+                            1,  // Descriptor set count
+                            &descriptorSet,
+                            1,  // Dynamic offset count
+                            &uniformOffset);
+
+    // Convert vertex data to uber shader format
+    // Pass numIndexes to expand vertices in index order
+    vertexOffset = VK_ConvertVerticesForUberShader(tess.numIndexes, &convertedVertexCount);
+    if (vertexOffset == 0 || convertedVertexCount == 0) {
+        // Conversion failed
+        vk.cmd->uber_shader_active = qfalse;
+        return qfalse;
+    }
+
+    // Bind the converted vertex buffer
+    VK_BindUberVertexBuffer(vk.cmd->command_buffer, vertexOffset);
+
+    // Update vertex count for draw call
+    // Store original value to restore later if needed
+    vk.cmd->uber_vertex_count = convertedVertexCount;
+
+    // Update depth attachment flag
+    vk_world.dirty_depth_attachment |= (def->state_bits & GLS_DEPTHMASK_TRUE);
+
+    return qtrue;
+}
+
