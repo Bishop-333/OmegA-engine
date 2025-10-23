@@ -582,6 +582,15 @@ static void CL_KeyDownEvent( int key, unsigned time )
 		return;
 	}
 
+	// Toggle uber shader texture sampling
+	if ( key == K_F1 ) {
+		cvar_t *toggle = Cvar_Get( "r_uberTextureMaps", "1", CVAR_ARCHIVE );
+		int newValue = ( toggle && toggle->integer ) ? 0 : 1;
+		Cvar_SetValue( "r_uberTextureMaps", (float)newValue );
+		Com_Printf( "Uber shader texture maps %s\n", newValue ? "enabled" : "disabled" );
+		return;
+	}
+
 	// keys can still be used for bound actions
 	if ( ( key < 128 || key == K_MOUSE1 ) && cls.state == CA_CINEMATIC && Key_GetCatcher() == 0 ) {
 		if ( Cvar_VariableIntegerValue( "com_cameraMode" ) == 0 ) {

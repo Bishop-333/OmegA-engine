@@ -385,9 +385,6 @@ void CL_ShutdownCGame( void ) {
 	if ( !cgvm ) {
 		return;
 	}
-
-	re.VertexLighting( qfalse );
-
 	VM_Call( cgvm, 0, CG_SHUTDOWN );
 	VM_Free( cgvm );
 	cgvm = NULL;
@@ -849,8 +846,6 @@ void CL_InitCGame( void ) {
 	Com_sprintf( cl.mapname, sizeof( cl.mapname ), "maps/%s.bsp", mapname );
 
 	// allow vertex lighting for in-game elements
-	re.VertexLighting( qtrue );
-
 	// load the dll or bytecode
 	interpret = Cvar_VariableIntegerValue( "vm_cgame" );
 	if ( cl_connectedToPureServer )
@@ -1214,3 +1209,4 @@ void CL_SetCGameTime( void ) {
 		}
 	}
 }
+

@@ -956,6 +956,60 @@ static void CL_PlayDemo_f( void ) {
 
 /*
 ==================
+CL_AutoPlayDemo_f
+
+Auto-play a randomly selected demo from the demos directory
+==================
+*/
+static void CL_AutoPlayDemo_f( void ) {
+	char	**demolist;
+	int		numdemos;
+	int		i;
+	char	demoname[MAX_OSPATH];
+	char	*ext_test;
+	int		randomIndex;
+
+	// Get list of all demo files - first try standard extension
+	demolist = FS_ListFiles( "demos", "." DEMOEXT, &numdemos );
+
+	// If no standard demos found, try protocol-specific extensions
+	if ( !numdemos || !demolist ) {
+		for ( i = 0; demo_protocols[i]; i++ ) {
+			char extension[32];
+			Com_sprintf( extension, sizeof(extension), "." DEMOEXT "%d", demo_protocols[i] );
+			demolist = FS_ListFiles( "demos", extension, &numdemos );
+			if ( demolist && numdemos > 0 ) {
+				break;
+			}
+		}
+	}
+
+	if ( !numdemos || !demolist ) {
+		Com_Printf( "No demos found in demos directory\n" );
+		return;
+	}
+
+	// Select a random demo
+	randomIndex = rand() % numdemos;
+	
+	// Strip the extension if present
+	Q_strncpyz( demoname, demolist[randomIndex], sizeof(demoname) );
+	ext_test = strrchr( demoname, '.' );
+	if ( ext_test ) {
+		*ext_test = '\0';
+	}
+
+	Com_Printf( "Auto-playing demo: %s\n", demoname );
+
+	// Free the file list
+	FS_FreeFileList( demolist );
+
+	// Play the selected demo
+	Cbuf_AddText( va( "demo %s\n", demoname ) );
+}
+
+/*
+==================
 CL_NextDemo
 
 Called when a demo or cinematic finishes
@@ -4018,6 +4072,7 @@ void CL_Init( void ) {
 	Cmd_SetCommandCompletionFunc( "record", CL_CompleteRecordName );
 	Cmd_AddCommand ("demo", CL_PlayDemo_f);
 	Cmd_SetCommandCompletionFunc( "demo", CL_CompleteDemoName );
+	Cmd_AddCommand ("autodemo", CL_AutoPlayDemo_f);
 	Cmd_AddCommand ("cinematic", CL_PlayCinematic_f);
 	Cmd_AddCommand ("stoprecord", CL_StopRecord_f);
 	Cmd_AddCommand ("connect", CL_Connect_f);

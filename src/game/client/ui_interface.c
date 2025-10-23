@@ -1244,8 +1244,6 @@ void CL_InitUI( void ) {
 	vmInterpret_t		interpret;
 
 	// disallow vl.collapse for UI elements
-	re.VertexLighting( qfalse );
-
 	// load the dll or bytecode
 	interpret = Cvar_VariableIntegerValue( "vm_ui" );
 	if ( cl_connectedToPureServer )
@@ -1320,3 +1318,4 @@ qboolean UI_GameCommand( void ) {
 
 	return VM_Call( uivm, 1, UI_CONSOLE_COMMAND, cls.realtime );
 }
+
