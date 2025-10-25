@@ -1,9 +1,36 @@
 #include <limits.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdarg.h>
 
 #include "../core/tr_local.h"
 #include "rt_rtx.h"
+#include "../lighting/tr_light_dynamic.h"
+#ifdef USE_VULKAN
+#include "../vulkan/vk.h"
+#endif
+
+#ifdef USE_VULKAN
+static void RT_DestroySceneLightBuffer(void);
+#endif
+static void RT_Status_f(void);
+
+pathTracer_t rt;
+
+cvar_t *rt_enable;
+cvar_t *rt_mode;
+cvar_t *rt_quality;
+cvar_t *rt_bounces;
+cvar_t *rt_samples;
+cvar_t *rt_denoise;
+cvar_t *rt_temporal;
+cvar_t *r_rt_mode;
+cvar_t *r_rt_backend;
+cvar_t *rt_probes;
+cvar_t *rt_cache;
+cvar_t *rt_debug;
+cvar_t *rt_staticLights;
+cvar_t *rt_gpuValidate;
 
 static qboolean rtBackendActive = qfalse;
 static qboolean rtBackendInitFailureLogged = qfalse;
@@ -13,9 +40,86 @@ static int rtBackendLastEnableState = 0;
 static int rtBackendLastTracerEnableState = 0;
 static uint32_t g_seed = 1u;
 
+#ifndef VectorDistance
+static ID_INLINE float VectorDistance(const vec3_t p1, const vec3_t p2) {
+    vec3_t delta;
+    VectorSubtract(p2, p1, delta);
+    return VectorLength(delta);
+}
+#endif
+
 static float FastRandom(void) {
 	g_seed = 1664525u * g_seed + 1013904223u;
 	return (float)(g_seed & 0x00FFFFFFu) / 16777215.0f;
+}
+
+static float RT_SafeRadius( float radius ) {
+	const float minRadius = 16.0f;
+	const float maxRadius = 131072.0f;
+
+	if ( radius < minRadius ) {
+		return minRadius;
+	}
+
+	if ( radius > maxRadius ) {
+		return maxRadius;
+	}
+
+	return radius;
+}
+
+static float RT_ComputeSpotCosFromFov( float fovDegrees ) {
+	if ( fovDegrees <= 0.0f ) {
+		return 1.0f;
+	}
+
+	float radians = DEG2RAD( 0.5f * fovDegrees );
+	float cosTheta = cosf( radians );
+
+	if ( cosTheta > 1.0f ) {
+		cosTheta = 1.0f;
+	} else if ( cosTheta < -1.0f ) {
+		cosTheta = -1.0f;
+	}
+
+	return cosTheta;
+}
+
+static uint32_t RT_ComputeSceneLightHash( const rtSceneLight_t *lights, int count ) {
+	if ( !lights || count <= 0 ) {
+		return 0u;
+	}
+
+	return (uint32_t)Com_BlockChecksum( lights, count * (int)sizeof( rtSceneLight_t ) );
+}
+
+static void VectorLerp( const vec3_t from, const vec3_t to, float lerp, vec3_t out ) {
+	out[0] = from[0] + ( to[0] - from[0] ) * lerp;
+	out[1] = from[1] + ( to[1] - from[1] ) * lerp;
+	out[2] = from[2] + ( to[2] - from[2] ) * lerp;
+}
+
+static char rtBackendStatusMessage[128] = "Software backend inactive";
+
+const char *RT_GetBackendStatus(void) {
+	return rtBackendStatusMessage;
+}
+
+void RT_SetBackendStatus( const char *fmt, ... ) {
+	if ( !fmt || !fmt[0] ) {
+		Q_strncpyz( rtBackendStatusMessage, "Software backend inactive", sizeof( rtBackendStatusMessage ) );
+		return;
+	}
+
+	va_list args;
+	va_start( args, fmt );
+	Q_vsnprintf( rtBackendStatusMessage, sizeof( rtBackendStatusMessage ), fmt, args );
+	va_end( args );
+}
+
+void RT_ResetBackendLogs( void ) {
+	rtBackendInitFailureLogged = qfalse;
+	rtBackendHardwareWarned = qfalse;
 }
 
 #define RT_BACKEND_INDEX_COMPUTE   0
@@ -33,6 +137,11 @@ static qboolean RT_MapIsValidationTarget(const char *mapName);
 static void RT_GetValidationMapName(char *buffer, size_t bufferSize);
 static void RT_RecordBackendValidation(const float *rgba, int width, int height, qboolean validated);
 static void RT_ReportBackendParity(void);
+
+#ifdef USE_VULKAN
+static void RT_DestroySceneLightBuffer(void);
+static uint32_t rtLastUploadedLightHash = 0u;
+#endif
 
 static void RT_SelectBackend(void) {
     const char *backendStr = r_rt_backend ? r_rt_backend->string : "auto";
@@ -307,6 +416,189 @@ static qboolean RT_TraceShadowRaySoftware(const vec3_t origin, const vec3_t dire
     return RT_TraceRay(&ray, &hit);
 }
 
+#ifdef USE_VULKAN
+static VkDeviceSize RT_GetSceneLightCapacity(void) {
+    return (VkDeviceSize)sizeof(rtxLightGpu_t) * (VkDeviceSize)RT_MAX_SCENE_LIGHTS;
+}
+
+static void RT_InitSceneLightBuffer(void) {
+    if (!vk.device || !vk.physical_device) {
+        return;
+    }
+
+    if (rt.sceneLightBuffer != VK_NULL_HANDLE && rt.sceneLightBufferMemory != VK_NULL_HANDLE) {
+        return;
+    }
+
+    VkBufferCreateInfo bufferInfo = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0,
+        .size = RT_GetSceneLightCapacity(),
+        .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 0,
+        .pQueueFamilyIndices = NULL
+    };
+
+    if (vkCreateBuffer(vk.device, &bufferInfo, NULL, &rt.sceneLightBuffer) != VK_SUCCESS) {
+        ri.Printf(PRINT_WARNING, "RT_InitSceneLightBuffer: failed to create buffer of size %llu\n",
+                  (unsigned long long)bufferInfo.size);
+        rt.sceneLightBuffer = VK_NULL_HANDLE;
+        rt.sceneLightBufferMemory = VK_NULL_HANDLE;
+        rt.sceneLightBufferSize = 0;
+        return;
+    }
+
+    VkMemoryRequirements memReqs;
+    vkGetBufferMemoryRequirements(vk.device, rt.sceneLightBuffer, &memReqs);
+
+    VkMemoryAllocateInfo allocInfo = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .pNext = NULL,
+        .allocationSize = memReqs.size,
+        .memoryTypeIndex = vk_find_memory_type(memReqs.memoryTypeBits,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+    };
+
+    if (vkAllocateMemory(vk.device, &allocInfo, NULL, &rt.sceneLightBufferMemory) != VK_SUCCESS) {
+        ri.Printf(PRINT_WARNING, "RT_InitSceneLightBuffer: failed to allocate %llu bytes for scene lights\n",
+                  (unsigned long long)allocInfo.allocationSize);
+        vkDestroyBuffer(vk.device, rt.sceneLightBuffer, NULL);
+        rt.sceneLightBuffer = VK_NULL_HANDLE;
+        rt.sceneLightBufferMemory = VK_NULL_HANDLE;
+        rt.sceneLightBufferSize = 0;
+        return;
+    }
+
+    if (vkBindBufferMemory(vk.device, rt.sceneLightBuffer, rt.sceneLightBufferMemory, 0) != VK_SUCCESS) {
+        ri.Printf(PRINT_WARNING, "RT_InitSceneLightBuffer: vkBindBufferMemory failed\n");
+        vkFreeMemory(vk.device, rt.sceneLightBufferMemory, NULL);
+        vkDestroyBuffer(vk.device, rt.sceneLightBuffer, NULL);
+        rt.sceneLightBuffer = VK_NULL_HANDLE;
+        rt.sceneLightBufferMemory = VK_NULL_HANDLE;
+        rt.sceneLightBufferSize = 0;
+        return;
+    }
+
+    rt.sceneLightBufferSize = bufferInfo.size;
+    rt.sceneLightBufferDirty = qtrue;
+}
+
+static void RT_DestroySceneLightBuffer(void) {
+    if (!vk.device) {
+        return;
+    }
+
+    if (rt.sceneLightBuffer != VK_NULL_HANDLE) {
+        vkDestroyBuffer(vk.device, rt.sceneLightBuffer, NULL);
+        rt.sceneLightBuffer = VK_NULL_HANDLE;
+    }
+
+    if (rt.sceneLightBufferMemory != VK_NULL_HANDLE) {
+        vkFreeMemory(vk.device, rt.sceneLightBufferMemory, NULL);
+        rt.sceneLightBufferMemory = VK_NULL_HANDLE;
+    }
+
+    rt.sceneLightBufferSize = 0;
+    rt.sceneLightBufferDirty = qtrue;
+    rtLastUploadedLightHash = 0u;
+}
+
+VkBuffer RT_GetSceneLightBuffer(void) {
+    return rt.sceneLightBuffer;
+}
+
+VkDeviceSize RT_GetSceneLightBufferSize(void) {
+    VkDeviceSize count = (VkDeviceSize)(rt.numSceneLights > 0 ? rt.numSceneLights : 1);
+    VkDeviceSize desired = count * (VkDeviceSize)sizeof(rtxLightGpu_t);
+    if (rt.sceneLightBufferSize > 0 && desired > rt.sceneLightBufferSize) {
+        desired = rt.sceneLightBufferSize;
+    }
+    return desired;
+}
+
+static void RT_FillGpuLight(const rtSceneLight_t *src, rtxLightGpu_t *dst) {
+    vec3_t dir;
+    VectorCopy(src->direction, dir);
+    if (VectorNormalize(dir) <= 0.0f) {
+        VectorSet(dir, 0.0f, 0.0f, -1.0f);
+    }
+
+    dst->position[0] = src->origin[0];
+    dst->position[1] = src->origin[1];
+    dst->position[2] = src->origin[2];
+    dst->position[3] = src->radius;
+
+    dst->direction[0] = dir[0];
+    dst->direction[1] = dir[1];
+    dst->direction[2] = dir[2];
+    dst->direction[3] = src->spotCos;
+
+    float intensity = (src->intensity > 0.0f) ? src->intensity : 1.0f;
+    dst->color[0] = src->color[0] * intensity;
+    dst->color[1] = src->color[1] * intensity;
+    dst->color[2] = src->color[2] * intensity;
+    dst->color[3] = (float)src->type;
+
+    float safeRadius = (src->radius > 0.0f) ? src->radius : 1.0f;
+    dst->attenuation[0] = 1.0f / safeRadius;
+    dst->attenuation[1] = src->castsShadows ? 1.0f : 0.0f;
+    dst->attenuation[2] = src->isStatic ? 1.0f : 0.0f;
+    dst->attenuation[3] = intensity;
+}
+
+void RT_UpdateSceneLightBuffer(void) {
+    if (!vk.device) {
+        return;
+    }
+
+    if (rt.sceneLightBuffer == VK_NULL_HANDLE || rt.sceneLightBufferMemory == VK_NULL_HANDLE) {
+        RT_InitSceneLightBuffer();
+        if (rt.sceneLightBuffer == VK_NULL_HANDLE || rt.sceneLightBufferMemory == VK_NULL_HANDLE) {
+            return;
+        }
+    }
+
+    if (!rt.sceneLightBufferDirty && rtLastUploadedLightHash == rt.sceneLightHash) {
+        return;
+    }
+
+    size_t lightCount = (size_t)(rt.numSceneLights > 0 ? rt.numSceneLights : 0);
+    size_t uploadCount = lightCount > 0 ? lightCount : 1;
+    size_t uploadBytes = uploadCount * sizeof(rtxLightGpu_t);
+
+    if (uploadBytes > (size_t)rt.sceneLightBufferSize && rt.sceneLightBufferSize > 0) {
+        uploadBytes = (size_t)rt.sceneLightBufferSize;
+        uploadCount = uploadBytes / sizeof(rtxLightGpu_t);
+        if (uploadCount == 0) {
+            uploadCount = 1;
+            uploadBytes = sizeof(rtxLightGpu_t);
+        }
+    }
+
+    rtxLightGpu_t gpuLights[RT_MAX_SCENE_LIGHTS];
+    Com_Memset(gpuLights, 0, sizeof(gpuLights));
+
+    for (size_t i = 0; i < lightCount && i < RT_MAX_SCENE_LIGHTS; ++i) {
+        RT_FillGpuLight(&rt.sceneLights[i], &gpuLights[i]);
+    }
+
+    void *mapped = NULL;
+    VkResult result = vkMapMemory(vk.device, rt.sceneLightBufferMemory, 0, uploadBytes, 0, &mapped);
+    if (result != VK_SUCCESS || !mapped) {
+        ri.Printf(PRINT_WARNING, "RT_UpdateSceneLightBuffer: vkMapMemory failed (%d)\n", result);
+        return;
+    }
+
+    Com_Memcpy(mapped, gpuLights, uploadBytes);
+    vkUnmapMemory(vk.device, rt.sceneLightBufferMemory);
+
+    rt.sceneLightBufferDirty = qfalse;
+    rtLastUploadedLightHash = rt.sceneLightHash;
+}
+#endif
+
 /*
 ===============
 RT_InitPathTracer
@@ -332,6 +624,7 @@ void RT_InitPathTracer(void) {
     rt_debug = ri.Cvar_Get("rt_debug", "0", CVAR_CHEAT);
     rt_staticLights = ri.Cvar_Get("rt_staticLights", "1", CVAR_ARCHIVE);
     rt_gpuValidate = ri.Cvar_Get("rt_gpuValidate", "0", CVAR_ARCHIVE);
+    r_rt_mode = rt_mode;
     
     ri.Cvar_SetDescription(rt_mode, "Path tracing mode: 'off', 'dynamic', or 'all'");
     ri.Cvar_SetDescription(r_rt_backend, "Ray tracing backend: 'auto', 'hardware', or 'software'");
@@ -1569,9 +1862,9 @@ void RT_SampleProbeGrid(const vec3_t pos, const vec3_t normal, vec3_t result) {
     int z = (int)(gridPos[2] / spacing);
     
     // Clamp to grid bounds
-    x = CLAMP(x, 0, RT_PROBE_GRID_SIZE - 2);
-    y = CLAMP(y, 0, RT_PROBE_GRID_SIZE - 2);
-    z = CLAMP(z, 0, RT_PROBE_GRID_SIZE - 2);
+    x = Com_Clamp(0, RT_PROBE_GRID_SIZE - 2, x);
+    y = Com_Clamp(0, RT_PROBE_GRID_SIZE - 2, y);
+    z = Com_Clamp(0, RT_PROBE_GRID_SIZE - 2, z);
     
     // Trilinear interpolation of 8 nearest probes
     float fx = (gridPos[0] / spacing) - x;
@@ -2359,7 +2652,10 @@ static qboolean RT_BuildDynamicFromLegacyDlight(const dlight_t *dlight, rtDynami
     VectorCopy(dlight->color, out->color);
     VectorClear(out->direction);
     out->radius = RT_SafeRadius(dlight->radius);
-    out->intensity = 1.0f;
+    out->intensity = brightness / 3.0f;
+    if (out->intensity <= 0.0f) {
+        out->intensity = 1.0f;
+    }
     out->spotCos = -1.0f;
     out->castsShadows = dlight->additive ? qfalse : qtrue;
     out->isStatic = qfalse;
@@ -2370,7 +2666,17 @@ static qboolean RT_BuildDynamicFromLegacyDlight(const dlight_t *dlight, rtDynami
 
 static void RT_RebuildSceneLights(void) {
     if (rt.mode == RT_MODE_OFF) {
-        rt.numSceneLights = 0;
+        if (rt.numSceneLights != 0 || rt.sceneLightHash != 0) {
+            rt.numSceneLights = 0;
+            if (rt.sceneLightHash != 0) {
+                rt.sceneLightHash = 0;
+                RT_ResetAccumulation();
+            }
+        }
+#ifdef USE_VULKAN
+        rt.sceneLightBufferDirty = qtrue;
+        RT_UpdateSceneLightBuffer();
+#endif
         return;
     }
 
@@ -2387,6 +2693,12 @@ static void RT_RebuildSceneLights(void) {
         dst->radius = RT_SafeRadius(src->radius);
         dst->intensity = src->intensity;
         dst->spotCos = Com_Clamp(-1.0f, 1.0f, src->spotCos);
+        if (dst->intensity <= 0.0f) {
+            float fallback = fabsf(dst->color[0]) + fabsf(dst->color[1]) + fabsf(dst->color[2]);
+            if (fallback > 0.0f) {
+                dst->intensity = fallback / 3.0f;
+            }
+        }
         dst->castsShadows = src->castsShadows;
         dst->isStatic = src->isStatic;
 
@@ -2414,6 +2726,12 @@ static void RT_RebuildSceneLights(void) {
             VectorCopy(sl->color, dst->color);
             dst->radius = RT_SafeRadius(sl->radius);
             dst->intensity = sl->intensity;
+            if (dst->intensity <= 0.0f) {
+                float fallback = fabsf(dst->color[0]) + fabsf(dst->color[1]) + fabsf(dst->color[2]);
+                if (fallback > 0.0f) {
+                    dst->intensity = fallback / 3.0f;
+                }
+            }
             dst->castsShadows = sl->castShadows;
             dst->isStatic = qtrue;
 

@@ -2,6 +2,7 @@
 #include "vk.h"
 #include "../postprocessing/tr_volumetric.h"
 #include "../postprocessing/tr_postprocess.h"
+#include "../pathtracing/rt_pathtracer.h"
 #include <stdio.h>  // For file operations
 
 #if defined (_DEBUG)
@@ -24,115 +25,137 @@ VkDebugReportCallbackEXT vk_debug_callback = VK_NULL_HANDLE;
 //
 // Vulkan API functions used by the renderer.
 //
-static PFN_vkCreateInstance								qvkCreateInstance;
-static PFN_vkEnumerateInstanceExtensionProperties		qvkEnumerateInstanceExtensionProperties;
+PFN_vkCreateInstance								qvkCreateInstance;
+PFN_vkEnumerateInstanceExtensionProperties		qvkEnumerateInstanceExtensionProperties;
 
-static PFN_vkCreateDevice								qvkCreateDevice;
-static PFN_vkDestroyInstance							qvkDestroyInstance;
-static PFN_vkEnumerateDeviceExtensionProperties			qvkEnumerateDeviceExtensionProperties;
-static PFN_vkEnumeratePhysicalDevices					qvkEnumeratePhysicalDevices;
-static PFN_vkGetDeviceProcAddr							qvkGetDeviceProcAddr;
-static PFN_vkGetPhysicalDeviceFeatures					qvkGetPhysicalDeviceFeatures;
-static PFN_vkGetPhysicalDeviceFormatProperties			qvkGetPhysicalDeviceFormatProperties;
-static PFN_vkGetPhysicalDeviceMemoryProperties			qvkGetPhysicalDeviceMemoryProperties;
-static PFN_vkGetPhysicalDeviceProperties				qvkGetPhysicalDeviceProperties;
-static PFN_vkGetPhysicalDeviceQueueFamilyProperties		qvkGetPhysicalDeviceQueueFamilyProperties;
-static PFN_vkDestroySurfaceKHR							qvkDestroySurfaceKHR;
-static PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR	qvkGetPhysicalDeviceSurfaceCapabilitiesKHR;
-static PFN_vkGetPhysicalDeviceSurfaceFormatsKHR			qvkGetPhysicalDeviceSurfaceFormatsKHR;
-static PFN_vkGetPhysicalDeviceSurfacePresentModesKHR	qvkGetPhysicalDeviceSurfacePresentModesKHR;
-static PFN_vkGetPhysicalDeviceSurfaceSupportKHR			qvkGetPhysicalDeviceSurfaceSupportKHR;
+PFN_vkCreateDevice								qvkCreateDevice;
+PFN_vkDestroyInstance							qvkDestroyInstance;
+PFN_vkEnumerateDeviceExtensionProperties			qvkEnumerateDeviceExtensionProperties;
+PFN_vkEnumeratePhysicalDevices					qvkEnumeratePhysicalDevices;
+PFN_vkGetDeviceProcAddr							qvkGetDeviceProcAddr;
+PFN_vkGetPhysicalDeviceFeatures					qvkGetPhysicalDeviceFeatures;
+PFN_vkGetPhysicalDeviceFormatProperties			qvkGetPhysicalDeviceFormatProperties;
+PFN_vkGetPhysicalDeviceMemoryProperties			qvkGetPhysicalDeviceMemoryProperties;
+PFN_vkGetPhysicalDeviceProperties				qvkGetPhysicalDeviceProperties;
+PFN_vkGetPhysicalDeviceQueueFamilyProperties		qvkGetPhysicalDeviceQueueFamilyProperties;
+PFN_vkDestroySurfaceKHR							qvkDestroySurfaceKHR;
+PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR	qvkGetPhysicalDeviceSurfaceCapabilitiesKHR;
+PFN_vkGetPhysicalDeviceSurfaceFormatsKHR			qvkGetPhysicalDeviceSurfaceFormatsKHR;
+PFN_vkGetPhysicalDeviceSurfacePresentModesKHR	qvkGetPhysicalDeviceSurfacePresentModesKHR;
+PFN_vkGetPhysicalDeviceSurfaceSupportKHR			qvkGetPhysicalDeviceSurfaceSupportKHR;
 #ifdef USE_VK_VALIDATION
-static PFN_vkCreateDebugReportCallbackEXT				qvkCreateDebugReportCallbackEXT;
-static PFN_vkDestroyDebugReportCallbackEXT				qvkDestroyDebugReportCallbackEXT;
+PFN_vkCreateDebugReportCallbackEXT				qvkCreateDebugReportCallbackEXT;
+PFN_vkDestroyDebugReportCallbackEXT				qvkDestroyDebugReportCallbackEXT;
 #endif
-static PFN_vkAllocateCommandBuffers						qvkAllocateCommandBuffers;
+PFN_vkAllocateCommandBuffers						qvkAllocateCommandBuffers;
 PFN_vkAllocateDescriptorSets						qvkAllocateDescriptorSets;
 PFN_vkAllocateMemory 							qvkAllocateMemory;
-static PFN_vkBeginCommandBuffer							qvkBeginCommandBuffer;
+PFN_vkBeginCommandBuffer							qvkBeginCommandBuffer;
 PFN_vkBindBufferMemory 						qvkBindBufferMemory;
 PFN_vkBindImageMemory 						qvkBindImageMemory;
 PFN_vkCmdBeginRenderPass 						qvkCmdBeginRenderPass;
 PFN_vkCmdBindDescriptorSets 					qvkCmdBindDescriptorSets;
-static PFN_vkCmdBindIndexBuffer							qvkCmdBindIndexBuffer;
+PFN_vkCmdBindIndexBuffer							qvkCmdBindIndexBuffer;
 PFN_vkCmdBindPipeline 						qvkCmdBindPipeline;
-static PFN_vkCmdBindVertexBuffers						qvkCmdBindVertexBuffers;
-static PFN_vkCmdBlitImage								qvkCmdBlitImage;
-static PFN_vkCmdClearAttachments						qvkCmdClearAttachments;
-static PFN_vkCmdCopyBuffer								qvkCmdCopyBuffer;
-static PFN_vkCmdCopyBufferToImage						qvkCmdCopyBufferToImage;
-static PFN_vkCmdCopyImage								qvkCmdCopyImage;
+PFN_vkCmdBindVertexBuffers						qvkCmdBindVertexBuffers;
+PFN_vkCmdBlitImage								qvkCmdBlitImage;
+PFN_vkCmdClearAttachments						qvkCmdClearAttachments;
+PFN_vkCmdCopyBuffer								qvkCmdCopyBuffer;
+PFN_vkCmdCopyBufferToImage						qvkCmdCopyBufferToImage;
+PFN_vkCmdCopyImage								qvkCmdCopyImage;
 PFN_vkCmdDraw 								qvkCmdDraw;
 PFN_vkCmdDispatch 							qvkCmdDispatch;
-static PFN_vkCmdDrawIndexed								qvkCmdDrawIndexed;
+PFN_vkCmdDrawIndexed								qvkCmdDrawIndexed;
 PFN_vkCmdEndRenderPass 						qvkCmdEndRenderPass;
-static PFN_vkCmdNextSubpass								qvkCmdNextSubpass;
+PFN_vkCmdNextSubpass								qvkCmdNextSubpass;
 PFN_vkCmdPipelineBarrier 						qvkCmdPipelineBarrier;
-static PFN_vkCmdPushConstants							qvkCmdPushConstants;
-static PFN_vkCmdSetDepthBias							qvkCmdSetDepthBias;
-static PFN_vkCmdSetScissor								qvkCmdSetScissor;
-static PFN_vkCmdSetViewport								qvkCmdSetViewport;
+PFN_vkCmdPushConstants							qvkCmdPushConstants;
+PFN_vkCmdSetDepthBias							qvkCmdSetDepthBias;
+PFN_vkCmdSetScissor								qvkCmdSetScissor;
+PFN_vkCmdSetViewport								qvkCmdSetViewport;
 PFN_vkCreateBuffer 							qvkCreateBuffer;
-static PFN_vkCreateCommandPool							qvkCreateCommandPool;
+PFN_vkCreateCommandPool							qvkCreateCommandPool;
 PFN_vkCreateDescriptorPool						qvkCreateDescriptorPool;
 PFN_vkCreateDescriptorSetLayout					qvkCreateDescriptorSetLayout;
-static PFN_vkCreateFence								qvkCreateFence;
-static PFN_vkCreateFramebuffer							qvkCreateFramebuffer;
+PFN_vkCreateFence								qvkCreateFence;
+PFN_vkCreateFramebuffer							qvkCreateFramebuffer;
 PFN_vkCreateGraphicsPipelines					qvkCreateGraphicsPipelines;
+PFN_vkCreateComputePipelines					qvkCreateComputePipelines;
+PFN_vkCreateAccelerationStructureKHR			qvkCreateAccelerationStructureKHR;
+PFN_vkDestroyAccelerationStructureKHR			qvkDestroyAccelerationStructureKHR;
 PFN_vkCreateImage 							qvkCreateImage;
 PFN_vkCreateImageView 						qvkCreateImageView;
 PFN_vkCreatePipelineLayout						qvkCreatePipelineLayout;
-static PFN_vkCreatePipelineCache						qvkCreatePipelineCache;
-static PFN_vkCreateRenderPass							qvkCreateRenderPass;
+PFN_vkCreatePipelineCache						qvkCreatePipelineCache;
+PFN_vkCreateRenderPass							qvkCreateRenderPass;
 PFN_vkCreateSampler								qvkCreateSampler;
-static PFN_vkCreateSemaphore							qvkCreateSemaphore;
+PFN_vkCreateSemaphore							qvkCreateSemaphore;
 PFN_vkCreateShaderModule							qvkCreateShaderModule;
 PFN_vkDestroyBuffer 							qvkDestroyBuffer;
-static PFN_vkDestroyCommandPool							qvkDestroyCommandPool;
+PFN_vkDestroyCommandPool							qvkDestroyCommandPool;
 PFN_vkDestroyDescriptorPool						qvkDestroyDescriptorPool;
-static PFN_vkDestroyDescriptorSetLayout					qvkDestroyDescriptorSetLayout;
-static PFN_vkDestroyDevice								qvkDestroyDevice;
-static PFN_vkDestroyFence								qvkDestroyFence;
-static PFN_vkDestroyFramebuffer							qvkDestroyFramebuffer;
+PFN_vkDestroyDescriptorSetLayout					qvkDestroyDescriptorSetLayout;
+PFN_vkDestroyDevice								qvkDestroyDevice;
+PFN_vkDestroyFence								qvkDestroyFence;
+PFN_vkDestroyFramebuffer							qvkDestroyFramebuffer;
 PFN_vkDestroyImage 							qvkDestroyImage;
 PFN_vkDestroyImageView 						qvkDestroyImageView;
 PFN_vkDestroyPipeline 						qvkDestroyPipeline;
-static PFN_vkDestroyPipelineCache						qvkDestroyPipelineCache;
+PFN_vkDestroyPipelineCache						qvkDestroyPipelineCache;
 PFN_vkDestroyPipelineLayout						qvkDestroyPipelineLayout;
-static PFN_vkDestroyRenderPass							qvkDestroyRenderPass;
+PFN_vkDestroyRenderPass							qvkDestroyRenderPass;
 PFN_vkDestroySampler								qvkDestroySampler;
-static PFN_vkDestroySemaphore							qvkDestroySemaphore;
+PFN_vkDestroySemaphore							qvkDestroySemaphore;
 PFN_vkDestroyShaderModule						qvkDestroyShaderModule;
-static PFN_vkDeviceWaitIdle								qvkDeviceWaitIdle;
-static PFN_vkEndCommandBuffer							qvkEndCommandBuffer;
-static PFN_vkFlushMappedMemoryRanges					qvkFlushMappedMemoryRanges;
-static PFN_vkFreeCommandBuffers							qvkFreeCommandBuffers;
-static PFN_vkFreeDescriptorSets							qvkFreeDescriptorSets;
+PFN_vkDeviceWaitIdle								qvkDeviceWaitIdle;
+PFN_vkEndCommandBuffer							qvkEndCommandBuffer;
+PFN_vkFlushMappedMemoryRanges					qvkFlushMappedMemoryRanges;
+PFN_vkFreeCommandBuffers							qvkFreeCommandBuffers;
+PFN_vkFreeDescriptorSets							qvkFreeDescriptorSets;
 PFN_vkFreeMemory 								qvkFreeMemory;
 PFN_vkGetBufferMemoryRequirements 			qvkGetBufferMemoryRequirements;
-static PFN_vkGetDeviceQueue								qvkGetDeviceQueue;
+PFN_vkGetDeviceQueue								qvkGetDeviceQueue;
 PFN_vkGetImageMemoryRequirements 				qvkGetImageMemoryRequirements;
-static PFN_vkGetImageSubresourceLayout					qvkGetImageSubresourceLayout;
-static PFN_vkInvalidateMappedMemoryRanges				qvkInvalidateMappedMemoryRanges;
+PFN_vkGetImageSubresourceLayout					qvkGetImageSubresourceLayout;
+PFN_vkInvalidateMappedMemoryRanges				qvkInvalidateMappedMemoryRanges;
 PFN_vkMapMemory 								qvkMapMemory;
-static PFN_vkQueueSubmit								qvkQueueSubmit;
-static PFN_vkQueueWaitIdle								qvkQueueWaitIdle;
-static PFN_vkResetCommandBuffer							qvkResetCommandBuffer;
-static PFN_vkResetDescriptorPool						qvkResetDescriptorPool;
-static PFN_vkResetFences								qvkResetFences;
+PFN_vkQueueSubmit								qvkQueueSubmit;
+PFN_vkQueueWaitIdle								qvkQueueWaitIdle;
+PFN_vkResetCommandBuffer							qvkResetCommandBuffer;
+PFN_vkResetDescriptorPool						qvkResetDescriptorPool;
+PFN_vkResetFences								qvkResetFences;
 PFN_vkUnmapMemory 							qvkUnmapMemory;
 PFN_vkUpdateDescriptorSets						qvkUpdateDescriptorSets;
-static PFN_vkWaitForFences								qvkWaitForFences;
-static PFN_vkAcquireNextImageKHR						qvkAcquireNextImageKHR;
-static PFN_vkCreateSwapchainKHR							qvkCreateSwapchainKHR;
-static PFN_vkDestroySwapchainKHR						qvkDestroySwapchainKHR;
-static PFN_vkGetSwapchainImagesKHR						qvkGetSwapchainImagesKHR;
-static PFN_vkQueuePresentKHR							qvkQueuePresentKHR;
+PFN_vkWaitForFences								qvkWaitForFences;
+PFN_vkAcquireNextImageKHR						qvkAcquireNextImageKHR;
+PFN_vkCreateSwapchainKHR							qvkCreateSwapchainKHR;
+PFN_vkDestroySwapchainKHR						qvkDestroySwapchainKHR;
+PFN_vkGetSwapchainImagesKHR						qvkGetSwapchainImagesKHR;
+PFN_vkQueuePresentKHR							qvkQueuePresentKHR;
 
-static PFN_vkGetBufferMemoryRequirements2KHR			qvkGetBufferMemoryRequirements2KHR;
-static PFN_vkGetImageMemoryRequirements2KHR				qvkGetImageMemoryRequirements2KHR;
+PFN_vkGetBufferMemoryRequirements2KHR			qvkGetBufferMemoryRequirements2KHR;
+PFN_vkGetImageMemoryRequirements2KHR				qvkGetImageMemoryRequirements2KHR;
 
-static PFN_vkDebugMarkerSetObjectNameEXT				qvkDebugMarkerSetObjectNameEXT;
+PFN_vkDebugMarkerSetObjectNameEXT				qvkDebugMarkerSetObjectNameEXT;
+PFN_vkCreateRayTracingPipelinesKHR				qvkCreateRayTracingPipelinesKHR;
+
+typedef struct vkCommandRegistryEntry_s {
+	VkCommandBuffer buffer;
+	VkCommandPool pool;
+	char tag[32];
+} vkCommandRegistryEntry_t;
+
+static vkCommandRegistryEntry_t vkCommandRegistry[64];
+static qboolean vkCommandRegistryOverflowWarned = qfalse;
+
+typedef struct vkImageLayoutEntry_s {
+	VkImage image;
+	VkImageLayout layout;
+} vkImageLayoutEntry_t;
+
+static vkImageLayoutEntry_t vkImageLayoutTable[256];
+static uint32_t vkImageLayoutCount = 0;
+static qboolean vkImageLayoutOverflowWarned = qfalse;
 
 ////////////////////////////////////////////////////////////////////////////
 
@@ -387,6 +410,51 @@ void vk_end_one_time_commands( VkCommandBuffer command_buffer )
 	end_command_buffer( command_buffer, "one-time commands" );
 }
 
+VkImageLayout vk_image_get_layout_or( VkImage image, VkImageLayout fallback )
+{
+	if ( image == VK_NULL_HANDLE ) {
+		return fallback;
+	}
+
+	for ( uint32_t i = 0; i < vkImageLayoutCount; ++i ) {
+		if ( vkImageLayoutTable[i].image == image ) {
+			return vkImageLayoutTable[i].layout;
+		}
+	}
+
+	return fallback;
+}
+
+
+VkImageLayout vk_image_get_layout( VkImage image )
+{
+	return vk_image_get_layout_or( image, VK_IMAGE_LAYOUT_UNDEFINED );
+}
+
+
+void vk_image_set_layout( VkImage image, VkImageLayout layout )
+{
+	if ( image == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	for ( uint32_t i = 0; i < vkImageLayoutCount; ++i ) {
+		if ( vkImageLayoutTable[i].image == image ) {
+			vkImageLayoutTable[i].layout = layout;
+			return;
+		}
+	}
+
+	if ( vkImageLayoutCount < ARRAY_LEN( vkImageLayoutTable ) ) {
+		vkImageLayoutTable[ vkImageLayoutCount ].image = image;
+		vkImageLayoutTable[ vkImageLayoutCount ].layout = layout;
+		++vkImageLayoutCount;
+	} else if ( !vkImageLayoutOverflowWarned ) {
+		ri.Printf( PRINT_WARNING, "Vulkan: image layout cache overflow, tracking disabled for image %p\n", (const void *)image );
+		vkImageLayoutOverflowWarned = qtrue;
+	}
+}
+
 
 static void record_image_layout_transition( VkCommandBuffer command_buffer, VkImage image, VkImageAspectFlags image_aspect_flags, 
 	VkImageLayout old_layout, VkImageLayout new_layout, uint32_t src_stage_override, uint32_t dst_stage_override ) {
@@ -473,6 +541,7 @@ static void record_image_layout_transition( VkCommandBuffer command_buffer, VkIm
 	barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
 
 	qvkCmdPipelineBarrier( command_buffer, src_stage, dst_stage, 0, 0, NULL, 0, NULL, 1, &barrier );
+	vk_image_set_layout( image, new_layout );
 }
 
 
@@ -2271,6 +2340,7 @@ static void init_vulkan_library( void )
 	INIT_DEVICE_FUNCTION(vkCreateFence)
 	INIT_DEVICE_FUNCTION(vkCreateFramebuffer)
 	INIT_DEVICE_FUNCTION(vkCreateGraphicsPipelines)
+	INIT_DEVICE_FUNCTION(vkCreateComputePipelines)
 	INIT_DEVICE_FUNCTION(vkCreateImage)
 	INIT_DEVICE_FUNCTION(vkCreateImageView)
 	INIT_DEVICE_FUNCTION(vkCreatePipelineCache)
@@ -2402,6 +2472,9 @@ static void deinit_device_functions( void )
 	qvkCreateFence								= NULL;
 	qvkCreateFramebuffer						= NULL;
 	qvkCreateGraphicsPipelines					= NULL;
+	qvkCreateComputePipelines					= NULL;
+	qvkCreateAccelerationStructureKHR			= NULL;
+	qvkDestroyAccelerationStructureKHR			= NULL;
 	qvkCreateImage								= NULL;
 	qvkCreateImageView							= NULL;
 	qvkCreatePipelineCache						= NULL;
@@ -2456,6 +2529,7 @@ static void deinit_device_functions( void )
 	qvkGetImageMemoryRequirements2KHR			= NULL;
 
 	qvkDebugMarkerSetObjectNameEXT				= NULL;
+	qvkCreateRayTracingPipelinesKHR				= NULL;
 }
 
 
@@ -6994,6 +7068,15 @@ static void get_mvp_transform( float *mvp )
 	}
 }
 
+void vk_get_mvp_transform( float *mvp )
+{
+	if ( !mvp ) {
+		return;
+	}
+
+	get_mvp_transform( mvp );
+}
+
 
 void vk_clear_color( const vec4_t color ) {
 
@@ -7308,6 +7391,158 @@ void vk_update_descriptor( int index, VkDescriptorSet descriptor )
 void vk_update_descriptor_offset( int index, uint32_t offset )
 {
 	vk.cmd->descriptor_set.offset[ index ] = offset;
+}
+
+void vk_destroy_descriptor_pool( VkDescriptorPool pool )
+{
+	if ( pool == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	if ( vk.device == VK_NULL_HANDLE || qvkDestroyDescriptorPool == NULL ) {
+		ri.Printf( PRINT_WARNING, "Vulkan: attempted to destroy descriptor pool without a valid device\n" );
+		return;
+	}
+
+	qvkDestroyDescriptorPool( vk.device, pool, NULL );
+}
+
+
+void vk_reset_descriptor_pool( VkDescriptorPool pool )
+{
+	if ( pool == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	if ( vk.device == VK_NULL_HANDLE || qvkResetDescriptorPool == NULL ) {
+		ri.Printf( PRINT_WARNING, "Vulkan: attempted to reset descriptor pool without a valid device\n" );
+		return;
+	}
+
+	const VkResult result = qvkResetDescriptorPool( vk.device, pool, 0 );
+	if ( result != VK_SUCCESS ) {
+		ri.Printf( PRINT_WARNING, "Vulkan: vkResetDescriptorPool failed with error %s\n", vk_result_string( result ) );
+	}
+}
+
+
+void vk_cmd_register( const char *tag, VkCommandBuffer buffer, VkCommandPool pool )
+{
+	if ( buffer == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	int freeIndex = -1;
+
+	for ( int i = 0; i < ARRAY_LEN( vkCommandRegistry ); ++i ) {
+		vkCommandRegistryEntry_t *entry = &vkCommandRegistry[i];
+
+		if ( entry->buffer == buffer ) {
+			entry->pool = pool;
+			if ( tag && tag[0] ) {
+				Q_strncpyz( entry->tag, tag, sizeof( entry->tag ) );
+			} else {
+				entry->tag[0] = '\0';
+			}
+			return;
+		}
+
+		if ( freeIndex == -1 && entry->buffer == VK_NULL_HANDLE ) {
+			freeIndex = i;
+		}
+	}
+
+	if ( freeIndex != -1 ) {
+		vkCommandRegistryEntry_t *entry = &vkCommandRegistry[ freeIndex ];
+		entry->buffer = buffer;
+		entry->pool = pool;
+		if ( tag && tag[0] ) {
+			Q_strncpyz( entry->tag, tag, sizeof( entry->tag ) );
+		} else {
+			entry->tag[0] = '\0';
+		}
+		return;
+	}
+
+	if ( !vkCommandRegistryOverflowWarned ) {
+		ri.Printf( PRINT_WARNING, "Vulkan: command buffer registry overflow (buffer=%p, tag=%s)\n",
+		           (const void *)buffer, tag ? tag : "" );
+		vkCommandRegistryOverflowWarned = qtrue;
+	}
+}
+
+
+void vk_cmd_unregister( VkCommandBuffer buffer )
+{
+	if ( buffer == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	for ( int i = 0; i < ARRAY_LEN( vkCommandRegistry ); ++i ) {
+		if ( vkCommandRegistry[i].buffer == buffer ) {
+			Com_Memset( &vkCommandRegistry[i], 0, sizeof( vkCommandRegistry[i] ) );
+			return;
+		}
+	}
+
+#if defined( _DEBUG )
+	ri.Printf( PRINT_DEVELOPER, "Vulkan: attempted to unregister unknown command buffer %p\n", (const void *)buffer );
+#endif
+}
+
+
+void vk_cmd_dump_leaks( void )
+{
+	qboolean found = qfalse;
+
+	for ( int i = 0; i < ARRAY_LEN( vkCommandRegistry ); ++i ) {
+		const vkCommandRegistryEntry_t *entry = &vkCommandRegistry[i];
+		if ( entry->buffer == VK_NULL_HANDLE ) {
+			continue;
+		}
+
+		if ( !found ) {
+			ri.Printf( PRINT_WARNING, "Vulkan: command buffers still registered:\n" );
+			found = qtrue;
+		}
+
+		ri.Printf( PRINT_WARNING, "  buffer=%p pool=%p tag=%s\n",
+		           (const void *)entry->buffer, (const void *)entry->pool,
+		           entry->tag[0] ? entry->tag : "(unnamed)" );
+	}
+
+	if ( !found ) {
+		ri.Printf( PRINT_DEVELOPER, "Vulkan: no command buffer leaks detected\n" );
+	}
+}
+
+void vk_register_acceleration_structure_dispatch( PFN_vkCreateAccelerationStructureKHR createFn,
+	PFN_vkDestroyAccelerationStructureKHR destroyFn )
+{
+	qvkCreateAccelerationStructureKHR = createFn;
+	qvkDestroyAccelerationStructureKHR = destroyFn;
+
+#if defined( _DEBUG )
+	if ( createFn && destroyFn ) {
+		ri.Printf( PRINT_DEVELOPER, "Vulkan: registered acceleration structure dispatch (create=%p destroy=%p)\n",
+		           (const void *)createFn, (const void *)destroyFn );
+	} else {
+		ri.Printf( PRINT_DEVELOPER, "Vulkan: cleared acceleration structure dispatch\n" );
+	}
+#endif
+}
+
+void vk_register_ray_tracing_pipeline_dispatch( PFN_vkCreateRayTracingPipelinesKHR createFn )
+{
+	qvkCreateRayTracingPipelinesKHR = createFn;
+
+#if defined( _DEBUG )
+	if ( createFn ) {
+		ri.Printf( PRINT_DEVELOPER, "Vulkan: registered ray tracing pipeline dispatch %p\n", (const void *)createFn );
+	} else {
+		ri.Printf( PRINT_DEVELOPER, "Vulkan: cleared ray tracing pipeline dispatch\n" );
+	}
+#endif
 }
 
 

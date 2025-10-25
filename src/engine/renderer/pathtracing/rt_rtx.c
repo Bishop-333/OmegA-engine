@@ -50,6 +50,20 @@ cvar_t *rtx_gi_bounces;
 cvar_t *rtx_reflection_quality;
 cvar_t *rtx_shadow_quality;
 cvar_t *rtx_debug;
+cvar_t *rtx_notextures;
+cvar_t *rtx_hybrid_intensity;
+cvar_t *rtx_surface_debug;
+
+cvar_t *r_rtx_enabled;
+cvar_t *r_rtx_quality;
+cvar_t *r_rtx_denoise;
+cvar_t *r_rtx_dlss;
+cvar_t *r_rtx_reflex;
+cvar_t *r_rtx_gi_bounces;
+cvar_t *r_rtx_hybrid_intensity;
+cvar_t *r_rtx_debug;
+cvar_t *r_rtx_notextures;
+cvar_t *r_rtx_surface_debug;
 
 // ============================================================================
 // Initialization
@@ -81,9 +95,23 @@ qboolean RTX_Init(void) {
     rtx_reflection_quality = ri.Cvar_Get("rtx_reflection_quality", "2", CVAR_ARCHIVE);
     rtx_shadow_quality = ri.Cvar_Get("rtx_shadow_quality", "2", CVAR_ARCHIVE);
     rtx_debug = ri.Cvar_Get("rtx_debug", "0", CVAR_CHEAT);
+    rtx_notextures = ri.Cvar_Get("rtx_notextures", "0", CVAR_ARCHIVE);
+    rtx_hybrid_intensity = ri.Cvar_Get("rtx_hybrid_intensity", "1.0", CVAR_ARCHIVE);
+    rtx_surface_debug = ri.Cvar_Get("rtx_surface_debug", "0", CVAR_CHEAT);
     
     // Always register console command so users can check RTX status
     ri.Cmd_AddCommand("rtx_status", RTX_Status_f);
+
+    r_rtx_enabled = rtx_enable;
+    r_rtx_quality = rtx_quality;
+    r_rtx_denoise = rtx_denoise;
+    r_rtx_dlss = rtx_dlss;
+    r_rtx_reflex = rtx_reflex;
+    r_rtx_gi_bounces = rtx_gi_bounces;
+    r_rtx_hybrid_intensity = rtx_hybrid_intensity;
+    r_rtx_debug = rtx_debug;
+    r_rtx_notextures = rtx_notextures;
+    r_rtx_surface_debug = rtx_surface_debug;
     
     if (!rtx_enable->integer) {
         ri.Printf(PRINT_ALL, "RTX: Hardware raytracing disabled (rtx_enable = 0)\n");
@@ -222,6 +250,17 @@ qboolean RTX_IsAvailable(void) {
 
 /*
 ================
+RTX_IsEnabled
+
+Return whether the RTX hardware path is allowed by configuration.
+================
+*/
+qboolean RTX_IsEnabled(void) {
+    return (rtx_enable && rtx_enable->integer) ? qtrue : qfalse;
+}
+
+/*
+================
 RTX_GetFeatures
 
 Get available RTX features
@@ -229,6 +268,25 @@ Get available RTX features
 */
 unsigned int RTX_GetFeatures(void) {
     return rtx.features;
+}
+
+/*
+================
+RTX_GetHybridIntensity
+
+Return the configured hybrid composite intensity, clamped to a sensible range.
+================
+*/
+float RTX_GetHybridIntensity(void) {
+    float intensity = 1.0f;
+
+    if ( r_rtx_hybrid_intensity ) {
+        intensity = r_rtx_hybrid_intensity->value;
+    } else if ( rtx_hybrid_intensity ) {
+        intensity = rtx_hybrid_intensity->value;
+    }
+
+    return Com_Clamp( 0.0f, 8.0f, intensity );
 }
 
 // ============================================================================
