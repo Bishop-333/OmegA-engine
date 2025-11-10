@@ -5712,7 +5712,7 @@ void *FS_LoadLibrary( const char *name, qboolean useSystemLib )
 			sp = sp->next;
 		}
 		if ( sp ) {
-			const char *fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, name );
+			const char *fn = FS_BuildOSPath( sp->dir->path, name, NULL );
 			libHandle = Sys_LoadLibrary( fn );
 			sp = sp->next;
 		}
