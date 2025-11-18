@@ -114,6 +114,7 @@ cvar_t		*con_conspeed;
 cvar_t		*con_autoclear;
 cvar_t		*con_notifytime;
 cvar_t		*con_scale;
+cvar_t		*con_fps;
 cvar_t		*con_clock;
 
 int			g_console_field_width;
@@ -578,6 +579,8 @@ void Con_Init( void )
 	con_scale = Cvar_Get( "con_scale", "0.8", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( con_scale, "0.5", "8", CV_FLOAT );
 	Cvar_SetDescription( con_scale, "Console font size scale." );
+	con_fps = Cvar_Get( "con_fps", "1", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( con_fps, "Enable/disable console fps display." );
 	con_clock = Cvar_Get( "con_clock", "1", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( con_clock, "Console clock.\n 1: 24-hour clock\n 2: 12-hour clock" );
 
@@ -1048,6 +1051,48 @@ static void Con_DrawNotify( void )
 	}
 }
 
+/*
+================
+Con_DrawFPS
+================
+*/
+#define FPS_FRAMES 4
+static void Con_DrawFPS(float y) {
+	const char		*s;
+	int			w;
+	static int	previousTimes[FPS_FRAMES];
+	static int	index;
+	int		i, total;
+	int		fps;
+	static	int	previous;
+	int		t, frameTime;
+
+	// don't use serverTime, because that will be drifting to
+	// correct for internet lag changes, timescales, timedemos, etc
+	t = Sys_Milliseconds();
+	frameTime = t - previous;
+	previous = t;
+
+	previousTimes[index % FPS_FRAMES] = frameTime;
+	index++;
+	if ( index > FPS_FRAMES ) {
+		// average multiple frames together to smooth changes out a bit
+		total = 0;
+		for ( i = 0 ; i < FPS_FRAMES ; i++ ) {
+			total += previousTimes[i];
+		}
+		if ( !total ) {
+			total = 1;
+		}
+		fps = 1000 * FPS_FRAMES / total;
+
+		s = va( "%ifps", fps );
+		w = strlen( s ) * smallchar_width;
+
+		SCR_DrawSmallStringExt( cls.glconfig.vidWidth - w - 8, y + 2, s, g_color_table[1], qfalse, qtrue);
+	}
+}
+
 
 /*
 ================
@@ -1155,6 +1200,11 @@ static void Con_DrawSolidConsole( float frac ) {
 		row--;
 	}
 
+	// draw console fps frames
+	if ( con_fps->integer ) {
+		Con_DrawFPS( 2 );
+	}
+
 	// draw console clock (fx3)
 	if ( con_clock->integer ) {
 		Com_RealTime( &qt );
@@ -1171,7 +1221,11 @@ static void Con_DrawSolidConsole( float frac ) {
 			time = va( "%02i:%02i:%02i", qt.tm_hour, qt.tm_min, qt.tm_sec );
 		}
 
-		SCR_DrawSmallStringExt( cls.glconfig.vidWidth - ( strlen( time ) ) * smallchar_width - 8, 2, time, g_color_table[1], qfalse, qtrue);
+		if ( con_fps->integer ) {
+			SCR_DrawSmallStringExt( cls.glconfig.vidWidth - ( strlen( time ) ) * smallchar_width - 8, smallchar_height + 6, time, g_color_table[1], qfalse, qtrue);
+		} else {
+			SCR_DrawSmallStringExt( cls.glconfig.vidWidth - ( strlen( time ) ) * smallchar_width - 8, 2, time, g_color_table[1], qfalse, qtrue);
+		}
 	}
 
 	// draw console tabs (fX3)
