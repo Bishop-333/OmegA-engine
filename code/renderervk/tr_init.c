@@ -1588,7 +1588,7 @@ static void R_Register( void )
 	r_dynamiclight = ri.Cvar_Get( "r_dynamiclight", "1", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_dynamiclight, "Enables dynamic lighting." );
 #ifdef USE_PMLIGHT
-#if arm32 || arm64 && !MACOS_X // RPi4 Vulkan driver have very poor GLSL shaders performance...
+#if arm32 || arm64 && !__APPLE__ // RPi4 Vulkan driver have very poor GLSL shaders performance...
 	r_dlightMode = ri.Cvar_Get( "r_dlightMode", "0", CVAR_ARCHIVE );
 #else
 	r_dlightMode = ri.Cvar_Get( "r_dlightMode", "1", CVAR_ARCHIVE );
@@ -1798,7 +1798,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription(r_bloom, "Enables bloom post-processing effect. Requires \\r_fbo 1.");
 
 	r_ext_multisample = ri.Cvar_Get( "r_ext_multisample", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
-#ifdef MACOS_X
+#ifdef __APPLE__
 	ri.Cvar_CheckRange( r_ext_multisample, "0", "16", CV_INTEGER );
 #else
 	ri.Cvar_CheckRange( r_ext_multisample, "0", "64", CV_INTEGER );

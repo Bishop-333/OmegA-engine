@@ -267,7 +267,7 @@ ifneq ($(call bin_path, $(PKG_CONFIG)),)
   endif
   ifeq ($(USE_OPENAL),1)
     OPENAL_INCLUDE ?= $(shell $(PKG_CONFIG) --silence-errors --cflags-only-I openal)
-    OPENAL_LIBS ?= $(shell $(PKG_CONFIG) --silence-errors --libs openal)-lvorbisfile)
+    OPENAL_LIBS ?= $(shell $(PKG_CONFIG) --silence-errors --libs openal)
   endif
 else
   # assume they're in the system default paths (no -I or -L needed)
@@ -523,8 +523,6 @@ ifeq ($(COMPILE_PLATFORM),darwin)
   BASE_CFLAGS += -Wall -Wimplicit -Wstrict-prototypes -pipe
 
   BASE_CFLAGS += -Wno-unused-result
-
-  BASE_CFLAGS += -DMACOS_X
 
   OPTIMIZE = -O2 -fvisibility=hidden
 

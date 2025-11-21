@@ -3964,7 +3964,7 @@ void CL_Init( void ) {
 	cl_conColor = Cvar_Get( "cl_conColor", "0 0 0 204", 0 );
 	Cvar_SetDescription( cl_conColor, "Console background color, set as R G B A values from 0-255, use with \\seta to save in config." );
 
-#ifdef MACOS_X
+#ifdef __APPLE__
 	// In game video is REALLY slow in Mac OS X right now due to driver slowness
 	cl_inGameVideo = Cvar_Get( "r_inGameVideo", "0", CVAR_ARCHIVE_ND );
 #else
@@ -4015,10 +4015,10 @@ void CL_Init( void ) {
 	Cvar_SetDescription( r_displaywidth, "Width currently displayed to your screen." );
 	r_displayheight = Cvar_Get( "r_displayheight", "0", CVAR_PROTECTED );
 	Cvar_SetDescription( r_displayheight, "Height currently displayed to your screen." );
-        fwd_use = Cvar_Get( "fwd_use", "0", CVAR_ARCHIVE );
+    fwd_use = Cvar_Get( "fwd_use", "0", CVAR_ARCHIVE );
 	Cvar_CheckRange( fwd_use, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( fwd_use, "QWFWD proxy support from fX3." );
-        fwd_addr = Cvar_Get( "fwd_addr", "", CVAR_ARCHIVE );
+    fwd_addr = Cvar_Get( "fwd_addr", "", CVAR_ARCHIVE );
 	Cvar_SetDescription( fwd_addr, "The IP address of the proxy you wish to connect to." );
 
 	// userinfo
