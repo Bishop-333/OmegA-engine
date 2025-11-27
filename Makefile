@@ -880,6 +880,7 @@ Q3REND1OBJ = \
   $(B)/rend1/tr_image_bmp.o \
   $(B)/rend1/tr_image_tga.o \
   $(B)/rend1/tr_image_pcx.o \
+  $(B)/rend1/tr_image_pvr.o \
   $(B)/rend1/tr_init.o \
   $(B)/rend1/tr_light.o \
   $(B)/rend1/tr_main.o \
@@ -918,6 +919,7 @@ Q3RENDVOBJ = \
   $(B)/rendv/tr_image_bmp.o \
   $(B)/rendv/tr_image_tga.o \
   $(B)/rendv/tr_image_pcx.o \
+  $(B)/rendv/tr_image_pvr.o \
   $(B)/rendv/tr_init.o \
   $(B)/rendv/tr_light.o \
   $(B)/rendv/tr_main.o \
