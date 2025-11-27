@@ -806,7 +806,7 @@ void SV_Init( void )
 	sv_filter = Cvar_Get( "sv_filter", "filter.txt", CVAR_ARCHIVE );
 	Cvar_SetDescription( sv_filter, "Cvar that point on filter file, if it is "" then filtering will be disabled." );
 
-	sv_antiWallhack = Cvar_Get( "sv_antiWallhack", "0", CVAR_ARCHIVE );
+	sv_antiWallhack = Cvar_Get( "sv_antiWallhack", "0", CVAR_SYSTEMINFO );
 	Cvar_SetDescription( sv_antiWallhack, "Enable server-side wallhack protection\n 0 - disabled\n 1 - players only\n 2 - all" );
 
 	// initialize bot cvars so they are listed and can be set before loading the botlib
