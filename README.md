@@ -1,6 +1,14 @@
-# OmegA-engine
+<p align="center">
+  <img src="code/unix/quake3.png" alt="OmegA Logo">
+</p>
 
+# OmegA-engine
 [![build](../../workflows/build/badge.svg)](../../actions?query=workflow%3Abuild)
+![License](https://img.shields.io/badge/License-GPLv2-blue.svg)
+&nbsp;&nbsp;&nbsp;
+![Linux](https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black)
+![Windows](https://img.shields.io/badge/Windows-0078D6?&logo=windows&logoColor=white)
+![macOS](https://img.shields.io/badge/mac%20os-000000?&logo=apple&logoColor=F0F0F0)
 
 This is a modern OpenArena engine aimed to be fast, secure and compatible with all existing OA mods.
 It is based on [quake3e](https://github.com/ec-/Quake3e) with latest upstream fixes applied.
@@ -86,3 +94,4 @@ Performance is usually greater or equal to other opengl1 renderers
 
 I develop during my free time, if you enjoyed my engine/fork or my mod please consider supporting me by donating !
 * paypal.me/fatsakura
+
