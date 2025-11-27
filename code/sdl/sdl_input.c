@@ -1165,7 +1165,7 @@ void HandleEvents( void )
 						Com_QueueEvent( in_eventTime, SE_CHAR, key, 0, 0, NULL );
 					else if( keys[K_CTRL].down && key >= 'a' && key <= 'z' )
 						Com_QueueEvent( in_eventTime, SE_CHAR, CTRL(key), 0, 0, NULL );
-#ifdef MACOS_X
+#ifdef __APPLE__
 					else if( keys[K_COMMAND].down && key == 'v' )
 						Com_QueueEvent( in_eventTime, SE_CHAR, CTRL(key), 0, 0, NULL );
 #endif

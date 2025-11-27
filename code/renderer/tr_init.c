@@ -1562,7 +1562,7 @@ static void R_Register( void )
 	r_dynamiclight = ri.Cvar_Get( "r_dynamiclight", "1", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_dynamiclight, "Enables dynamic lighting." );
 #ifdef USE_PMLIGHT
-#if arm32 || arm64 && !MACOS_X // RPi4 GL driver have very poor ARB shaders performance...
+#if arm32 || arm64 && !__APPLE__ // RPi4 GL driver have very poor ARB shaders performance...
 	r_dlightMode = ri.Cvar_Get( "r_dlightMode", "0", CVAR_ARCHIVE );
 #else
 	r_dlightMode = ri.Cvar_Get( "r_dlightMode", "1", CVAR_ARCHIVE );
@@ -1589,7 +1589,7 @@ static void R_Register( void )
 
 #ifdef USE_FBO
 	r_ext_multisample = ri.Cvar_Get( "r_ext_multisample", "0", CVAR_ARCHIVE_ND );
-#ifdef MACOS_X
+#ifdef __APPLE__
 	ri.Cvar_CheckRange( r_ext_multisample, "0", "4", CV_INTEGER );
 #else
 	ri.Cvar_CheckRange( r_ext_multisample, "0", "8", CV_INTEGER );

@@ -216,7 +216,7 @@ typedef struct {
 
 #if defined(_WIN32)
 #define OPENGL_DRIVER_NAME	"opengl32"
-#elif defined(MACOS_X)
+#elif defined(__APPLE__)
 #define OPENGL_DRIVER_NAME	"/System/Library/Frameworks/OpenGL.framework/Libraries/libGL.dylib"
 #else
 #define OPENGL_DRIVER_NAME	"libGL.so.1"

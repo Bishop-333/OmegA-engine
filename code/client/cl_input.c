@@ -1015,7 +1015,7 @@ void CL_InitInput( void ) {
 	Cvar_SetDescription( m_forward, "Set the back and forth movement distance of the player in relation to how much the mouse moves." );
 	m_side = Cvar_Get( "m_side", "0.25", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( m_side, "Set the strafe movement distance of the player in relation to how much the mouse moves." );
-#ifdef MACOS_X
+#ifdef __APPLE__
 	// Input is jittery on OS X w/o this
 	m_filter = Cvar_Get( "m_filter", "1", CVAR_ARCHIVE_ND );
 #else
