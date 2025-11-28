@@ -418,23 +418,41 @@ static void SV_AddEntitiesVisibleFromPoint( const vec3_t origin, clientSnapshot_
 			}
 		}
 
-		// wallhack protection from SourceTech
+		// wallhack protection (SourceTech)
 		if ( sv_antiWallhack->integer ) {
 			trace_t trace;
-			vec3_t corners;
+			vec3_t corners, shift, viewpoint;
 			qboolean visible = qfalse;
-			int i;
+			int i, pass;
+			float delta = 0.25f;
 
-			for ( i = 0; i < 8; i++ ) {
-				corners[0] = ent->r.currentOrigin[0] + ((i & 1) ? ent->r.maxs[0] : ent->r.mins[0]);
-				corners[1] = ent->r.currentOrigin[1] + ((i & 2) ? ent->r.maxs[1] : ent->r.mins[1]);
-				corners[2] = ent->r.currentOrigin[2] + ((i & 4) ? ent->r.maxs[2] : ent->r.mins[2]);
-
-				SV_Trace( &trace, origin, NULL, NULL, corners, frame->ps.clientNum, CONTENTS_SOLID, qfalse );
-
-				if ( trace.fraction == 1.0f || trace.entityNum == ent->s.number || (trace.contents & CONTENTS_TRANSLUCENT) ) {
-					visible = qtrue;
+			for ( pass = 0; pass < 2; pass++ ) {
+				if ( visible ) {
 					break;
+				}
+				if ( pass == 0 ) {
+					VectorCopy( origin, viewpoint );
+					VectorClear( shift );
+				} else {
+					VectorMA( origin, delta, frame->ps.velocity, viewpoint );
+					if ( ent->s.pos.trType != TR_STATIONARY ) {
+						VectorScale( ent->s.pos.trDelta, delta, shift );
+					} else {
+						VectorClear( shift );
+					}
+				}
+
+				for ( i = 0; i < 8; i++ ) {
+					corners[0] = ent->r.currentOrigin[0] + shift[0] + ((i & 1) ? ent->r.maxs[0] : ent->r.mins[0]);
+					corners[1] = ent->r.currentOrigin[1] + shift[1] + ((i & 2) ? ent->r.maxs[1] : ent->r.mins[1]);
+					corners[2] = ent->r.currentOrigin[2] + shift[2] + ((i & 4) ? ent->r.maxs[2] : ent->r.mins[2]);
+
+					SV_Trace( &trace, viewpoint, NULL, NULL, corners, frame->ps.clientNum, CONTENTS_SOLID, qfalse );
+
+					if ( trace.fraction == 1.0f || trace.entityNum == ent->s.number || (trace.contents & CONTENTS_TRANSLUCENT) ) {
+						visible = qtrue;
+						break;
+					}
 				}
 			}
 			if ( sv_antiWallhack->integer == 1 ) {
