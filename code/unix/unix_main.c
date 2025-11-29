@@ -41,6 +41,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include <dlfcn.h>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
+
 #ifdef __linux__
 #ifdef __GLIBC__
   #include <fpu_control.h> // bk001213 - force dumps on divide by zero
@@ -986,6 +990,27 @@ static int Sys_ParseArgs( int argc, const char* argv[] )
 #	endif
 #endif
 
+void Sys_Frame(void)
+{
+#ifdef DEDICATED
+	// init here for dedicated, as we don't have GLimp_Init
+	InitSig();
+#endif
+
+#ifdef __linux__
+	Sys_ConfigureFPU();
+#endif
+
+#ifdef DEDICATED
+	// run the game
+	Com_Frame( qfalse );
+#else
+	// check for other input devices
+	IN_Frame();
+	// run the game
+	Com_Frame( CL_NoDelay() );
+#endif
+}
 
 int main( int argc, const char* argv[] )
 {
@@ -1060,22 +1085,15 @@ int main( int argc, const char* argv[] )
 	InitSig();
 #endif
 
+#ifdef __EMSCRIPTEN__
+    // Le navigateur prend le contrôle et appelle Sys_Frame en boucle
+    emscripten_set_main_loop(Sys_Frame, 0, 1);
+#else
 	while (1)
 	{
-#ifdef __linux__
-		Sys_ConfigureFPU();
-#endif
-
-#ifdef DEDICATED
-		// run the game
-		Com_Frame( qfalse );
-#else
-		// check for other input devices
-		IN_Frame();
-		// run the game
-		Com_Frame( CL_NoDelay() );
-#endif
+		Sys_Frame();
 	}
+#endif
 	// never gets here
 	return 0;
 }

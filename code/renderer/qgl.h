@@ -38,8 +38,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <windows.h>
 #include <GL/gl.h>
 #elif defined( __linux__ ) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined( __sun )
-#include <GL/gl.h>
-#include <GL/glx.h>
+#ifdef __EMSCRIPTEN__
+#include <GLES3/gl3.h>
+#else
+#endif
 #elif defined(__APPLE__)
 #include <OpenGL/gl.h>
 #endif
@@ -274,13 +276,17 @@ typedef char GLchar;
 	GLE( int,	glXSwapIntervalSGI, int interval )
 #endif
 
-#define QGL_LinX11_PROCS \
-	GLE( XVisualInfo*, glXChooseVisual, Display *dpy, int screen, int *attribList ) \
-	GLE( GLXContext, glXCreateContext, Display *dpy, XVisualInfo *vis, GLXContext shareList, Bool direct ) \
-	GLE( void, glXDestroyContext, Display *dpy, GLXContext ctx ) \
-	GLE( Bool, glXMakeCurrent, Display *dpy, GLXDrawable drawable, GLXContext ctx) \
-	GLE( void, glXCopyContext, Display *dpy, GLXContext src, GLXContext dst, GLuint mask ) \
-	GLE( void, glXSwapBuffers, Display *dpy, GLXDrawable drawable )
+#ifdef __EMSCRIPTEN__
+  #define QGL_LinX11_PROCS
+#else
+	#define QGL_LinX11_PROCS \
+		GLE( XVisualInfo*, glXChooseVisual, Display *dpy, int screen, int *attribList ) \
+		GLE( GLXContext, glXCreateContext, Display *dpy, XVisualInfo *vis, GLXContext shareList, Bool direct ) \
+		GLE( void, glXDestroyContext, Display *dpy, GLXContext ctx ) \
+		GLE( Bool, glXMakeCurrent, Display *dpy, GLXDrawable drawable, GLXContext ctx) \
+		GLE( void, glXCopyContext, Display *dpy, GLXContext src, GLXContext dst, GLuint mask ) \
+		GLE( void, glXSwapBuffers, Display *dpy, GLXDrawable drawable )
+#endif
 
 #ifndef __APPLE__
 

@@ -544,7 +544,13 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 		if ( !vulkan )
 #endif
 		{
-	
+
+#ifdef __EMSCRIPTEN__
+            SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+            SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+            SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+#endif
+
 #ifdef __sgi /* Fix for SGIs grabbing too many bits of color */
 			if (perChannelColorBits == 4)
 				perChannelColorBits = 0; /* Use minimum size for 16-bit color */

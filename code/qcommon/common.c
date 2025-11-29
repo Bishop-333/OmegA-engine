@@ -3893,7 +3893,14 @@ void Com_Init( char *commandLine ) {
 	// init commands and vars
 	//
 #ifndef DEDICATED
+#ifdef __EMSCRIPTEN__
+	// Under Emscripten the browser handles throttling the frame rate.
+	// Manual framerate throttling interacts poorly with Emscripten's
+	// browser-driven event loop. So default throttling to off.
+	com_maxfps = Cvar_Get( "com_maxfps", "0", 0 );
+#else
 	com_maxfps = Cvar_Get( "com_maxfps", "125", 0 ); // try to force that in some light way
+#endif
 	Cvar_CheckRange( com_maxfps, "0", "1000", CV_INTEGER );
 	Cvar_SetDescription( com_maxfps, "Sets maximum frames per second." );
 	com_maxfpsUnfocused = Cvar_Get( "com_maxfpsUnfocused", "60", CVAR_ARCHIVE_ND );

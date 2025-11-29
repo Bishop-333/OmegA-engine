@@ -93,6 +93,11 @@ ifeq ($(COMPILE_PLATFORM),cygwin)
   PLATFORM=mingw32
 endif
 
+# detect "emmake make"
+ifeq ($(findstring /emcc,$(CC)),/emcc)
+  PLATFORM=emscripten
+endif
+
 ifndef PLATFORM
 PLATFORM=$(COMPILE_PLATFORM)
 endif
@@ -578,6 +583,68 @@ ifeq ($(COMPILE_PLATFORM),darwin)
 
 else
 
+ifeq ($(PLATFORM),emscripten)
+
+#############################################################################
+# SETUP AND BUILD -- emscripten
+#############################################################################
+
+  ifneq ($(findstring /emcc,$(CC)),/emcc)
+    CC=emcc
+  endif
+  ARCH=wasm32
+  BINEXT=.js
+
+  # dlopen(), opengl1, and networking are not functional
+  USE_RENDERER_DLOPEN=0
+  USE_OPENAL_DLOPEN=0
+  BUILD_GAME_SO=0
+  BUILD_RENDERER_OPENGL1=0
+  BUILD_SERVER=0
+  USE_HTTP=0
+
+  CLIENT_CFLAGS+=-s USE_SDL=2
+
+  CLIENT_LDFLAGS+=-s TOTAL_MEMORY=256MB
+  CLIENT_LDFLAGS+=-s STACK_SIZE=5MB
+  CLIENT_LDFLAGS+=-s MIN_WEBGL_VERSION=1 -s MAX_WEBGL_VERSION=2
+
+  # The HTML file can use these functions to load extra files before the game starts.
+  CLIENT_LDFLAGS+=-s EXPORTED_RUNTIME_METHODS=FS,addRunDependency,removeRunDependency
+  CLIENT_LDFLAGS+=-s EXIT_RUNTIME=1
+  CLIENT_LDFLAGS+=-s EXPORT_ES6
+  CLIENT_LDFLAGS+=-s EXPORT_NAME=ioquake3
+
+  # Game data files can be packaged by emcc into a .data file that lives next to the wasm bundle
+  # and added to the virtual filesystem before the game starts. This requires the game data to be
+  # present at build time and it can't be changed afterward.
+  # For more flexibility, game data files can be loaded from a web server at runtime by listing
+  # them in client-config.json. This way they don't have to be present at build time and can be
+  # changed later.
+  ifeq ($(EMSCRIPTEN_PRELOAD_FILE),1)
+    ifeq ($(wildcard $(BASEGAME)/*),)
+      $(error "No files in '$(BASEGAME)' directory for emscripten to preload.")
+    endif
+    CLIENT_LDFLAGS+=--preload-file $(BASEGAME)
+  endif
+
+  OPTIMIZEVM = -O3
+  OPTIMIZE = $(OPTIMIZEVM) -ffast-math
+
+  # These allow a warning-free build.
+  # Some of these warnings may actually be legit problems and should be fixed at some point.
+  BASE_CFLAGS+=-Wno-deprecated-non-prototype -Wno-dangling-else -Wno-implicit-const-int-float-conversion -Wno-misleading-indentation -Wno-format-overflow -Wno-logical-not-parentheses -Wno-absolute-value
+
+  DEBUG_CFLAGS=-g3 -O0 # -fsanitize=address -fsanitize=undefined
+  # Emscripten needs debug compiler flags to be passed to the linker as well
+  DEBUG_LDFLAGS=$(DEBUG_CFLAGS)
+
+  SHLIBEXT=wasm
+  SHLIBCFLAGS=-fPIC
+  SHLIBLDFLAGS=-s SIDE_MODULE
+
+else
+
 #############################################################################
 # SETUP AND BUILD -- *NIX PLATFORMS
 #############################################################################
@@ -651,6 +718,8 @@ else
 endif # *NIX platforms
 
 endif # !MINGW
+endif # emscripten
+
 
 
 TARGET_CLIENT = $(CNAME)$(ARCHEXT)$(BINEXT)
