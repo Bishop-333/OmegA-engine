@@ -517,7 +517,7 @@ ifdef MINGW
   DEBUG_CFLAGS = $(BASE_CFLAGS) -DDEBUG -D_DEBUG -g -O0
   RELEASE_CFLAGS = $(BASE_CFLAGS) -DNDEBUG $(OPTIMIZE)
 
-else # !MINGW
+else # darwin
 
 ifeq ($(COMPILE_PLATFORM),darwin)
 
@@ -581,7 +581,7 @@ ifeq ($(COMPILE_PLATFORM),darwin)
   DEBUG_CFLAGS = $(BASE_CFLAGS) -DDEBUG -D_DEBUG -g -O0
   RELEASE_CFLAGS = $(BASE_CFLAGS) -DNDEBUG $(OPTIMIZE)
 
-else
+else # emscripten
 
 ifeq ($(PLATFORM),emscripten)
 
@@ -643,7 +643,7 @@ ifeq ($(PLATFORM),emscripten)
   SHLIBCFLAGS=-fPIC
   SHLIBLDFLAGS=-s SIDE_MODULE
 
-else
+else # *NIX platforms
 
 #############################################################################
 # SETUP AND BUILD -- *NIX PLATFORMS
@@ -717,7 +717,7 @@ else
 
 endif # *NIX platforms
 endif # emscripten
-endif # !MINGW
+endif # darwin
 
 
 
