@@ -716,9 +716,8 @@ else
   DEBUG_LDFLAGS = -rdynamic
 
 endif # *NIX platforms
-
-endif # !MINGW
 endif # emscripten
+endif # !MINGW
 
 
 
