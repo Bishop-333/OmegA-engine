@@ -1286,6 +1286,9 @@ qboolean CL_Disconnect( qboolean showMainMenu ) {
 	// allow cheats locally
 	Cvar_Set( "sv_cheats", "1" );
 
+	// force unpause after disconnect
+	Cvar_Set( "cl_paused", "0" );
+
 	// not connected to a pure server anymore
 	cl_connectedToPureServer = 0;
 
