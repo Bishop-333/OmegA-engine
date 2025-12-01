@@ -3806,7 +3806,8 @@ static void CL_InitGLimp_Cvars( void )
 	// shared with GLimp
 	r_allowSoftwareGL = Cvar_Get( "r_allowSoftwareGL", "0", CVAR_LATCH );
 	Cvar_SetDescription( r_allowSoftwareGL, "Toggle the use of the default software OpenGL driver supplied by the Operating System." );
-	r_allowResize = Cvar_Get( "r_allowResize", "0", CVAR_LATCH );
+	r_allowResize = Cvar_Get( "r_allowResize", "1", CVAR_LATCH );
+	Cvar_SetDescription( r_allowResize, "Setting to 1 will allow window to be resized in windowed mode." );
 	r_swapInterval = Cvar_Get( "r_swapInterval", "0", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( r_swapInterval, "V-blanks to wait before swapping buffers.\n 0: No V-Sync\n 1: Synced to the monitor's refresh rate." );
 	r_glDriver = Cvar_Get( "r_glDriver", OPENGL_DRIVER_NAME, CVAR_ARCHIVE_ND | CVAR_LATCH );
