@@ -399,10 +399,11 @@ typedef enum {
 	VM_COUNT
 } vmIndex_t;
 
-// we don't need more than 4 arguments (counting callnum) for vmMain, at least in Vanilla Quake3
-#define MAX_VMMAIN_CALL_ARGS 4
+// Max number of arguments to pass from engine to vm's vmMain function.
+// command number + 12 arguments
+#define MAX_VMMAIN_CALL_ARGS 13
 
-typedef intptr_t (QDECL *vmMainFunc_t)( int command, int arg0, int arg1, int arg2 );
+typedef intptr_t (QDECL *vmMainFunc_t)( int command, int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7, int arg8, int arg9, int arg10, int arg11 );
 
 typedef intptr_t (*syscall_t)( intptr_t *parms );
 typedef intptr_t (QDECL *dllSyscall_t)( intptr_t callNum, ... );
