@@ -1345,7 +1345,7 @@ void Con_RunConsole( void )
 	for ( i = 0; i < MAX_CONSOLES; i++ ){
 		// decide on the destination height of the console
 		if ( Key_GetCatcher( ) & KEYCATCH_CONSOLE )
-			con[i].finalFrac = 0.5;
+			con[i].finalFrac = cl_consoleHeight->value;
 		else
 			con[i].finalFrac = 0.0;	// none visible
 	
