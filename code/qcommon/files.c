@@ -5685,6 +5685,7 @@ void *FS_LoadLibrary( const char *name, qboolean useSystemLib )
 {
 	const searchpath_t *sp = fs_searchpaths;
 	void *libHandle = NULL;
+	char *fn;
 
 	if(useSystemLib)
 	{
@@ -5712,8 +5713,14 @@ void *FS_LoadLibrary( const char *name, qboolean useSystemLib )
 			sp = sp->next;
 		}
 		if ( sp ) {
-			const char *fn = FS_BuildOSPath( sp->dir->path, name, NULL );
+			fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, name );
 			libHandle = Sys_LoadLibrary( fn );
+
+			if ( !libHandle ) {
+				fn = FS_BuildOSPath( sp->dir->path, name, NULL );
+				libHandle = Sys_LoadLibrary( fn );
+			}
+			
 			sp = sp->next;
 		}
 	}
