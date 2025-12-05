@@ -1231,7 +1231,7 @@ fileHandle_t FS_FOpenFileWrite( const char *filename ) {
 		return FS_INVALID_HANDLE;
 	}
 
-	if ( !fs_mod_settings->integer && !strcmp( filename, Q3CONFIG_CFG ) ) {
+	if ( !fs_mod_settings->integer && !Q_stricmp( fs_gamedirvar->string, DEFAULT_GAME ) && !Q_stricmp( filename, Q3CONFIG_CFG ) ) {
 		mod_dir = fs_basegame->string;
 	} else {
 		mod_dir = FS_GetCurrentGameDir();
@@ -1629,7 +1629,7 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 	if ( file == NULL ) {
 		// just wants to see if file is there
 		for ( search = fs_searchpaths ; search ; search = search->next ) {
-			if ( !fs_mod_settings->integer && !strcmp( filename, Q3CONFIG_CFG ) ) {
+			if ( !fs_mod_settings->integer && !Q_stricmp( fs_gamedirvar->string, DEFAULT_GAME ) && !Q_stricmp( filename, Q3CONFIG_CFG ) ) {
 				if ( search->pack && !FS_IsBaseGame( search->pack->pakGamename ) ) {
 					continue;
 				} else if ( search->dir && !FS_IsBaseGame( search->dir->gamedir ) ) {
@@ -4762,10 +4762,10 @@ static void FS_Startup( void ) {
 		"Exclude specified pak files from download list on client side.\n"
 		"Format is <moddir>/<pakname> (without .pk3 suffix), you may list multiple entries separated by space." );
 	
-	fs_mod_settings = Cvar_Get( "fs_mod_settings", "1", CVAR_INIT );
+	fs_mod_settings = Cvar_Get( "fs_mod_settings", "0", CVAR_INIT );
 	Cvar_CheckRange( fs_mod_settings, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( fs_mod_settings, "Set file handle policy for q3config.cfg files:\n"
-		" 0 - All settings are loaded and saved in the q3config.cfg in "BASEGAME", regardless of the current mod.\n"
+		" 0 - All settings are loaded and saved in the q3config.cfg in "BASEGAME", only for "DEFAULT_GAME".\n"
 		" 1 - Existing behavior, with separately stored settings for each mod.\n" );
 
 	start = Sys_Milliseconds();
