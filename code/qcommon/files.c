@@ -300,6 +300,8 @@ static	cvar_t		*fs_locked;
 #endif
 static	cvar_t		*fs_excludeReference;
 
+static	cvar_t		*fs_mod_settings;
+
 static	searchpath_t	*fs_searchpaths;
 static	int			fs_readCount;			// total bytes read
 static	int			fs_loadCount;			// total files read
@@ -1219,6 +1221,7 @@ fileHandle_t FS_FOpenFileWrite( const char *filename ) {
 	char			*ospath;
 	fileHandle_t	f;
 	fileHandleData_t *fd;
+	const char		*mod_dir;
 
 	if ( !fs_searchpaths ) {
 		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
@@ -1228,7 +1231,13 @@ fileHandle_t FS_FOpenFileWrite( const char *filename ) {
 		return FS_INVALID_HANDLE;
 	}
 
-	ospath = FS_BuildOSPath( fs_homepath->string, fs_gamedir, filename );
+	if ( !fs_mod_settings->integer && !strcmp( filename, Q3CONFIG_CFG ) ) {
+		mod_dir = fs_basegame->string;
+	} else {
+		mod_dir = FS_GetCurrentGameDir();
+	}
+
+	ospath = FS_BuildOSPath( fs_homepath->string, mod_dir, filename );
 
 	if ( fs_debug->integer ) {
 		Com_Printf( "FS_FOpenFileWrite: %s\n", ospath );
@@ -1544,6 +1553,29 @@ static int FS_OpenFileInPak( fileHandle_t *file, pack_t *pak, fileInPack_t *pakF
 
 
 /*
+================
+FS_IsBaseGame
+================
+*/
+static qboolean FS_IsBaseGame( const char *game )
+{
+	int i;
+
+	if ( game == NULL || *game == '\0' ) {
+		return qtrue;
+	}
+
+	for ( i = 0; i < basegame_cnt; i++ ) {
+		if ( Q_stricmp( basegames[i], game ) == 0 ) {
+			return qtrue;
+		}
+	}
+
+	return qfalse;
+}
+
+
+/*
 ===========
 FS_FOpenFileRead
 
@@ -1597,6 +1629,13 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 	if ( file == NULL ) {
 		// just wants to see if file is there
 		for ( search = fs_searchpaths ; search ; search = search->next ) {
+			if ( !fs_mod_settings->integer && !strcmp( filename, Q3CONFIG_CFG ) ) {
+				if ( search->pack && !FS_IsBaseGame( search->pack->pakGamename ) ) {
+					continue;
+				} else if ( search->dir && !FS_IsBaseGame( search->dir->gamedir ) ) {
+					continue;
+				}
+			}
 			// is the element a pak file?
 			if ( search->pack && search->pack->hashTable[ (hash = fullHash & (search->pack->hashSize-1)) ] ) {
 				// skip non-pure files
@@ -1638,6 +1677,13 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 	// search through the path, one element at a time
 	//
 	for ( search = fs_searchpaths ; search ; search = search->next ) {
+		if ( !fs_mod_settings->integer && !strcmp( filename, Q3CONFIG_CFG ) ) {
+			if ( search->pack && !FS_IsBaseGame( search->pack->pakGamename ) ) {
+				continue;
+			} else if ( search->dir && !FS_IsBaseGame( search->dir->gamedir ) ) {
+				continue;
+			}
+		}
 		// is the element a pak file?
 		if ( search->pack && search->pack->hashTable[ (hash = fullHash & (search->pack->hashSize-1)) ] ) {
 			// disregard if it doesn't match one of the allowed pure pak files
@@ -3650,29 +3696,6 @@ static void FS_GetModDescription( const char *modDir, char *description, int des
 
 
 /*
-================
-FS_IsBaseGame
-================
-*/
-static qboolean FS_IsBaseGame( const char *game )
-{
-	int i;
-
-	if ( game == NULL || *game == '\0' ) {
-		return qtrue;
-	}
-
-	for ( i = 0; i < basegame_cnt; i++ ) {
-		if ( Q_stricmp( basegames[i], game ) == 0 ) {
-			return qtrue;
-		}
-	}
-
-	return qfalse;
-}
-
-
-/*
 ===========
 FS_PathCmp
 
@@ -4738,6 +4761,12 @@ static void FS_Startup( void ) {
 	Cvar_SetDescription( fs_excludeReference,
 		"Exclude specified pak files from download list on client side.\n"
 		"Format is <moddir>/<pakname> (without .pk3 suffix), you may list multiple entries separated by space." );
+	
+	fs_mod_settings = Cvar_Get( "fs_mod_settings", "1", CVAR_INIT );
+	Cvar_CheckRange( fs_mod_settings, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( fs_mod_settings, "Set file handle policy for q3config.cfg files:\n"
+		" 0 - All settings are loaded and saved in the q3config.cfg in "BASEGAME", regardless of the current mod.\n"
+		" 1 - Existing behavior, with separately stored settings for each mod.\n" );
 
 	start = Sys_Milliseconds();
 
@@ -4835,6 +4864,7 @@ static void FS_Startup( void ) {
 	Com_Printf( "%d files in %d pk3 files\n", fs_packFiles, fs_packCount );
 
 	fs_gamedirvar->modified = qfalse; // We just loaded, it's not modified
+	fs_mod_settings->modified = qfalse;
 
 #ifdef FS_MISSING
 	if (missingFiles == NULL) {
@@ -5370,6 +5400,11 @@ restart if necessary
 qboolean FS_ConditionalRestart( int checksumFeed, qboolean clientRestart )
 {
 	if ( fs_gamedirvar->modified )
+	{
+		Com_GameRestart( checksumFeed, clientRestart );
+		return qtrue;
+	}
+	else if ( fs_mod_settings->modified )
 	{
 		Com_GameRestart( checksumFeed, clientRestart );
 		return qtrue;
