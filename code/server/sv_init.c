@@ -737,8 +737,8 @@ void SV_Init( void )
 	Cvar_SetDescription( sv_minRate, "Minimum server bandwidth (in bit per second) a client can use." );
 	sv_maxRate = Cvar_Get( "sv_maxRate", "0", CVAR_ARCHIVE_ND | CVAR_SERVERINFO );
 	Cvar_SetDescription( sv_maxRate, "Maximum server bandwidth (in bit per second) a client can use." );
-	sv_dlRate = Cvar_Get( "sv_dlRate", "100", CVAR_ARCHIVE | CVAR_SERVERINFO );
-	Cvar_CheckRange( sv_dlRate, "0", "500", CV_INTEGER );
+	sv_dlRate = Cvar_Get( "sv_dlRate", "500", CVAR_ARCHIVE | CVAR_SERVERINFO );
+	Cvar_CheckRange( sv_dlRate, "0", "1000", CV_INTEGER );
 	Cvar_SetDescription( sv_dlRate, "Bandwidth allotted to PK3 file downloads via UDP, in kbyte/s." );
 	sv_floodProtect = Cvar_Get( "sv_floodProtect", "1", CVAR_ARCHIVE | CVAR_SERVERINFO );
 	Cvar_SetDescription( sv_floodProtect, "Toggle server flood protection to keep players from bringing the server down." );
