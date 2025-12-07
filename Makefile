@@ -43,7 +43,7 @@ USE_VULKAN       = 1
 USE_OPENGL       = 1
 USE_OPENGL_API   = 1
 USE_VULKAN_API   = 1
-USE_RENDERER_DLOPEN = 0
+USE_RENDERER_DLOPEN = 1
 
 # valid options: omega, ratmod, aftershock or null (no mod)
 MOD_DEFAULT      = omega
@@ -519,6 +519,8 @@ ifeq ($(COMPILE_PLATFORM),darwin)
 #############################################################################
 # SETUP AND BUILD -- MACOS
 #############################################################################
+
+  USE_RENDERER_DLOPEN = 0
 
   BASE_CFLAGS += -Wall -Wimplicit -Wstrict-prototypes -pipe
 

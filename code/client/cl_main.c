@@ -97,7 +97,7 @@ cvar_t *cl_drawBuffer;
 
 //OmegA
 cvar_t *cl_consoleHeight;
-cvar_t *cl_omegaEngine;
+static cvar_t *cl_omegaEngine;
 cvar_t *fwd_use;
 cvar_t *fwd_addr;
 cvar_t *r_displaywidth;
