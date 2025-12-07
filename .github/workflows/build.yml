@@ -53,9 +53,7 @@ jobs:
 
     - name: Build
       run: |
-        make install -j$(nproc) ARCH=${{ matrix.arch }} DESTDIR=bin RENDERER_DEFAULT=vulkan
-        make clean ARCH=${{ matrix.arch }}
-        make install -j$(nproc) ARCH=${{ matrix.arch }} DESTDIR=bin RENDERER_DEFAULT=opengl BUILD_SERVER=1
+        make install -j$(nproc) ARCH=${{ matrix.arch }} DESTDIR=bin BUILD_SERVER=1
 
     - uses: actions/upload-artifact@v4
       with:
@@ -85,9 +83,7 @@ jobs:
 
     - name: Build
       run: |
-        make install -j$(nproc) ARCH=${{ matrix.arch }} DESTDIR=bin RENDERER_DEFAULT=vulkan
-        make clean ARCH=${{ matrix.arch }} 
-        make install -j$(nproc) ARCH=${{ matrix.arch }} DESTDIR=bin RENDERER_DEFAULT=opengl BUILD_SERVER=1
+        make install -j$(nproc) ARCH=${{ matrix.arch }} DESTDIR=bin BUILD_SERVER=1
 
     - uses: actions/upload-artifact@v4
       with:
@@ -118,9 +114,7 @@ jobs:
 
     - name: Build
       run: |
-        make install -j$(nproc) ARCH=${{ matrix.arch }} DESTDIR=bin RENDERER_DEFAULT=vulkan
-        make clean ARCH=${{ matrix.arch }}
-        make install -j$(nproc) ARCH=${{ matrix.arch }} DESTDIR=bin RENDERER_DEFAULT=opengl BUILD_SERVER=1
+        make install -j$(nproc) ARCH=${{ matrix.arch }} DESTDIR=bin BUILD_SERVER=1
 
     - uses: actions/upload-artifact@v4
       with:
