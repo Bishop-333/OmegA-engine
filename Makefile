@@ -241,6 +241,7 @@ JPDIR=$(MOUNT_DIR)/libjpeg
 OGGDIR=$(MOUNT_DIR)/libogg
 VORBISDIR=$(MOUNT_DIR)/libvorbis
 OPENALDIR=$(MOUNT_DIR)/libopenal
+VULKANDIR=$(MOUNT_DIR)/libvulkan
 
 bin_path=$(shell which $(1) 2> /dev/null)
 
@@ -520,8 +521,6 @@ ifeq ($(COMPILE_PLATFORM),darwin)
 # SETUP AND BUILD -- MACOS
 #############################################################################
 
-  USE_RENDERER_DLOPEN = 0
-
   BASE_CFLAGS += -Wall -Wimplicit -Wstrict-prototypes -pipe
 
   BASE_CFLAGS += -Wno-unused-result
@@ -543,6 +542,11 @@ ifeq ($(COMPILE_PLATFORM),darwin)
   ifeq ($(ARCH),arm64)
     BASE_CFLAGS += -arch arm64
     LDFLAGS += -arch arm64
+  endif
+
+  ifeq ($(USE_VULKAN),1)
+    CLIENT_LDFLAGS += $(VULKANDIR)/macosx/libMoltenVK.dylib
+    CLIENT_EXTRA_FILES += $(VULKANDIR)/macosx/libMoltenVK.dylib
   endif
 
   ifeq ($(USE_OPENAL),1)

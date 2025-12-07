@@ -1437,7 +1437,7 @@ static VkFormat get_hdr_format( VkFormat base_format )
 
 	switch ( r_hdr->integer ) {
 		case -1: return VK_FORMAT_B4G4R4A4_UNORM_PACK16;
-		case 1: return VK_FORMAT_R16G16B16A16_UNORM;
+		case 1: return VK_FORMAT_R16G16B16A16_SFLOAT;
 		default: return base_format;
 	}
 }
