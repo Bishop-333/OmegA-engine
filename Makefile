@@ -47,6 +47,7 @@ USE_RENDERER_DLOPEN = 1
 
 # valid options: omega, ratmod, aftershock or null (no mod)
 MOD_DEFAULT      = omega
+QUAKE3           = 0
 
 # valid options: opengl, vulkan
 RENDERER_DEFAULT = opengl

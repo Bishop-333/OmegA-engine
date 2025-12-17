@@ -300,7 +300,9 @@ static	cvar_t		*fs_locked;
 #endif
 static	cvar_t		*fs_excludeReference;
 
+#ifndef QUAKE3
 static	cvar_t		*fs_mod_settings;
+#endif
 
 static	searchpath_t	*fs_searchpaths;
 static	int			fs_readCount;			// total bytes read
@@ -1231,11 +1233,12 @@ fileHandle_t FS_FOpenFileWrite( const char *filename ) {
 		return FS_INVALID_HANDLE;
 	}
 
+#ifndef QUAKE3
 	if ( !fs_mod_settings->integer && !Q_stricmp( fs_gamedirvar->string, DEFAULT_GAME ) && !Q_stricmp( filename, Q3CONFIG_CFG ) ) {
 		mod_dir = fs_basegame->string;
-	} else {
+	} else
+#endif
 		mod_dir = FS_GetCurrentGameDir();
-	}
 
 	ospath = FS_BuildOSPath( fs_homepath->string, mod_dir, filename );
 
@@ -1629,6 +1632,7 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 	if ( file == NULL ) {
 		// just wants to see if file is there
 		for ( search = fs_searchpaths ; search ; search = search->next ) {
+#ifndef QUAKE3
 			if ( !fs_mod_settings->integer && !Q_stricmp( fs_gamedirvar->string, DEFAULT_GAME ) && !Q_stricmp( filename, Q3CONFIG_CFG ) ) {
 				if ( search->pack && !FS_IsBaseGame( search->pack->pakGamename ) ) {
 					continue;
@@ -1636,6 +1640,7 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 					continue;
 				}
 			}
+#endif
 			// is the element a pak file?
 			if ( search->pack && search->pack->hashTable[ (hash = fullHash & (search->pack->hashSize-1)) ] ) {
 				// skip non-pure files
@@ -1677,6 +1682,7 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 	// search through the path, one element at a time
 	//
 	for ( search = fs_searchpaths ; search ; search = search->next ) {
+#ifndef QUAKE3
 		if ( !fs_mod_settings->integer && !strcmp( filename, Q3CONFIG_CFG ) ) {
 			if ( search->pack && !FS_IsBaseGame( search->pack->pakGamename ) ) {
 				continue;
@@ -1684,6 +1690,7 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 				continue;
 			}
 		}
+#endif
 		// is the element a pak file?
 		if ( search->pack && search->pack->hashTable[ (hash = fullHash & (search->pack->hashSize-1)) ] ) {
 			// disregard if it doesn't match one of the allowed pure pak files
@@ -4762,11 +4769,13 @@ static void FS_Startup( void ) {
 		"Exclude specified pak files from download list on client side.\n"
 		"Format is <moddir>/<pakname> (without .pk3 suffix), you may list multiple entries separated by space." );
 	
+#ifndef QUAKE3
 	fs_mod_settings = Cvar_Get( "fs_mod_settings", "0", CVAR_INIT );
 	Cvar_CheckRange( fs_mod_settings, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( fs_mod_settings, "Set file handle policy for q3config.cfg files:\n"
 		" 0 - All settings are loaded and saved in the q3config.cfg in "BASEGAME", only for "DEFAULT_GAME".\n"
 		" 1 - Existing behavior, with separately stored settings for each mod.\n" );
+#endif
 
 	start = Sys_Milliseconds();
 
@@ -4864,7 +4873,9 @@ static void FS_Startup( void ) {
 	Com_Printf( "%d files in %d pk3 files\n", fs_packFiles, fs_packCount );
 
 	fs_gamedirvar->modified = qfalse; // We just loaded, it's not modified
+#ifndef QUAKE3
 	fs_mod_settings->modified = qfalse;
+#endif
 
 #ifdef FS_MISSING
 	if (missingFiles == NULL) {
@@ -5404,11 +5415,13 @@ qboolean FS_ConditionalRestart( int checksumFeed, qboolean clientRestart )
 		Com_GameRestart( checksumFeed, clientRestart );
 		return qtrue;
 	}
+#ifndef QUAKE3
 	else if ( fs_mod_settings->modified )
 	{
 		Com_GameRestart( checksumFeed, clientRestart );
 		return qtrue;
 	}
+#endif
 	else if ( checksumFeed != fs_checksumFeed )
 	{
 		FS_Restart( checksumFeed );
