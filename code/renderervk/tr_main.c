@@ -242,16 +242,16 @@ void R_WorldToLocal( const vec3_t world, vec3_t local ) {
 R_TransformModelToClip
 ==========================
 */
-void R_TransformModelToClip( const vec3_t src, const float *modelMatrix, const float *projectionMatrix,
+void R_TransformModelToClip( const vec3_t src, const float *modelViewMatrix, const float *projectionMatrix,
 							vec4_t eye, vec4_t dst ) {
 	int i;
 
 	for ( i = 0 ; i < 4 ; i++ ) {
 		eye[i] = 
-			src[0] * modelMatrix[ i + 0 * 4 ] +
-			src[1] * modelMatrix[ i + 1 * 4 ] +
-			src[2] * modelMatrix[ i + 2 * 4 ] +
-			1 * modelMatrix[ i + 3 * 4 ];
+			src[0] * modelViewMatrix[ i + 0 * 4 ] +
+			src[1] * modelViewMatrix[ i + 1 * 4 ] +
+			src[2] * modelViewMatrix[ i + 2 * 4 ] +
+			1 * modelViewMatrix[ i + 3 * 4 ];
 	}
 
 	for ( i = 0 ; i < 4 ; i++ ) {
@@ -320,6 +320,21 @@ void myGlMultMatrix( const float *a, const float *b, float *out ) {
 	}
 }
 
+void Matrix16Identity( mat4_t out )
+{
+	out[ 0] = 1.0f; out[ 4] = 0.0f; out[ 8] = 0.0f; out[12] = 0.0f;
+	out[ 1] = 0.0f; out[ 5] = 1.0f; out[ 9] = 0.0f; out[13] = 0.0f;
+	out[ 2] = 0.0f; out[ 6] = 0.0f; out[10] = 1.0f; out[14] = 0.0f;
+	out[ 3] = 0.0f; out[ 7] = 0.0f; out[11] = 0.0f; out[15] = 1.0f;
+}
+
+void Matrix16Copy( const mat4_t in, mat4_t out )
+{
+	out[ 0] = in[ 0]; out[ 4] = in[ 4]; out[ 8] = in[ 8]; out[12] = in[12]; 
+	out[ 1] = in[ 1]; out[ 5] = in[ 5]; out[ 9] = in[ 9]; out[13] = in[13]; 
+	out[ 2] = in[ 2]; out[ 6] = in[ 6]; out[10] = in[10]; out[14] = in[14]; 
+	out[ 3] = in[ 3]; out[ 7] = in[ 7]; out[11] = in[11]; out[15] = in[15]; 
+}
 
 /*
 =================
@@ -367,7 +382,8 @@ void R_RotateForEntity( const trRefEntity_t *ent, const viewParms_t *viewParms,
 	glMatrix[11] = 0;
 	glMatrix[15] = 1;
 
-	myGlMultMatrix( glMatrix, viewParms->world.modelMatrix, or->modelMatrix );
+	Matrix16Copy( glMatrix, or->modelMatrix );
+	myGlMultMatrix( glMatrix, viewParms->world.modelViewMatrix, or->modelViewMatrix );
 
 	// calculate the viewer origin in the model's space
 	// needed for fog, specular, and environment mapping
@@ -434,7 +450,8 @@ static void R_RotateForViewer( void )
 
 	// convert from our coordinate system (looking down X)
 	// to OpenGL's coordinate system (looking down -Z)
-	myGlMultMatrix( viewerMatrix, s_flipMatrix, tr.or.modelMatrix );
+	myGlMultMatrix( viewerMatrix, s_flipMatrix, tr.or.modelViewMatrix );
+	Matrix16Identity( tr.or.modelMatrix );
 
 	tr.viewParms.world = tr.or;
 }
@@ -733,7 +750,7 @@ R_PlaneForSurface
 static void R_PlaneForSurface( const surfaceType_t *surfType, cplane_t *plane ) {
 	srfTriangles_t	*tri;
 	srfPoly_t		*poly;
-	drawVert_t		*v1, *v2, *v3;
+	srfVert_t		*v1, *v2, *v3;
 	vec4_t			plane4;
 
 	if (!surfType) {
@@ -995,7 +1012,7 @@ static qboolean SurfIsOffscreen( const drawSurf_t *drawSurf, qboolean *isMirror 
 		int j;
 		unsigned int pointFlags = 0;
 
-		R_TransformModelToClip( tess.xyz[i], tr.or.modelMatrix, tr.viewParms.projectionMatrix, eye, clip );
+		R_TransformModelToClip( tess.xyz[i], tr.or.modelViewMatrix, tr.viewParms.projectionMatrix, eye, clip );
 
 		for ( j = 0; j < 3; j++ )
 		{
@@ -1085,7 +1102,7 @@ static void R_GetModelViewBounds( int *mins, int *maxs )
 	maxn[0] = maxn[1] = -1.0;
 
 	// premultiply
-	myGlMultMatrix( tr.or.modelMatrix, tr.viewParms.projectionMatrix, mvp );
+	myGlMultMatrix( tr.or.modelViewMatrix, tr.viewParms.projectionMatrix, mvp );
 
 	for ( i = 0; i < tess.numVertexes; i++ ) {
 		R_TransformModelToClipMVP( tess.xyz[i], mvp, clip );

@@ -74,7 +74,7 @@ static void R_PerformanceCounters( void ) {
 R_IssueRenderCommands
 ====================
 */
-static void R_IssueRenderCommands( void ) {
+void R_IssueRenderCommands( void ) {
 	renderCommandList_t	*cmdList;
 
 	cmdList = &backEndData->commands;
@@ -104,6 +104,7 @@ static void R_IssueRenderCommands( void ) {
 		// let it start on the new batch
 		RB_ExecuteRenderCommands( cmdList->cmds );
 	}
+
 }
 
 
@@ -177,6 +178,25 @@ void R_AddDrawSurfCmd( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 #endif
 }
 
+#ifdef VK_CUBEMAP
+/*
+=============
+R_AddConvolveCubemapsCmd
+=============
+*/
+void R_AddConvolveCubemapCmd( cubemap_t *cubemap , int cubemapId ) {
+	convolveCubemapCommand_t	*cmd;
+	
+	cmd = (convolveCubemapCommand_t *)R_GetCommandBuffer( sizeof( *cmd ));
+	if ( !cmd ) {
+		return;
+	}
+	cmd->commandId = RC_CONVOLVECUBEMAP;
+	
+	cmd->cubemap = cubemap;
+	cmd->cubemapId = cubemapId;
+}
+#endif
 
 /*
 =============

@@ -369,38 +369,7 @@ void RE_AddAdditiveLightToScene( const vec3_t org, float intensity, float r, flo
 
 void *R_GetCommandBuffer( int bytes );
 
-/*
-@@@@@@@@@@@@@@@@@@@@@
-RE_RenderScene
-
-Draw a 3D view into a part of the window, then return
-to 2D drawing.
-
-Rendering a scene may require multiple views to be rendered
-to handle mirrors,
-@@@@@@@@@@@@@@@@@@@@@
-*/
-void RE_RenderScene( const refdef_t *fd ) {
-#ifdef USE_VULKAN
-	renderCommand_t	lastRenderCommand;
-#endif
-	viewParms_t		parms;
-	int				startTime;
-
-	if ( !tr.registered ) {
-		return;
-	}
-
-	if ( r_norefresh->integer ) {
-		return;
-	}
-
-	startTime = ri.Milliseconds();
-
-	if (!tr.world && !( fd->rdflags & RDF_NOWORLDMODEL ) ) {
-		ri.Error (ERR_DROP, "R_RenderScene: NULL worldmodel");
-	}
-
+void RE_BeginScene( const refdef_t *fd ) {
 	Com_Memcpy( tr.refdef.text, fd->text, sizeof( tr.refdef.text ) );
 
 	tr.refdef.x = fd->x;
@@ -473,6 +442,53 @@ void RE_RenderScene( const refdef_t *fd ) {
 	// each scene / view.
 	tr.frameSceneNum++;
 	tr.sceneCount++;
+}
+
+void RE_EndScene( void ) {
+	// the next scene rendered in this frame will tack on after this one
+	r_firstSceneDrawSurf = tr.refdef.numDrawSurfs;
+#ifdef USE_PMLIGHT
+	r_firstSceneLitSurf = tr.refdef.numLitSurfs;
+#endif
+
+	r_firstSceneEntity = r_numentities;
+	r_firstSceneDlight = r_numdlights;
+	r_firstScenePoly = r_numpolys;
+}
+
+/*
+@@@@@@@@@@@@@@@@@@@@@
+RE_RenderScene
+
+Draw a 3D view into a part of the window, then return
+to 2D drawing.
+
+Rendering a scene may require multiple views to be rendered
+to handle mirrors,
+@@@@@@@@@@@@@@@@@@@@@
+*/
+void RE_RenderScene( const refdef_t *fd ) {
+#ifdef USE_VULKAN
+	renderCommand_t	lastRenderCommand;
+#endif
+	viewParms_t		parms;
+	int				startTime;
+
+	if ( !tr.registered ) {
+		return;
+	}
+
+	if ( r_norefresh->integer ) {
+		return;
+	}
+
+	startTime = ri.Milliseconds();
+
+	if (!tr.world && !( fd->rdflags & RDF_NOWORLDMODEL ) ) {
+		ri.Error (ERR_DROP, "R_RenderScene: NULL worldmodel");
+	}
+
+	RE_BeginScene( fd );
 
 	// setup view parms for the initial view
 	//
@@ -554,15 +570,7 @@ void RE_RenderScene( const refdef_t *fd ) {
 	}
 #endif
 
-	// the next scene rendered in this frame will tack on after this one
-	r_firstSceneDrawSurf = tr.refdef.numDrawSurfs;
-#ifdef USE_PMLIGHT
-	r_firstSceneLitSurf = tr.refdef.numLitSurfs;
-#endif
-
-	r_firstSceneEntity = r_numentities;
-	r_firstSceneDlight = r_numdlights;
-	r_firstScenePoly = r_numpolys;
+	RE_EndScene();
 
 	tr.frontEndMsec += ri.Milliseconds() - startTime;
 }

@@ -132,7 +132,7 @@ R_SetupEntityLightingGrid
 
 =================
 */
-static void R_SetupEntityLightingGrid( trRefEntity_t *ent ) {
+static void R_SetupEntityLightingGrid( trRefEntity_t *ent, world_t *world ) {
 	vec3_t	lightOrigin;
 	int		pos[3];
 	int		i, j;
@@ -151,17 +151,17 @@ static void R_SetupEntityLightingGrid( trRefEntity_t *ent ) {
 		VectorCopy( ent->e.origin, lightOrigin );
 	}
 
-	VectorSubtract( lightOrigin, tr.world->lightGridOrigin, lightOrigin );
+	VectorSubtract( lightOrigin, world->lightGridOrigin, lightOrigin );
 	for ( i = 0 ; i < 3 ; i++ ) {
 		float	v;
 
-		v = lightOrigin[i]*tr.world->lightGridInverseSize[i];
+		v = lightOrigin[i]*world->lightGridInverseSize[i];
 		pos[i] = floor( v );
 		frac[i] = v - pos[i];
 		if ( pos[i] < 0 ) {
 			pos[i] = 0;
-		} else if ( pos[i] > tr.world->lightGridBounds[i] - 1 ) {
-			pos[i] = tr.world->lightGridBounds[i] - 1;
+		} else if ( pos[i] > world->lightGridBounds[i] - 1 ) {
+			pos[i] = world->lightGridBounds[i] - 1;
 		}
 	}
 
@@ -169,13 +169,13 @@ static void R_SetupEntityLightingGrid( trRefEntity_t *ent ) {
 	VectorClear( ent->directedLight );
 	VectorClear( direction );
 
-	assert( tr.world->lightGridData ); // NULL with -nolight maps
+	assert( world->lightGridData ); // NULL with -nolight maps
 
 	// trilerp the light value
 	gridStep[0] = 8;
-	gridStep[1] = 8 * tr.world->lightGridBounds[0];
-	gridStep[2] = 8 * tr.world->lightGridBounds[0] * tr.world->lightGridBounds[1];
-	gridData = tr.world->lightGridData + pos[0] * gridStep[0]
+	gridStep[1] = 8 * world->lightGridBounds[0];
+	gridStep[2] = 8 * world->lightGridBounds[0] * world->lightGridBounds[1];
+	gridData = world->lightGridData + pos[0] * gridStep[0]
 		+ pos[1] * gridStep[1] + pos[2] * gridStep[2];
 
 	totalFactor = 0;
@@ -188,7 +188,7 @@ static void R_SetupEntityLightingGrid( trRefEntity_t *ent ) {
 		data = gridData;
 		for ( j = 0 ; j < 3 ; j++ ) {
 			if ( i & (1<<j) ) {
-				if ( pos[j] + 1 > tr.world->lightGridBounds[j] - 1 ) {
+				if ( pos[j] + 1 > world->lightGridBounds[j] - 1 ) {
 					break; // ignore values outside lightgrid
 				}
 				factor *= frac[j];
@@ -315,7 +315,7 @@ void R_SetupEntityLighting( const trRefdef_t *refdef, trRefEntity_t *ent ) {
 	// if NOWORLDMODEL, only use dynamic lights (menu system, etc)
 	if ( !(refdef->rdflags & RDF_NOWORLDMODEL )
 		&& tr.world->lightGridData ) {
-		R_SetupEntityLightingGrid( ent );
+		R_SetupEntityLightingGrid( ent, tr.world  );
 	} else {
 		ent->ambientLight[0] = ent->ambientLight[1] =
 			ent->ambientLight[2] = tr.identityLight * 150;
@@ -423,10 +423,34 @@ int R_LightForPoint( vec3_t point, vec3_t ambientLight, vec3_t directedLight, ve
 
 	Com_Memset(&ent, 0, sizeof(ent));
 	VectorCopy( point, ent.e.origin );
-	R_SetupEntityLightingGrid( &ent );
+	R_SetupEntityLightingGrid( &ent, tr.world );
 	VectorCopy(ent.ambientLight, ambientLight);
 	VectorCopy(ent.directedLight, directedLight);
 	VectorCopy(ent.lightDir, lightDir);
+
+	return qtrue;
+}
+
+/*
+=================
+R_LightDirForPoint
+=================
+*/
+int R_LightDirForPoint( vec3_t point, vec3_t lightDir, vec3_t normal, world_t *world )
+{
+	trRefEntity_t ent;
+
+	if ( world->lightGridData == NULL )
+	  return qfalse;
+
+	Com_Memset( &ent, 0, sizeof(ent) );
+	VectorCopy( point, ent.e.origin );
+	R_SetupEntityLightingGrid( &ent, world );
+
+	if (DotProduct( ent.lightDir, normal) > 0.2f )
+		VectorCopy( ent.lightDir, lightDir );
+	else
+		VectorCopy( normal, lightDir );
 
 	return qtrue;
 }

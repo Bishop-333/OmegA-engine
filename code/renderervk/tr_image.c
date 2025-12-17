@@ -753,6 +753,27 @@ static void generate_image_upload_data( image_t *image, byte *data, Image_Upload
 		ri.Hunk_FreeTempMemory( resampled_buffer );
 }
 
+static void vk_upload_cube( image_t *image ) {
+	image->handle = VK_NULL_HANDLE;
+	image->view = VK_NULL_HANDLE;
+	image->descriptor = VK_NULL_HANDLE;
+
+	image->uploadWidth = image->uploadHeight = image->width;
+	image->layers = 6;
+
+	const uint32_t numMips = (uint32_t)(floor(log2(image->width))) + 1;
+
+	vk_create_image( image, image->width, image->height, numMips );
+	
+	VkClearColorValue color;
+
+	color.float32[0] = 1.0f;
+	color.float32[1] = 1.0f;
+	color.float32[2] = 1.0f;
+	color.float32[3] = 1.0f;
+
+	vk_clear_cube_color( image, color );
+}
 
 static void upload_vk_image( image_t *image, byte *pic ) {
 
@@ -774,6 +795,7 @@ static void upload_vk_image( image_t *image, byte *pic ) {
 
 	image->uploadWidth = w;
 	image->uploadHeight = h;
+	image->layers = 1;
 
 	vk_create_image( image, w, h, upload_data.mip_levels );
 	vk_upload_image_data( image, 0, 0, w, h, upload_data.mip_levels, upload_data.buffer, upload_data.buffer_size, qfalse );
@@ -1003,6 +1025,35 @@ void R_UploadSubImage( byte *data, int x, int y, int width, int height, image_t 
 }
 #endif // !USE_VULKAN
 
+image_t *R_GetLoadedImage( const char *name, int flags ) {
+	long	hash;
+	image_t	*image;
+
+	hash = generateHashValue(name);
+	for ( image = hashTable[hash]; image; image = image->next ) {
+		if ( !strcmp( name, image->imgName ) ) {
+			// the white image can be used with any set of parms, but other mismatches are errors
+			if ( strcmp( name, "*white" ) ) {
+				if ( image->flags != flags ) {
+					ri.Printf( PRINT_DEVELOPER, "WARNING: reused image %s with mixed flags (%i vs %i)\n", name, image->flags, flags );
+				}
+			}
+			return image;
+		}
+	}
+
+	return NULL;
+}
+
+static uint32_t vk_find_texture_type( const uint32_t type ) {
+#ifdef USE_VK_PBR	
+	for ( uint32_t i = 0 ; i < ARRAY_LEN( textureMapTypes ) ; i++ ) {
+		if ( textureMapTypes[i].type == type )
+			return i;
+	}
+#endif
+	return  0; // identity
+}
 
 /*
 ================
@@ -1012,7 +1063,7 @@ This is the only way any image_t are created
 Picture data may be modified in-place during mipmap processing
 ================
 */
-image_t *R_CreateImage( const char *name, const char *name2, byte *pic, int width, int height, imgFlags_t flags ) {
+image_t *R_CreateImage( const char *name, const char *name2, byte *pic, int width, int height, imgFlags_t flags, int format, uint32_t type ) {
 	image_t		*image;
 	long		hash;
 #ifndef USE_VULKAN
@@ -1059,6 +1110,7 @@ image_t *R_CreateImage( const char *name, const char *name2, byte *pic, int widt
 	image->flags = flags;
 	image->width = width;
 	image->height = height;
+	image->type = vk_find_texture_type( type );
 
 	if ( namelen > 6 && Q_stristr( image->imgName, "maps/" ) == image->imgName && Q_stristr( image->imgName + 6, "/lm_" ) != NULL ) {
 		// external lightmap atlases stored in maps/<mapname>/lm_XXXX textures
@@ -1077,8 +1129,12 @@ image_t *R_CreateImage( const char *name, const char *name2, byte *pic, int widt
 	image->handle = VK_NULL_HANDLE;
 	image->view = VK_NULL_HANDLE;
 	image->descriptor = VK_NULL_HANDLE;
+	image->internalFormat = format;
 
-	upload_vk_image( image, pic );
+	if ( image->flags & IMGFLAG_CUBEMAP )
+		vk_upload_cube( image );
+	else
+		upload_vk_image( image, pic );
 #else
 	if ( flags & IMGFLAG_RGB )
 		image->internalFormat = GL_RGB;
@@ -1258,7 +1314,7 @@ Finds or loads the given image.
 Returns NULL if it fails, not a default image.
 ==============
 */
-image_t	*R_FindImageFile( const char *name, imgFlags_t flags )
+image_t	*R_FindImageFile( const char *name, imgFlags_t flags, uint32_t type )
 {
 	image_t	*image;
 	const char *localName;
@@ -1329,11 +1385,148 @@ image_t	*R_FindImageFile( const char *name, imgFlags_t flags )
 		}
 	}
 
-	image = R_CreateImage( name, localName, pic, width, height, flags );
+	image = R_CreateImage( name, localName, pic, width, height, flags, 0, type );
 	ri.Free( pic );
 	return image;
 }
 
+image_t *R_BuildSDRSpecGlossImage(shaderStage_t *stage, const char *specImageName, imgFlags_t flags)
+{
+	char	sdrName[MAX_QPATH];
+	int		specWidth, specHeight;
+	byte	*specPic;
+	image_t *image;
+
+	if ( !specImageName )
+		return NULL;
+
+	COM_StripExtension( specImageName, sdrName, sizeof(sdrName) );
+	Q_strcat( sdrName, sizeof(sdrName), "_SDR" );
+
+	//
+	// see if the image is already loaded
+	//
+	image = R_GetLoadedImage( sdrName, flags );
+	if ( image != NULL )
+		return image;
+
+	R_LoadImage( specImageName, &specPic, &specWidth, &specHeight );
+	if (specPic == NULL)
+		return NULL;
+
+	byte *sdrSpecPic = (byte *)ri.Hunk_AllocateTempMemory(sizeof(unsigned) * specWidth * specHeight);
+	vec3_t currentColor;
+	for ( int i = 0; i < specWidth * specHeight * 4; i += 4 )
+	{
+		currentColor[0] = ByteToFloat(specPic[i + 0]);
+		currentColor[1] = ByteToFloat(specPic[i + 1]);
+		currentColor[2] = ByteToFloat(specPic[i + 2]);
+
+		float ratio = 
+			(sRGBtoRGB(currentColor[0]) + sRGBtoRGB(currentColor[1]) + sRGBtoRGB(currentColor[1])) /
+			(currentColor[0] + currentColor[1] + currentColor[2]);
+
+		sdrSpecPic[i + 0] = FloatToByte(currentColor[0] * ratio);
+		sdrSpecPic[i + 1] = FloatToByte(currentColor[1] * ratio);
+		sdrSpecPic[i + 2] = FloatToByte(currentColor[2] * ratio);
+		sdrSpecPic[i + 3] = specPic[i + 3];
+	}
+	ri.Free( specPic );
+
+	return R_CreateImage( sdrName, NULL, sdrSpecPic, specWidth, specHeight, flags, 0, stage->physicalMapType );
+}
+
+qboolean vk_create_normal_texture( shaderStage_t *stage, const char *name, imgFlags_t flags )
+{
+	switch ( stage->normalMapType ) {
+		case PHYS_NORMAL:
+		case PHYS_NORMALHEIGHT:
+			break;
+		default:
+			return qfalse;
+	}
+
+	stage->normalMap = R_FindImageFile( name, flags, stage->normalMapType );
+
+	if ( !stage->normalMap )
+		return qfalse;
+
+	stage->vk_pbr_flags |= PBR_HAS_NORMALMAP;
+	return qtrue;
+}
+
+qboolean vk_create_phyisical_texture( shaderStage_t *stage, const char *name, imgFlags_t flags )
+{
+	char	packedName[MAX_QPATH];
+	int		packedWidth, packedHeight;
+	byte	*packedPic;
+	image_t *image;
+
+	if ( !name ) 
+		return qfalse;
+
+	switch ( stage->physicalMapType ) {
+		case PHYS_RMO:
+		case PHYS_RMOS:
+		case PHYS_MOXR:
+		case PHYS_MOSR:
+		case PHYS_ORM:
+		case PHYS_ORMS:
+			break;
+		case PHYS_SPECGLOSS:
+		{
+			stage->physicalMap = R_BuildSDRSpecGlossImage( stage, name, flags );
+			
+			if ( !stage->physicalMap )
+				stage->physicalMap = tr.whiteImage;
+
+			stage->vk_pbr_flags |= PBR_HAS_SPECULARMAP;
+
+			return qtrue;
+		}
+		default:
+			return qfalse;
+	}
+
+	R_LoadImage( name, &packedPic, &packedWidth, &packedHeight );
+	if ( packedPic == NULL )
+		return qfalse;
+
+	switch ( stage->physicalMapType )
+	{
+		case PHYS_RMOS:
+		case PHYS_MOSR:
+		case PHYS_ORMS:
+			stage->specularScale[1] = 1.0f;	// Don't scale base specular
+			break;
+		default:
+			stage->specularScale[1] = 0.5f; // Basespecular is assumed to be 0.04 and shader assumes 0.08
+			break;
+	}
+
+	// Don't scale occlusion, roughness and metalness 
+	// currently unused
+	stage->specularScale[0] =
+	stage->specularScale[2] =
+	stage->specularScale[3] = 1.0f;
+
+	COM_StripExtension( name, packedName, sizeof(packedName) );
+	Q_strcat( packedName, sizeof(packedName), "_ORMS" );
+
+	//
+	// see if the image is already loaded
+	//
+	image = R_GetLoadedImage( packedName, flags );
+	if ( image != NULL )
+		stage->physicalMap = image;
+	else
+		stage->physicalMap = R_CreateImage( packedName, NULL, packedPic, packedWidth, packedHeight, flags, 0, stage->physicalMapType );
+
+	Z_Free( packedPic );
+
+	stage->vk_pbr_flags |= PBR_HAS_PHYSICALMAP;
+	return qtrue;
+}
 
 /*
 ================
@@ -1365,7 +1558,7 @@ static void R_CreateDlightImage( void ) {
 			data[y][x][3] = 255;
 		}
 	}
-	tr.dlightImage = R_CreateImage( "*dlight", NULL, (byte*)data, DLIGHT_SIZE, DLIGHT_SIZE, IMGFLAG_CLAMPTOEDGE );
+	tr.dlightImage = R_CreateImage( "*dlight", NULL, (byte*)data, DLIGHT_SIZE, DLIGHT_SIZE, IMGFLAG_CLAMPTOEDGE, 0, 0 );
 }
 
 
@@ -1450,7 +1643,7 @@ static void R_CreateFogImage( void ) {
 			data[(y*FOG_S+x)*4+3] = 255*d;
 		}
 	}
-	tr.fogImage = R_CreateImage( "*fog", NULL, data, FOG_S, FOG_T, IMGFLAG_CLAMPTOEDGE );
+	tr.fogImage = R_CreateImage( "*fog", NULL, data, FOG_S, FOG_T, IMGFLAG_CLAMPTOEDGE, 0, 0 );
 	ri.Hunk_FreeTempMemory( data );
 }
 
@@ -1529,7 +1722,7 @@ static qboolean R_BuildDefaultImage( const char *format ) {
 		}
 	}
 
-	tr.defaultImage = R_CreateImage( "*default", NULL, (byte *)data, DEFAULT_SIZE, DEFAULT_SIZE, IMGFLAG_MIPMAP );
+	tr.defaultImage = R_CreateImage( "*default", NULL, (byte *)data, DEFAULT_SIZE, DEFAULT_SIZE, IMGFLAG_MIPMAP, 0, 0 );
 
 	return qtrue;
 }
@@ -1550,7 +1743,7 @@ static void R_CreateDefaultImage( void ) {
 		if ( R_BuildDefaultImage( r_defaultImage->string ) )
 			return;
 		// load from external file
-		tr.defaultImage = R_FindImageFile( r_defaultImage->string, IMGFLAG_MIPMAP | IMGFLAG_PICMIP );
+		tr.defaultImage = R_FindImageFile( r_defaultImage->string, IMGFLAG_MIPMAP | IMGFLAG_PICMIP, 0 );
 		if ( tr.defaultImage )
 			return;
 	}
@@ -1579,7 +1772,7 @@ static void R_CreateDefaultImage( void ) {
 		data[x][DEFAULT_SIZE-1][3] = 255;
 	}
 
-	tr.defaultImage = R_CreateImage( "*default", NULL, (byte *)data, DEFAULT_SIZE, DEFAULT_SIZE, IMGFLAG_MIPMAP );
+	tr.defaultImage = R_CreateImage( "*default", NULL, (byte *)data, DEFAULT_SIZE, DEFAULT_SIZE, IMGFLAG_MIPMAP, 0, 0 );
 }
 
 
@@ -1595,11 +1788,11 @@ static void R_CreateBuiltinImages( void ) {
 	R_CreateDefaultImage();
 
 	Com_Memset( data, 0, sizeof( data ) );
-	tr.blackImage = R_CreateImage( "*black", NULL, (byte *)data, 8, 8, IMGFLAG_NONE );
+	tr.blackImage = R_CreateImage( "*black", NULL, (byte *)data, 8, 8, IMGFLAG_NONE, 0, 0 );
 
 	// we use a solid white image instead of disabling texturing
 	Com_Memset( data, 255, sizeof( data ) );
-	tr.whiteImage = R_CreateImage( "*white", NULL, (byte *)data, 8, 8, IMGFLAG_NONE );
+	tr.whiteImage = R_CreateImage( "*white", NULL, (byte *)data, 8, 8, IMGFLAG_NONE, 0, 0 );
 
 	// with overbright bits active, we need an image which is some fraction of full color,
 	// for default lightmaps, etc
@@ -1612,13 +1805,21 @@ static void R_CreateBuiltinImages( void ) {
 		}
 	}
 
-	tr.identityLightImage = R_CreateImage( "*identityLight", NULL, (byte *)data, 8, 8, IMGFLAG_NONE );
+	tr.identityLightImage = R_CreateImage( "*identityLight", NULL, (byte *)data, 8, 8, IMGFLAG_NONE, 0, 0 );
 
 	//for ( x = 0; x < ARRAY_LEN( tr.scratchImage ); x++ ) {
 		// scratchimage is usually used for cinematic drawing
 		//tr.scratchImage[x] = R_CreateImage( "*scratch", (byte*)data, DEFAULT_SIZE, DEFAULT_SIZE,
-		//	IMGFLAG_PICMIP | IMGFLAG_CLAMPTOEDGE | IMGFLAG_RGB );
+		//	IMGFLAG_PICMIP | IMGFLAG_CLAMPTOEDGE | IMGFLAG_RGB, 0, 0 );
 	//}
+
+#ifdef USE_VK_PBR
+	tr.emptyImage = R_CreateImage("*empty", NULL, (byte*)data, 2, 2, IMGFLAG_NONE, 0, 0);
+
+#ifdef VK_CUBEMAP
+	tr.emptyCubemap = R_CreateImage( "*emptyCubemap", NULL, NULL, 1, 1, IMGFLAG_CUBEMAP, vk.color_format, 0 );
+#endif
+#endif
 
 	R_CreateDlightImage();
 	R_CreateFogImage();

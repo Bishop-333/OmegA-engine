@@ -781,7 +781,7 @@ void RB_DrawSun( float scale, shader_t *shader ) {
 #ifdef USE_VULKAN
 	vk_update_mvp( NULL );
 #else
-	qglLoadMatrixf( backEnd.viewParms.world.modelMatrix );
+	qglLoadMatrixf( backEnd.viewParms.world.modelViewMatrix );
 #endif
 
 	dist = backEnd.viewParms.zFar / 1.75;		// div sqrt(3)

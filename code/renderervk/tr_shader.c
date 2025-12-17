@@ -581,6 +581,13 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 	int i, depthMaskBits = GLS_DEPTHMASK_TRUE, blendSrcBits = 0, blendDstBits = 0, atestBits = 0, depthFuncBits = 0;
 	qboolean depthMaskExplicit = qfalse;
 
+#ifdef USE_VK_PBR
+	char				physicalAlbedoName[MAX_QPATH];
+	qboolean			physicalAlbedo = qfalse;
+	char				bufferNormalTextureName[MAX_QPATH];
+	char				bufferPackedTextureName[MAX_QPATH];
+#endif
+
 	stage->active = qfalse;
 
 	while ( 1 )
@@ -647,15 +654,106 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 				if (shader.noLightScale)
 					flags |= IMGFLAG_NOLIGHTSCALE;
 
-				stage->bundle[0].image[0] = R_FindImageFile( token, flags );
+				stage->bundle[0].image[0] = R_FindImageFile( token, flags, 0 );
 
 				if ( !stage->bundle[0].image[0] )
 				{
 					ri.Printf( PRINT_WARNING, "WARNING: R_FindImageFile could not find '%s' in shader '%s'\n", token, shader.name );
 					return qfalse;
 				}
+
+#ifdef USE_VK_PBR
+				Q_strncpyz( physicalAlbedoName, token, sizeof(physicalAlbedoName) );
+				physicalAlbedo = qtrue;
+#endif
 			}
 		}
+#ifdef USE_VK_PBR
+		else if ( (!Q_stricmp(token, "normalMap") || !Q_stricmp(token, "normalHeightMap")) && vk.pbrActive )
+		{
+			token = COM_ParseExt(text, qfalse);
+			if ( !token[0] )
+			{
+				ri.Printf(PRINT_WARNING, "WARNING: missing parameter for 'normalMap' keyword in shader '%s'\n", shader.name);
+				return qfalse;
+			}
+
+			stage->normalMapType = !Q_stricmp(token, "normalHeightMap") ? PHYS_NORMALHEIGHT : PHYS_NORMAL;
+
+			Q_strncpyz( bufferNormalTextureName, token, sizeof(bufferNormalTextureName) );
+		
+			Vector4Set( stage->normalScale, r_baseNormalX->value, r_baseNormalY->value, 1.0f, r_baseParallax->value );
+		}
+		//
+		// specMap <name> || specularMap <name>
+		//
+		else if (!Q_stricmp(token, "specMap") || !Q_stricmp(token, "specularMap"))
+		{
+			token = COM_ParseExt(text, qfalse);
+			if (!token[0])
+			{
+				ri.Printf(PRINT_WARNING, "WARNING: missing parameter for 'specularMap' keyword in shader '%s'\n", shader.name);
+				return qfalse;
+			}
+			stage->physicalMapType = PHYS_SPECGLOSS;
+			Vector4Set(stage->specularScale, 1.0f, 1.0f, 1.0f, 0.0f);
+			if (!Q_stricmp(token, "$whiteimage"))
+			{
+				stage->physicalMap = tr.whiteImage;
+				stage->vk_pbr_flags |= PBR_HAS_SPECULARMAP;
+				continue;
+			}
+			Q_strncpyz( bufferPackedTextureName, token, sizeof(bufferPackedTextureName) );
+		}
+		else if ( (!Q_stricmp(token, "rmoMap") || !Q_stricmp(token, "rmosMap")) )
+		{
+			token = COM_ParseExt(text, qfalse);
+			if ( !token[0] )
+			{
+				ri.Printf(PRINT_WARNING, "WARNING: missing parameter for 'rmoMap' keyword in shader '%s'\n", shader.name);
+				return qfalse;
+			}
+			stage->physicalMapType = !Q_stricmp(token, "rmosMap") ? PHYS_RMOS : PHYS_RMO;
+			if ( !Q_stricmp( token, "$whiteimage" ) )
+			{
+				stage->physicalMap = tr.whiteImage;
+				continue;
+			}
+			Q_strncpyz( bufferPackedTextureName, token, sizeof(bufferPackedTextureName) );
+		}
+		else if ( (!Q_stricmp(token, "moxrMap") || !Q_stricmp(token, "mosrMap")) )
+		{
+			token = COM_ParseExt(text, qfalse);
+			if ( !token[0] )
+			{
+				ri.Printf(PRINT_WARNING, "WARNING: missing parameter for 'moxrMap' keyword in shader '%s'\n", shader.name);
+				return qfalse;
+			}
+			stage->physicalMapType = !Q_stricmp(token, "mosrMap") ? PHYS_MOSR : PHYS_MOXR;
+			if ( !Q_stricmp( token, "$whiteimage" ) )
+			{
+				stage->physicalMap = tr.whiteImage;
+				continue;
+			}			
+			Q_strncpyz( bufferPackedTextureName, token, sizeof(bufferPackedTextureName) );
+		}
+		else if ( (!Q_stricmp(token, "ormMap") || !Q_stricmp(token, "ormsMap")) )
+		{
+			token = COM_ParseExt(text, qfalse);
+			if ( !token[0] )
+			{
+				ri.Printf(PRINT_WARNING, "WARNING: missing parameter for 'ormMap' keyword in shader '%s'\n", shader.name);
+				return qfalse;
+			}
+			stage->physicalMapType = !Q_stricmp(token, "ormsMap") ? PHYS_ORMS : PHYS_ORM;
+			if ( !Q_stricmp( token, "$whiteimage" ) )
+			{
+				stage->physicalMap = tr.whiteImage;
+				continue;
+			}			
+			Q_strncpyz( bufferPackedTextureName, token, sizeof(bufferPackedTextureName) );
+		}
+#endif
 		//
 		// clampmap <name>
 		//
@@ -690,7 +788,7 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			if (shader.noLightScale)
 				flags |= IMGFLAG_NOLIGHTSCALE;
 
-			stage->bundle[0].image[0] = R_FindImageFile( token, flags );
+			stage->bundle[0].image[0] = R_FindImageFile( token, flags, 0 );
 			if ( !stage->bundle[0].image[0] )
 			{
 				ri.Printf( PRINT_WARNING, "WARNING: R_FindImageFile could not find '%s' in shader '%s'\n", token, shader.name );
@@ -734,7 +832,7 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 					if (shader.noLightScale)
 						flags |= IMGFLAG_NOLIGHTSCALE;
 
-					stage->bundle[0].image[num] = R_FindImageFile( token, flags );
+					stage->bundle[0].image[num] = R_FindImageFile( token, flags, 0 );
 					if ( !stage->bundle[0].image[num] )
 					{
 						ri.Printf( PRINT_WARNING, "WARNING: R_FindImageFile could not find '%s' in shader '%s'\n", token, shader.name );
@@ -762,7 +860,7 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			handle = ri.CIN_PlayCinematic( token, 0, 0, 256, 256, (CIN_loop | CIN_silent | CIN_shader) );
 			if ( handle != -1 ) {
 				if ( !tr.scratchImage[ handle ] ) {
-					tr.scratchImage[ handle ] = R_CreateImage( va( "*scratch%i", handle ), NULL, NULL, 256, 256, IMGFLAG_CLAMPTOEDGE | IMGFLAG_RGB | IMGFLAG_NOSCALE );
+					tr.scratchImage[ handle ] = R_CreateImage( va( "*scratch%i", handle ), NULL, NULL, 256, 256, IMGFLAG_CLAMPTOEDGE | IMGFLAG_RGB | IMGFLAG_NOSCALE, 0, 0 );
 				}
 				stage->bundle[0].isVideoMap = qtrue;
 				stage->bundle[0].videoMapHandle = handle;
@@ -860,6 +958,151 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 				depthMaskBits = 0;
 			}
 
+		}
+
+		else if ( !Q_stricmp( token, "gloss" ) )
+		{
+			token = COM_ParseExt(text, qfalse);
+			if ( token[0] == 0 )
+			{
+				ri.Printf( PRINT_WARNING, "WARNING: missing parameter for gloss in shader '%s'\n", shader.name );
+				continue;
+			}
+
+			stage->specularScale[3] = 1.0 - atof( token );
+		}
+		else if (!Q_stricmp(token, "roughness"))
+		{
+			token = COM_ParseExt(text, qfalse);
+			if (token[0] == 0)
+			{
+				ri.Printf(PRINT_WARNING, "WARNING: missing parameter for roughness in shader '%s'\n", shader.name);
+				continue;
+			}
+
+			stage->specularScale[3] = atof(token);
+		}
+		else if (!Q_stricmp(token, "specularreflectance"))
+		{
+			token = COM_ParseExt(text, qfalse);
+			if ( token[0] == 0 )
+			{
+				ri.Printf( PRINT_WARNING, "WARNING: missing parameter for specular reflectance in shader '%s'\n", shader.name );
+				continue;
+			}
+			stage->specularScale[0] =
+			stage->specularScale[1] =
+			stage->specularScale[2] = Com_Clamp( 0.0f, 1.0f, atof( token ) );
+		}
+		else if (!Q_stricmp(token, "specularexponent"))
+		{
+			float exponent;
+
+			token = COM_ParseExt(text, qfalse);
+			if ( token[0] == 0 )
+			{
+				ri.Printf( PRINT_WARNING, "WARNING: missing parameter for specular exponent in shader '%s'\n", shader.name );
+				continue;
+			}
+			exponent = atof( token );
+
+			// Change shininess to gloss
+			// FIXME: assumes max exponent of 8192 and min of 1, must change here if altered in gen_frag.glsl
+			exponent = Com_Clamp( 1.0f, 8192.0f, exponent );
+			stage->specularScale[3] = log(exponent) / log(8192.0);
+		}
+		else if ( !Q_stricmp(token, "parallaxdepth") )
+		{
+			token = COM_ParseExt(text, qfalse);
+			if ( token[0] == 0 )
+			{
+				ri.Printf( PRINT_WARNING, "WARNING: missing parameter for parallaxDepth in shader '%s'\n", shader.name );
+				continue;
+			}
+
+			stage->normalScale[3] = atof( token );
+		}
+		else if ( !Q_stricmp(token, "parallaxbias") )
+		{
+			token = COM_ParseExt(text, qfalse);
+			if (token[0] == 0)
+			{
+				ri.Printf(PRINT_WARNING, "WARNING: missing parameter for parallaxBias in shader '%s'\n", shader.name);
+				continue;
+			}
+
+			stage->parallaxBias = atof(token);
+		}
+		else if ( !Q_stricmp(token, "normalscale") )
+		{
+			token = COM_ParseExt(text, qfalse);
+			if ( token[0] == 0 )
+			{
+				ri.Printf( PRINT_WARNING, "WARNING: missing parameter for normalScale in shader '%s'\n", shader.name );
+				continue;
+			}
+
+			stage->normalScale[0] = atof( token );
+
+			token = COM_ParseExt(text, qfalse);
+			if ( token[0] == 0 )
+			{
+				// one value, applies to X/Y
+				stage->normalScale[1] = stage->normalScale[0];
+				continue;
+			}
+
+			stage->normalScale[1] = atof( token );
+
+			token = COM_ParseExt(text, qfalse);
+			if ( token[0] == 0 )
+			{
+				// two values, no height
+				continue;
+			}
+
+			stage->normalScale[3] = atof( token );
+		}
+		else if ( !Q_stricmp(token, "specularscale") )
+		{
+			token = COM_ParseExt(text, qfalse);
+			if ( token[0] == 0 )
+			{
+				ri.Printf( PRINT_WARNING, "WARNING: missing parameter for specularScale in shader '%s'\n", shader.name );
+				continue;
+			}
+
+			stage->specularScale[0] = atof( token );
+
+			token = COM_ParseExt(text, qfalse);
+			if ( token[0] == 0 )
+			{
+				ri.Printf( PRINT_WARNING, "WARNING: missing parameter for specularScale in shader '%s'\n", shader.name );
+				continue;
+			}
+
+			stage->specularScale[1] = atof( token );
+
+			token = COM_ParseExt(text, qfalse);
+			if ( token[0] == 0 )
+			{
+				// two values, rgb then gloss
+				stage->specularScale[3] = stage->specularScale[1];
+				stage->specularScale[1] =
+				stage->specularScale[2] = stage->specularScale[0];
+				continue;
+			}
+
+			stage->specularScale[2] = atof( token );
+
+			token = COM_ParseExt(text, qfalse);
+			if ( token[0] == 0 )
+			{
+				// three values, rgb
+				continue;
+			}
+
+			stage->specularScale[3] = atof( token );
 		}
 		//
 		// rgbGen
@@ -1095,6 +1338,60 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			return qfalse;
 		}
 	}
+
+#ifdef USE_VK_PBR
+	if ( vk.pbrActive && ( physicalAlbedo || stage->physicalMapType != PHYS_NONE ) ) {
+		uint32_t i;
+		imgFlags_t flags = IMGFLAG_NOLIGHTSCALE;
+
+		if (!shader.noMipMaps)
+			flags |= IMGFLAG_MIPMAP;
+
+		if (!shader.noPicMip)
+			flags |= IMGFLAG_PICMIP;
+
+		//if (shader.noTC)
+		//	flags |= IMGFLAG_NO_COMPRESSION;
+
+		// load defined physical map, if not loaded $whiteimage
+		if ( !stage->physicalMap && stage->physicalMapType != PHYS_NONE )
+			vk_create_phyisical_texture( stage, bufferPackedTextureName, flags );
+		
+		// scan for a potential physical map
+		if ( !stage->physicalMap && physicalAlbedo ) {
+			for ( i = 0; i < ARRAY_LEN( textureMapTypes ); i++ ) {
+				COM_StripExtension( physicalAlbedoName, bufferPackedTextureName, MAX_QPATH );
+				
+				Q_strcat( bufferPackedTextureName, MAX_QPATH, textureMapTypes[i].suffix );
+				stage->physicalMapType = textureMapTypes[i].type;
+
+				if ( vk_create_phyisical_texture( stage, bufferPackedTextureName, flags ) ) {
+					break;
+				}
+			}
+		}
+		
+		flags |= IMGFLAG_NO_COMPRESSION;
+		
+		// load defined normal map
+		if ( stage->normalMapType != PHYS_NONE )
+			vk_create_normal_texture( stage, bufferNormalTextureName, flags );
+		
+		// scan for a potential normal map
+		if ( !stage->normalMap && physicalAlbedo ) {
+			for ( i = 0; i < ARRAY_LEN( textureMapTypes ); i++ ) {
+				COM_StripExtension( physicalAlbedoName, bufferNormalTextureName, MAX_QPATH );
+				
+				Q_strcat( bufferNormalTextureName, MAX_QPATH, textureMapTypes[i].suffix );
+				stage->normalMapType = textureMapTypes[i].type;
+
+				if ( vk_create_normal_texture( stage, bufferNormalTextureName, flags ) ) {
+					break;
+				}
+			}
+		}
+	}
+#endif
 
 	//
 	// if cgen isn't explicitly specified, use either identity or identitylighting
@@ -1357,7 +1654,7 @@ static void ParseSkyParms( const char **text ) {
 		for (i=0 ; i<6 ; i++) {
 			Com_sprintf( pathname, sizeof(pathname), "%s_%s.tga"
 				, token, suf[i] );
-			shader.sky.outerbox[i] = R_FindImageFile( pathname, imgFlags | IMGFLAG_CLAMPTOEDGE );
+			shader.sky.outerbox[i] = R_FindImageFile( pathname, imgFlags | IMGFLAG_CLAMPTOEDGE, 0 );
 
 			if ( !shader.sky.outerbox[i] ) {
 				shader.sky.outerbox[i] = tr.defaultImage;
@@ -1387,7 +1684,7 @@ static void ParseSkyParms( const char **text ) {
 		for (i=0 ; i<6 ; i++) {
 			Com_sprintf( pathname, sizeof(pathname), "%s_%s.tga"
 				, token, suf[i] );
-			shader.sky.innerbox[i] = R_FindImageFile( pathname, imgFlags );
+			shader.sky.innerbox[i] = R_FindImageFile( pathname, imgFlags, 0 );
 			if ( !shader.sky.innerbox[i] ) {
 				shader.sky.innerbox[i] = tr.defaultImage;
 			}
@@ -2326,6 +2623,16 @@ static int CollapseMultitexture( unsigned int st0bits, shaderStage_t *st0, shade
 
 	st0->numTexBundles++;
 
+#ifdef USE_VK_PBR
+	if( st1->vk_pbr_flags ) {
+		st0->vk_pbr_flags = st1->vk_pbr_flags;
+		st0->normalMap = st1->normalMap;
+		st0->physicalMap = st1->physicalMap;
+		Vector4Copy( st1->specularScale, st0->specularScale );
+		Vector4Copy( st1->normalScale, st0->normalScale );
+	}
+#endif
+
 	//
 	// move down subsequent shaders
 	//
@@ -3015,7 +3322,7 @@ static void DetectNeeds( void )
 			if ( t == TCGEN_LIGHTMAP )
 			{
 				shader.needsST2 = qtrue;
-			} 
+			}
 			if ( t == TCGEN_ENVIRONMENT_MAPPED || t == TCGEN_ENVIRONMENT_MAPPED_FP )
 			{
 				shader.needsNormal = qtrue;
@@ -3368,6 +3675,7 @@ static shader_t *FinishShader( void ) {
 			int env_mask;
 			shaderStage_t *pStage = &stages[i];
 			def.state_bits = pStage->stateBits;
+			def.vk_pbr_flags = 0;
 
 			if ( pStage->mtEnv3 ) {
 				switch ( pStage->mtEnv3 ) {
@@ -3557,6 +3865,22 @@ static shader_t *FinishShader( void ) {
 				}
 			}
 
+			if ( pStage->vk_pbr_flags && def.shader_type >= TYPE_GENERIC_BEGIN  )
+			{
+			#ifdef USE_VK_PBR
+				def.vk_pbr_flags = pStage->vk_pbr_flags;
+				pStage->tessFlags |= TESS_PBR;
+				shader.hasPBR = qtrue;
+
+				if ( hasLightmapStage ) 
+					def.vk_pbr_flags |= PBR_HAS_LIGHTMAP;
+
+				// move this to ubo ..
+				Vector4Copy( pStage->specularScale, def.specularScale );
+				Vector4Copy( pStage->normalScale, def.normalScale );
+			#endif
+			}
+
 			def.mirror = qfalse;
 			pStage->vk_pipeline[0] = vk_find_pipeline_ext( 0, &def, qtrue );
 			def.mirror = qtrue;
@@ -3564,12 +3888,16 @@ static shader_t *FinishShader( void ) {
 
 			if ( pStage->depthFragment ) {
 				def.mirror = qfalse;
+				#ifdef USE_VK_PBR
+					def.vk_pbr_flags = 0;
+				#endif
 				def.shader_type = TYPE_SIGNLE_TEXTURE_DF;
 				pStage->vk_pipeline_df = vk_find_pipeline_ext( 0, &def, qtrue );
 				def.mirror = qtrue;
 				def.shader_type = TYPE_SIGNLE_TEXTURE_DF;
 				pStage->vk_mirror_pipeline_df = vk_find_pipeline_ext( 0, &def, qfalse );
 			}
+
 
 #ifdef USE_FOG_COLLAPSE
 			if ( fogCollapse && tr.numFogs > 0 ) {
@@ -3586,6 +3914,7 @@ static shader_t *FinishShader( void ) {
 
 				pStage->vk_pipeline[1] = vk_find_pipeline_ext( 0, &def, qfalse );
 				pStage->vk_mirror_pipeline[1] = vk_find_pipeline_ext( 0, &def_mirror, qfalse );
+
 
 				pStage->bundle[0].adjustColorsForFog = ACFF_NONE; // will be handled in shader from now
 
@@ -3887,7 +4216,7 @@ shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 			flags |= IMGFLAG_CLAMPTOEDGE;
 		}
 
-		image = R_FindImageFile( name, flags );
+		image = R_FindImageFile( name, flags, 0 );
 		if ( !image ) {
 			ri.Printf( PRINT_DEVELOPER, "Couldn't find image file for shader %s\n", name );
 			shader.defaultShader = qtrue;
@@ -4149,7 +4478,27 @@ static int loadShaderBuffers( char **shaderFiles, const int numShaderFiles, char
 	// load and parse shader files
 	for ( i = 0; i < numShaderFiles; i++ )
 	{
+
+#ifdef USE_VK_PBR
+		// look for a .mtr file first
+		if( vk.pbrActive ){
+			char *ext;
+			Com_sprintf( filename, sizeof( filename ), "scripts/%s", shaderFiles[i] );
+			if ( (ext = strrchr(filename, '.')) )
+			{
+				strcpy(ext, ".mtr");
+			}
+
+			if ( ri.FS_ReadFile( filename, NULL ) <= 0 )
+			{
+				Com_sprintf( filename, sizeof( filename ), "scripts/%s", shaderFiles[i] );
+			}
+		}else{
+			Com_sprintf(filename, sizeof(filename), "scripts/%s", shaderFiles[i]);
+		}
+#else
 		Com_sprintf( filename, sizeof( filename ), "scripts/%s", shaderFiles[i] );
+#endif
 		//ri.Printf( PRINT_DEVELOPER, "...loading '%s'\n", filename );
 		summand = ri.FS_ReadFile( filename, (void **)&buffers[i] );
 

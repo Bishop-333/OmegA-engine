@@ -543,9 +543,11 @@ static void ProjectDlightTexture( void ) {
 
 #endif // USE_LEGACY_DLIGHTS
 
-uint32_t VK_PushUniform( const vkUniform_t *uniform );
+uint32_t vk_append_uniform( const void *uniform, size_t size, uint32_t min_offset );
+uint32_t vk_push_uniform( const vkUniform_t *uniform );
 void VK_SetFogParams( vkUniform_t *uniform, int *fogStage );
 static vkUniform_t uniform;
+static vkUniformCamera_t uniform_camera;
 
 /*
 ===================
@@ -566,7 +568,7 @@ static void RB_FogPass( qboolean rebindIndex ) {
 		vk_bind_index();
 	}
 	VK_SetFogParams( &uniform, &fog_stage );
-	VK_PushUniform( &uniform );
+	vk_push_uniform( &uniform );
 	vk_update_descriptor( VK_DESC_FOG_ONLY, tr.fogImage->descriptor );
 	vk_draw_geometry( DEPTH_RANGE_NORMAL, qtrue );
 #else
@@ -924,6 +926,23 @@ void R_ComputeTexCoords( const int b, const textureBundle_t *bundle ) {
 	tess.svars.texcoordPtr[ b ] = src;
 }
 
+static qboolean vk_is_valid_pbr_surface( const qboolean hasPBR ) {
+	if( !vk.pbrActive || !hasPBR )
+		return qfalse;
+
+	if ( backEnd.projection2D )
+		return qfalse;
+
+	if ( backEnd.viewParms.portalView == PV_MIRROR )
+		return qfalse;
+
+	if ( backEnd.currentEntity ) {
+		if ( backEnd.currentEntity != &tr.worldEntity )
+			return qfalse;
+	}
+
+	return qtrue;
+}
 
 /*
 ** RB_IterateStagesGeneric
@@ -939,6 +958,9 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 	int stage, i;
 
 #ifdef USE_VULKAN
+#ifdef USE_VK_PBR
+	qboolean is_pbr_surface;
+#endif
 	uint32_t pipeline;
 	int fog_stage;
 	qboolean pushUniform;
@@ -948,6 +970,8 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 	tess_flags = input->shader->tessFlags;
 
 	pushUniform = qfalse;
+
+	is_pbr_surface = qfalse;
 
 #ifdef USE_FOG_COLLAPSE
 	if ( fogCollapse ) {
@@ -965,6 +989,23 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			pushUniform = qtrue;
 		}
 	}
+
+#ifdef USE_VK_PBR
+	is_pbr_surface = vk_is_valid_pbr_surface( tess.shader->hasPBR );
+
+	if ( is_pbr_surface ) {
+		Com_Memcpy( &uniform_camera.modelMatrix, backEnd.or.modelMatrix, sizeof(float) * 16 );
+		Com_Memcpy( &uniform_camera.viewOrigin, backEnd.refdef.vieworg, sizeof( vec3_t) );
+		uniform_camera.viewOrigin[3] = 0.0;
+
+		//VectorCopy4( pStage->normalScale, uniform_global.normalScale );
+		//VectorCopy4( pStage->specularScale, uniform_global.specularScale );
+
+		vk.cmd->camera_ubo_offset = vk_append_uniform( &uniform_camera, sizeof(uniform_camera), vk.uniform_camera_item_size );
+
+		pushUniform = qtrue;
+	}
+#endif
 #endif // USE_VULKAN
 
 	for ( stage = 0; stage < MAX_SHADER_STAGES; stage++ )
@@ -1002,7 +1043,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 
 		if ( pushUniform ) {
 			pushUniform = qfalse;
-			VK_PushUniform( &uniform );
+			vk_push_uniform( &uniform );
 		}
 
 		GL_SelectTexture( 0 );
@@ -1012,11 +1053,44 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			GL_Bind( tr.whiteImage ); // replace diffuse texture with a white one thus effectively render only lightmap
 		}
 
+#ifdef USE_VK_PBR
+		if ( is_pbr_surface && pStage->vk_pbr_flags ) {
+			vk_update_descriptor( VK_DESC_PBR_BRDFLUT, vk.brdflut_image_descriptor );
+				
+			if ( pStage->vk_pbr_flags & PBR_HAS_NORMALMAP )
+				vk_update_descriptor( VK_DESC_PBR_NORMAL, pStage->normalMap->descriptor );
+
+			if ( pStage->vk_pbr_flags & PBR_HAS_PHYSICALMAP || pStage->vk_pbr_flags & PBR_HAS_SPECULARMAP )
+				vk_update_descriptor( VK_DESC_PBR_PHYSICAL, pStage->physicalMap->descriptor );
+			
+			if ( !tr.numCubemaps || backEnd.viewParms.targetCube != NULL ) {
+				vk_update_descriptor( VK_DESC_PBR_CUBEMAP, tr.emptyCubemap->descriptor );
+				//vk_update_descriptor( 10, tr.emptyCubemap->descriptor ); // irradiance is currently unused
+			}
+			else { 
+				// use the first cubemap index, indexes are not assigned per surface yet
+				vk_update_descriptor( VK_DESC_PBR_CUBEMAP, tr.cubemaps[0].prefiltered_image->descriptor );
+				//vk_update_descriptor( 10, tr.cubemaps[0].irradiance_image->descriptor ); // irradiance is currently unused
+			}
+		}
+#endif
+
 		if ( backEnd.viewParms.portalView == PV_MIRROR ) {
 			pipeline = pStage->vk_mirror_pipeline[fog_stage];
 		} else {
 			pipeline = pStage->vk_pipeline[fog_stage];
 		}
+
+#ifdef USE_VK_PBR
+		if ( !is_pbr_surface && pStage->vk_pbr_flags ) {
+			Vk_Pipeline_Def			def;
+
+			vk_get_pipeline_def( pipeline, &def );
+
+			def.vk_pbr_flags = 0;
+			pipeline = vk_find_pipeline_ext( 0, &def, qfalse );
+		}
+#endif
 
 		vk_bind_pipeline( pipeline );
 		vk_bind_geometry( tess_flags );
@@ -1079,7 +1153,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 
 #ifdef USE_VULKAN
 	if ( pushUniform ) {
-		VK_PushUniform( &uniform );
+		vk_push_uniform( &uniform );
 	}
 	if ( tess_flags ) // fog-only shaders?
 		vk_bind_geometry( tess_flags );
@@ -1143,24 +1217,28 @@ static void VK_SetLightParams( vkUniform_t *uniform, const dlight_t *dl ) {
 }
 #endif
 
+uint32_t vk_append_uniform( const void *uniform, size_t size, uint32_t min_offset ) {
+	const uint32_t offset = PAD(vk.cmd->vertex_buffer_offset, (VkDeviceSize)vk.uniform_alignment);
 
-uint32_t VK_PushUniform( const vkUniform_t *uniform ) {
-	const uint32_t offset = vk.cmd->uniform_read_offset = PAD( vk.cmd->vertex_buffer_offset, vk.uniform_alignment );
-
-	if ( offset + vk.uniform_item_size > vk.geometry_buffer_size )
+	if ( offset + min_offset > vk.geometry_buffer_size )
 		return ~0U;
 
-	// push uniform
-	Com_Memcpy( vk.cmd->vertex_buffer_ptr + offset, uniform, sizeof( *uniform ) );
-	vk.cmd->vertex_buffer_offset = offset + vk.uniform_item_size;
-
-	vk_reset_descriptor( VK_DESC_UNIFORM );
-	vk_update_descriptor( VK_DESC_UNIFORM, vk.cmd->uniform_descriptor );
-	vk_update_descriptor_offset( VK_DESC_UNIFORM, vk.cmd->uniform_read_offset );
+	Com_Memcpy( vk.cmd->vertex_buffer_ptr + offset, uniform, size );
+	vk.cmd->vertex_buffer_offset = offset + min_offset;
 
 	return offset;
 }
 
+uint32_t vk_push_uniform( const vkUniform_t *uniform ) {
+	const uint32_t offset = vk_append_uniform( uniform, sizeof(*uniform), (VkDeviceSize)vk.uniform_item_size );
+
+	vk_reset_descriptor( VK_DESC_UNIFORM );
+	vk_update_descriptor( VK_DESC_UNIFORM, vk.cmd->uniform_descriptor );
+	vk_update_descriptor_offset( VK_DESC_UNIFORM_MAIN_BINDING, offset );
+	vk_update_descriptor_offset( VK_DESC_UNIFORM_CAMERA_BINDING, vk.cmd->camera_ubo_offset );
+
+	return offset;
+}
 
 #ifdef USE_PMLIGHT
 void VK_LightingPass( void )
@@ -1185,7 +1263,7 @@ void VK_LightingPass( void )
 		// light parameters
 		VK_SetLightParams( &uniform, tess.light );
 
-		uniform_offset = VK_PushUniform( &uniform );
+		uniform_offset = vk_push_uniform( &uniform );
 
 		tess.dlightUpdateParams = qfalse;
 	}
@@ -1228,7 +1306,6 @@ void VK_LightingPass( void )
 	vk_draw_geometry( tess.depthRange, qtrue );
 }
 #endif // USE_PMLIGHT
-
 
 void RB_StageIteratorGeneric( void )
 {

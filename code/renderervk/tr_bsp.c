@@ -24,6 +24,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_local.h"
 #ifdef USE_VULKAN
 #include "vk.h"
+
+#ifdef VK_CUBEMAP
+#define JSON_IMPLEMENTATION
+#include "json.h"
+#undef JSON_IMPLEMENTATION
+#endif
 #endif
 
 /*
@@ -374,7 +380,7 @@ static void R_LoadMergedLightmaps( const lump_t *l, byte *image )
 	for ( offs = 0, i = 0 ; i < tr.numLightmaps; i++ ) {
 
 		tr.lightmaps[ i ] = R_CreateImage( va( "*mergedLightmap%d", i ), NULL, NULL,
-			lightmapWidth, lightmapHeight, lightmapFlags | IMGFLAG_CLAMPTOBORDER );
+			lightmapWidth, lightmapHeight, lightmapFlags | IMGFLAG_CLAMPTOBORDER, 0, 0 );
 
 		for ( y = 0; y < lightmapCountY; y++ ) {
 			if ( offs >= l->filelen )
@@ -461,7 +467,7 @@ static void R_LoadLightmaps( const lump_t *l ) {
 	for ( i = 0 ; i < tr.numLightmaps ; i++ ) {
 		maxIntensity = R_ProcessLightmap( image, buf + i * LIGHTMAP_SIZE * LIGHTMAP_SIZE * 3, maxIntensity );
 		tr.lightmaps[i] = R_CreateImage( va( "*lightmap%d", i ), NULL, image, LIGHTMAP_SIZE, LIGHTMAP_SIZE,
-			lightmapFlags | IMGFLAG_CLAMPTOEDGE );
+			lightmapFlags | IMGFLAG_CLAMPTOEDGE, 0, 0 );
 	}
 
 	//if ( r_lightmap->integer == 2 )	{
@@ -558,6 +564,143 @@ static shader_t *ShaderForShaderNum( const int shaderNum, int lightmapNum ) {
 	return shader;
 }
 
+#ifdef USE_VK_PBR
+static void GenerateFaceTangents( srfSurfaceFace_t *face )
+{
+	if ( !vk.pbrActive )
+		return;
+
+	float		*xyz0, *xyz1, *xyz2;
+	float		*st0, *st1, *st2;
+	float		*normal0, *normal1, *normal2;
+	float		*qtangent0, *qtangent1, *qtangent2;
+	int			i, *indices, i0, i1, i2;
+	vec3_t		tangent, binormal;
+	
+	indices = ( (int*)( (byte*)face + face->ofsIndices ) );
+	face->qtangents = (float*)ri.Hunk_Alloc( face->numPoints * sizeof(tess.qtangent[0]), h_low );
+
+	for ( i = 0; i < face->numIndices; i += 3 ) {
+		i0 = indices[i + 0];
+		i1 = indices[i + 1];
+		i2 = indices[i + 2];
+
+		if ( i0 >= face->numPoints || i1 >= face->numPoints || i2 >= face->numPoints )
+			continue;
+
+		xyz0 = face->points[i0];		// xyz
+		xyz1 = face->points[i1];
+		xyz2 = face->points[i2];
+
+		normal0 = face->points[i0]+3;	// normal
+		normal1 = face->points[i1]+3;
+		normal2 = face->points[i2]+3;
+
+		// squeezed in normals so start reading from index 6 instead of 3
+		st0 = face->points[i0]+6;		// st
+		st1 = face->points[i1]+6;
+		st2 = face->points[i2]+6;
+
+		R_CalcTangents( tangent, binormal,
+			xyz0, xyz1, xyz2, 
+			st0, st1, st2 );
+
+		qtangent0 = face->qtangents + indices[i + 0] * 4;
+		qtangent1 = face->qtangents + indices[i + 1] * 4;
+		qtangent2 = face->qtangents + indices[i + 2] * 4;		
+
+		R_TBNtoQtangents( tangent, binormal, normal0, qtangent0 );
+		R_TBNtoQtangents( tangent, binormal, normal1, qtangent1 );
+		R_TBNtoQtangents( tangent, binormal, normal2, qtangent2 );
+	}
+}
+
+static void GenerateTriTangents( srfTriangles_t *tri )
+{
+	if ( !vk.pbrActive )
+		return;
+
+	srfVert_t	*dv0, *dv1, *dv2;
+	int			i, i0, i1, i2;
+	vec3_t		tangent, binormal;
+
+	for ( i = 0; i < tri->numIndexes; i += 3 ) {
+		i0 = tri->indexes[ i + 0 ];
+		i1 = tri->indexes[ i + 1 ];
+		i2 = tri->indexes[ i + 2 ];
+
+		if ( i0 >= tri->numVerts || i1 >= tri->numVerts || i2 >= tri->numVerts )
+			continue;
+
+		dv0 = &tri->verts[i0];
+		dv1 = &tri->verts[i1];
+		dv2 = &tri->verts[i2];
+
+		R_CalcTangents( tangent, binormal,
+			dv0->xyz, dv1->xyz, dv2->xyz, 
+			dv0->st, dv1->st, dv2->st );
+
+		R_TBNtoQtangents( tangent, binormal, dv0->normal, dv0->qtangent );
+		R_TBNtoQtangents( tangent, binormal, dv1->normal, dv1->qtangent );
+		R_TBNtoQtangents( tangent, binormal, dv2->normal, dv2->qtangent );
+	}
+}
+
+static void GenerateFaceLightDirs( srfSurfaceFace_t *face ) {
+	face->lightdir = (float*)ri.Hunk_Alloc( face->numPoints * sizeof(tess.lightdir[0]), h_low );
+
+	for ( int i = 0; i < face->numPoints; i++ )
+		R_LightDirForPoint( face->points[i], face->lightdir + i * 4, face->points[i] + 3, &s_worldData );
+}
+
+static void GenerateTriLightDirs( srfTriangles_t *tri ) {
+	for ( int i = 0; i < tri->numVerts; i++ )
+		R_LightDirForPoint( tri->verts[i].xyz, tri->verts[i].lightdir, tri->verts[i].normal, &s_worldData );
+}
+
+static void GenerateGridLightDirs( srfGridMesh_t *grid ) {
+	int	width, height, numPoints;
+
+	width = LittleLong( grid->width );
+	height = LittleLong( grid->height );
+	numPoints = width * height;
+
+	for ( int i = 0; i < numPoints; i++ )
+		R_LightDirForPoint( grid->verts[i].xyz, grid->verts[i].lightdir, grid->verts[i].normal, &s_worldData );
+}
+
+static void vk_generate_light_directions( void )
+{
+	if ( !vk.pbrActive )
+		return;
+
+	srfSurfaceFace_t *face;
+	srfTriangles_t *tris;
+	srfGridMesh_t *grid;
+	msurface_t *sf;
+	uint32_t i;
+
+	for ( i = 0, sf = &s_worldData.surfaces[0]; i < s_worldData.numsurfaces; i++, sf++ ) {
+		face = (srfSurfaceFace_t *)sf->data;
+		if ( face->surfaceType == SF_FACE ) {
+			GenerateFaceLightDirs( face );
+			continue;
+		}
+
+		tris = (srfTriangles_t *)sf->data;
+		if ( tris->surfaceType == SF_TRIANGLES ) {
+			GenerateTriLightDirs( tris ); 
+			continue;
+		}
+
+		grid = (srfGridMesh_t *)sf->data;
+		if ( grid->surfaceType == SF_GRID ) {
+			GenerateGridLightDirs( grid ); 
+			continue;
+		}
+	}
+}
+#endif
 
 #ifdef USE_PMLIGHT
 static void GenerateNormals( srfSurfaceFace_t *face )
@@ -690,7 +833,22 @@ static void ParseFace( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 	for ( i = 0 ; i < numPoints ; i++ ) {
 		for ( j = 0 ; j < 3 ; j++ ) {
 			cv->points[i][j] = LittleFloat( verts[i].xyz[j] );
+#ifdef USE_VK_PBR
+			cv->points[i][3+j] = LittleFloat( verts[i].normal[j] );
+#endif
 		}
+#ifdef USE_VK_PBR
+		for ( j = 0 ; j < 2 ; j++ ) {
+			cv->points[i][6+j] = LittleFloat( verts[i].st[j] );
+			cv->points[i][8+j] = LittleFloat( verts[i].lightmap[j] );
+		}
+		R_ColorShiftLightingBytes( verts[i].color.rgba, (byte *)&cv->points[i][10], qtrue );
+		if ( lightmapNum >= 0 && r_mergeLightmaps->integer ) {
+			// adjust lightmap coords
+			cv->points[i][8] = cv->points[i][8] * tr.lightmapScale[0] + lightmapX;
+			cv->points[i][9] = cv->points[i][9] * tr.lightmapScale[1] + lightmapY;
+		}
+#else
 		for ( j = 0 ; j < 2 ; j++ ) {
 			cv->points[i][3+j] = LittleFloat( verts[i].st[j] );
 			cv->points[i][5+j] = LittleFloat( verts[i].lightmap[j] );
@@ -701,6 +859,7 @@ static void ParseFace( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 			cv->points[i][5] = cv->points[i][5] * tr.lightmapScale[0] + lightmapX;
 			cv->points[i][6] = cv->points[i][6] * tr.lightmapScale[1] + lightmapY;
 		}
+#endif
 	}
 
 	indexes += LittleLong( ds->firstIndex );
@@ -750,6 +909,10 @@ static void ParseFace( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 	SetPlaneSignbits( &cv->plane );
 	cv->plane.type = PlaneTypeForNormal( cv->plane.normal );
 
+#ifdef USE_VK_PBR
+	GenerateFaceTangents( cv );
+#endif
+
 	surf->data = (surfaceType_t *)cv;
 }
 
@@ -763,7 +926,7 @@ static void ParseMesh( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 	srfGridMesh_t	*grid;
 	int				i, j;
 	int				width, height, numPoints;
-	drawVert_t points[MAX_PATCH_SIZE*MAX_PATCH_SIZE];
+	srfVert_t points[MAX_PATCH_SIZE*MAX_PATCH_SIZE];
 	int				lightmapNum;
 	float			lightmapX, lightmapY;
 	vec3_t			bounds[2];
@@ -869,7 +1032,7 @@ static void ParseTriSurf( const dsurface_t *ds, const drawVert_t *verts, msurfac
 	tri->surfaceType = SF_TRIANGLES;
 	tri->numVerts = numVerts;
 	tri->numIndexes = numIndexes;
-	tri->verts = (drawVert_t *)(tri + 1);
+	tri->verts = (srfVert_t *)(tri + 1);
 	tri->indexes = (int *)(tri->verts + tri->numVerts );
 
 	surf->data = (surfaceType_t *)tri;
@@ -904,6 +1067,10 @@ static void ParseTriSurf( const dsurface_t *ds, const drawVert_t *verts, msurfac
 			ri.Error( ERR_DROP, "Bad index in triangle surface" );
 		}
 	}
+
+#ifdef USE_VK_PBR
+	GenerateTriTangents( tri );
+#endif
 }
 
 
@@ -1621,7 +1788,7 @@ static void R_MovePatchSurfacesToHunk( void ) {
 			continue;
 		//
 		n = grid->width * grid->height - 1;
-		size = n * sizeof( drawVert_t ) + sizeof( *grid );
+		size = n * sizeof( srfVert_t ) + sizeof( *grid );
 
 		for (j = 0; j < n; j++) {
 			for (k = 0; k < 3; k++) {
@@ -1629,6 +1796,7 @@ static void R_MovePatchSurfacesToHunk( void ) {
 			}
 		}
 
+		size = (grid->width * grid->height - 1) * sizeof( srfVert_t ) + sizeof( *grid );
 		hunkgrid = ri.Hunk_Alloc( size, h_low );
 		Com_Memcpy(hunkgrid, grid, size);
 
@@ -2269,6 +2437,283 @@ qboolean RE_GetEntityToken( char *buffer, int size ) {
 	}
 }
 
+#ifdef VK_CUBEMAP
+#ifndef MAX_SPAWN_VARS
+#define MAX_SPAWN_VARS 64
+#endif
+
+// derived from G_ParseSpawnVars() in g_spawn.c
+static qboolean R_ParseSpawnVars( char *spawnVarChars, int maxSpawnVarChars, int *numSpawnVars, char *spawnVars[MAX_SPAWN_VARS][2] )
+{
+	char    keyname[MAX_TOKEN_CHARS];
+	char	com_token[MAX_TOKEN_CHARS];
+	int		numSpawnVarChars = 0;
+	*numSpawnVars = 0;
+	// parse the opening brace
+	if ( !RE_GetEntityToken( com_token, sizeof( com_token ) ) ) {
+		// end of spawn string
+		return qfalse;
+	}
+	if ( com_token[0] != '{' ) {
+		ri.Printf( PRINT_ALL, "R_ParseSpawnVars: found %s when expecting {\n",com_token );
+		return qfalse;
+	}
+	// go through all the key / value pairs
+	while ( 1 ) {  
+		int keyLength, tokenLength;
+		// parse key
+		if ( !RE_GetEntityToken( keyname, sizeof( keyname ) ) ) {
+			ri.Printf( PRINT_ALL, "R_ParseSpawnVars: EOF without closing brace\n" );
+			return qfalse;
+		}
+		if ( keyname[0] == '}' ) {
+			break;
+		}
+		// parse value  
+		if ( !RE_GetEntityToken( com_token, sizeof( com_token ) ) ) {
+			ri.Printf( PRINT_ALL, "R_ParseSpawnVars: EOF without closing brace\n" );
+			return qfalse;
+		}
+		if ( com_token[0] == '}' ) {
+			ri.Printf( PRINT_ALL, "R_ParseSpawnVars: closing brace without data\n" );
+			return qfalse;
+		}
+		if ( *numSpawnVars == MAX_SPAWN_VARS ) {
+			ri.Printf( PRINT_ALL, "R_ParseSpawnVars: MAX_SPAWN_VARS\n" );
+			return qfalse;
+		}
+		keyLength = strlen(keyname) + 1;
+		tokenLength = strlen(com_token) + 1;
+		if ( numSpawnVarChars + keyLength + tokenLength > maxSpawnVarChars )
+		{
+			ri.Printf( PRINT_ALL, "R_ParseSpawnVars: MAX_SPAWN_VAR_CHARS\n" );
+			return qfalse;
+		}
+		strcpy( spawnVarChars + numSpawnVarChars, keyname );
+		spawnVars[ *numSpawnVars ][0] = spawnVarChars + numSpawnVarChars;
+		numSpawnVarChars += keyLength;
+		strcpy( spawnVarChars + numSpawnVarChars, com_token );
+		spawnVars[ *numSpawnVars ][1] = spawnVarChars + numSpawnVarChars;
+		numSpawnVarChars += tokenLength;
+		(*numSpawnVars)++;
+	}
+	return qtrue;
+}
+
+static void R_LoadEnvironmentJson( const char *baseName )
+{
+	char filename[MAX_QPATH];
+	union {
+		char *c;
+		void *v;
+	} buffer;
+	char *bufferEnd;
+	const char *environmentArrayJson;
+	int filelen, i;
+	Com_sprintf( filename, sizeof(filename), "cubemaps/%s/env.json", baseName );
+	filelen = ri.FS_ReadFile( filename, &buffer.v );
+	if ( !buffer.c )
+		return;
+	bufferEnd = buffer.c + filelen;
+	ri.Printf( PRINT_ALL, "Loaded Enviroment JSON: %s\n", filename );
+	if ( JSON_ValueGetType( buffer.c, bufferEnd ) != JSONTYPE_OBJECT )
+	{
+		ri.Printf( PRINT_ALL, "Bad %s: does not start with a object\n", filename );
+		ri.FS_FreeFile( buffer.v );
+		return;
+	}
+	//-----------------------------CUBEMAPS------------------------------------
+	environmentArrayJson = JSON_ObjectGetNamedValue( buffer.c, bufferEnd, "Cubemaps" );
+	if ( !environmentArrayJson )
+	{
+		ri.Printf( PRINT_ALL, "Bad %s: no Cubemaps\n", filename );
+		ri.FS_FreeFile( buffer.v );
+		return;
+	}
+	if ( JSON_ValueGetType( environmentArrayJson, bufferEnd ) != JSONTYPE_ARRAY )
+	{
+		ri.Printf( PRINT_ALL, "Bad %s: Cubemaps not an array\n", filename );
+		ri.FS_FreeFile( buffer.v );
+		return;
+	}
+	tr.numCubemaps = JSON_ArrayGetIndex( environmentArrayJson, bufferEnd, NULL, 0 );
+	tr.cubemaps = (cubemap_t *)ri.Hunk_Alloc( tr.numCubemaps * sizeof(*tr.cubemaps), h_low );
+	for ( i = 0; i < tr.numCubemaps; i++ )
+	{
+		cubemap_t *cubemap = &tr.cubemaps[i];
+		const char *cubemapJson, *keyValueJson, *indexes[3];
+		int j;
+		cubemapJson = JSON_ArrayGetValue( environmentArrayJson, bufferEnd, i );
+		keyValueJson = JSON_ObjectGetNamedValue( cubemapJson, bufferEnd, "Name" );
+		if ( !JSON_ValueGetString( keyValueJson, bufferEnd, cubemap->name, MAX_QPATH ) )
+			cubemap->name[0] = '\0';
+		keyValueJson = JSON_ObjectGetNamedValue( cubemapJson, bufferEnd, "Position" );
+		JSON_ArrayGetIndex( keyValueJson, bufferEnd, indexes, 3 );
+		for ( j = 0; j < 3; j++ )
+			cubemap->origin[j] = JSON_ValueGetFloat( indexes[j], bufferEnd );
+		cubemap->parallaxRadius = 1000.0f;
+		keyValueJson = JSON_ObjectGetNamedValue( cubemapJson, bufferEnd, "Radius" );
+		if (keyValueJson)
+			cubemap->parallaxRadius = JSON_ValueGetFloat( keyValueJson, bufferEnd );
+	}
+	ri.FS_FreeFile(buffer.v);
+}
+
+static const char *cubemapEntities[5] =
+{
+	"misc_cubemap",
+	"info_player_deathmatch",
+	"info_player_start",
+	"info_player_duel",
+	"info_player_intermission",
+};
+
+static void R_LoadCubemapEntities( int index )
+{
+	const char *cubemapEntityName = cubemapEntities[index];
+	char spawnVarChars[2048];
+	int numSpawnVars;
+	char *spawnVars[MAX_SPAWN_VARS][2];
+	int numCubemaps = 0;
+	// count cubemaps
+	numCubemaps = 0;
+	while( R_ParseSpawnVars( spawnVarChars, sizeof(spawnVarChars), &numSpawnVars, spawnVars ) )
+	{
+		int i;
+		for ( i = 0; i < numSpawnVars; i++ )
+		{
+			if (!Q_stricmp(spawnVars[i][0], "classname") && !Q_stricmp(spawnVars[i][1], cubemapEntityName))
+				numCubemaps++;
+		}
+	}
+	if ( !numCubemaps )
+		return;
+	tr.numCubemaps = numCubemaps;
+	tr.cubemaps = (cubemap_t *)ri.Hunk_Alloc( tr.numCubemaps * sizeof(*tr.cubemaps), h_low );
+	numCubemaps = 0;
+	while( R_ParseSpawnVars( spawnVarChars, sizeof(spawnVarChars), &numSpawnVars, spawnVars ) )
+	{
+		int i;
+		char name[MAX_QPATH];
+		qboolean isCubemap = qfalse;
+		qboolean originSet = qfalse;
+		vec3_t origin;
+		float parallaxRadius = 1000.0f;
+		name[0] = '\0';
+		for ( i = 0; i < numSpawnVars; i++ )
+		{
+			if ( !Q_stricmp( spawnVars[i][0], "classname" ) && !Q_stricmp( spawnVars[i][1], cubemapEntityName ) )
+				isCubemap = qtrue;
+			if ( !Q_stricmp( spawnVars[i][0], "name" ) )
+				Q_strncpyz( name, spawnVars[i][1], MAX_QPATH );
+			if ( !Q_stricmp( spawnVars[i][0], "origin" ) )
+			{
+				sscanf( spawnVars[i][1], "%f %f %f", &origin[0], &origin[1], &origin[2] );
+				originSet = qtrue;
+			}
+			else if ( !Q_stricmp( spawnVars[i][0], "radius" ) )
+				sscanf( spawnVars[i][1], "%f", &parallaxRadius );
+		}
+		if ( isCubemap && originSet )
+		{
+			cubemap_t *cubemap = &tr.cubemaps[numCubemaps];
+			Q_strncpyz( cubemap->name, name, MAX_QPATH );
+			VectorCopy( origin, cubemap->origin );
+			cubemap->parallaxRadius = parallaxRadius;
+			numCubemaps++;
+		}
+	}
+}
+
+static void R_RenderCubemapSide( int cubemapIndex, int cubemapSide, qboolean subscene, qboolean bounce )
+{
+	refdef_t refdef;
+	viewParms_t	parms;
+	Com_Memset( &refdef, 0, sizeof( refdef) );
+	VectorCopy( tr.cubemaps[cubemapIndex].origin, refdef.vieworg );
+	refdef.fov_x = 90;
+	refdef.fov_y = 90;
+	refdef.width = REF_CUBEMAP_SIZE;
+	refdef.height = REF_CUBEMAP_SIZE;
+	refdef.x = 0;
+	refdef.y = 0;
+	switch ( cubemapSide )
+	{
+		case 0:
+			// +X
+			VectorSet( refdef.viewaxis[0], 1, 0, 0 );
+			VectorSet( refdef.viewaxis[1], 0, 0, 1 );
+			VectorSet( refdef.viewaxis[2], 0, -1, 0 );
+			break;
+		case 1:
+			// -X
+			VectorSet( refdef.viewaxis[0], -1, 0, 0 );
+			VectorSet( refdef.viewaxis[1], 0, 0, -1 );
+			VectorSet( refdef.viewaxis[2], 0, -1, 0 );
+			break;
+		case 2:
+			// +Y
+			VectorSet( refdef.viewaxis[0], 0, -1, 0 );
+			VectorSet( refdef.viewaxis[1], -1, 0, 0 );
+			VectorSet( refdef.viewaxis[2], 0, 0, -1 );
+			break;
+		case 3:
+			// -Y
+			VectorSet( refdef.viewaxis[0], 0, 1, 0 );
+			VectorSet( refdef.viewaxis[1], -1, 0, 0 );
+			VectorSet( refdef.viewaxis[2], 0, 0, 1 );
+			break;
+		case 4:
+			// +Z
+			VectorSet( refdef.viewaxis[0], 0, 0, 1 );
+			VectorSet( refdef.viewaxis[1], -1, 0, 0 );
+			VectorSet( refdef.viewaxis[2], 0, -1, 0 );
+			break;
+		case 5:
+			// -Z
+			VectorSet( refdef.viewaxis[0], 0, 0, -1 );
+			VectorSet( refdef.viewaxis[1], 1, 0, 0 );
+			VectorSet( refdef.viewaxis[2], 0, -1, 0 );
+			break;
+	}
+	if ( !subscene )
+		RE_BeginScene( &refdef );
+	Com_Memset( &parms, 0, sizeof( parms ) );
+	parms.viewportX = refdef.x;
+	parms.viewportY = refdef.y;
+	parms.viewportWidth = REF_CUBEMAP_SIZE;
+	parms.viewportHeight = REF_CUBEMAP_SIZE;
+	parms.portalView = PV_NONE;
+	parms.fovX = 90;
+	parms.fovY = 90;
+	VectorCopy( refdef.vieworg, parms.or.origin );
+	VectorCopy( refdef.viewaxis[0], parms.or.axis[0] );
+	VectorCopy( refdef.viewaxis[1], parms.or.axis[1] );
+	VectorCopy( refdef.viewaxis[2], parms.or.axis[2] );
+	VectorCopy( refdef.vieworg, parms.pvsOrigin );
+	parms.targetCube = &tr.cubemaps[cubemapIndex];
+	parms.targetCubeLayer = cubemapSide;
+	R_RenderView( &parms );
+	RE_EndScene();
+}
+static void R_RenderAllCubemaps( void )
+{
+	int maxCubemaps, frontEndMsec, backEndMsec;
+	uint32_t i, j;
+	// Limit number of Cubemaps per map
+	maxCubemaps = MIN( tr.numCubemaps, 128 );
+	for ( i = 0; i < maxCubemaps; i++ ) 
+	{
+		RE_BeginFrame( STEREO_CENTER );
+		for ( j = 0; j < 6; j++ )
+			R_RenderCubemapSide( i, j, qfalse, qfalse );
+		RE_ClearScene();
+		R_AddConvolveCubemapCmd( &tr.cubemaps[i], i );
+		R_IssueRenderCommands();
+		RE_EndFrame( &frontEndMsec, &backEndMsec );
+	}
+}
+#endif
 
 /*
 =================
@@ -2359,6 +2804,28 @@ void RE_LoadWorldMap( const char *name ) {
 	R_LoadEntities( &header->lumps[LUMP_ENTITIES] );
 	R_LoadLightGrid( &header->lumps[LUMP_LIGHTGRID] );
 
+#ifdef USE_VK_PBR
+	vk_generate_light_directions();
+
+	#ifdef VK_CUBEMAP
+			// load cubemaps
+			if ( vk.cubemapActive )
+			{
+				// Try loading an env.json file first
+				R_LoadEnvironmentJson( s_worldData.baseName );
+
+				if ( !tr.numCubemaps ) {
+					for ( int i = 0; i < ARRAY_LEN(cubemapEntities); i++ )
+					{
+						R_LoadCubemapEntities( i );
+						if ( tr.numCubemaps )
+							break;
+					}
+				}
+			}
+		#endif
+#endif	
+
 #ifdef USE_VBO
 	R_BuildWorldVBO( s_worldData.surfaces, s_worldData.numsurfaces );
 #endif
@@ -2371,4 +2838,10 @@ void RE_LoadWorldMap( const char *name ) {
 	tr.world = &s_worldData;
 
 	ri.FS_FreeFile( buffer.v );
+
+#ifdef VK_CUBEMAP
+	// Render all cubemaps
+	if ( vk.cubemapActive && tr.numCubemaps )
+		R_RenderAllCubemaps();
+#endif
 }

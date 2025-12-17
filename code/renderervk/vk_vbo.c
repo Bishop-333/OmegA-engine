@@ -282,6 +282,18 @@ static void VBO_AddGeometry( vbo_t *vbo, vbo_item_t *vi, shaderCommands_t *input
 		// go to first color offset
 		offs = input->shader->normalOffset + input->shader->numVertexes * sizeof( input->normal[0] );
 
+#ifdef USE_VK_PBR
+		if( vk.pbrActive ) {
+			input->shader->qtangentOffset = input->shader->normalOffset + input->shader->numVertexes * sizeof(input->normal[0]);
+			input->shader->lightdirOffset = input->shader->qtangentOffset + input->shader->numVertexes * sizeof(input->qtangent[0]);
+
+			vbo->vbo_offset += input->shader->numVertexes * ( sizeof(input->qtangent[0]) + sizeof(input->lightdir[0]) );
+			
+			// go to first color offset
+			offs = input->shader->lightdirOffset + input->shader->numVertexes * sizeof(input->qtangent[0]);
+		}
+#endif
+
 		for ( i = 0; i < MAX_VBO_STAGES; i++ )
 		{
 			shaderStage_t *pStage = input->xstages[ i ];
@@ -376,6 +388,28 @@ static void VBO_AddGeometry( vbo_t *vbo, vbo_item_t *vi, shaderCommands_t *input
 	}
 	//Com_Printf( "v offs=%i size=%i\n", offs, size );
 	memcpy( vbo->vbo_buffer + offs, input->normal, size );
+
+#ifdef USE_VK_PBR
+	// qtangent
+	if( vk.pbrActive ) {	
+		offs = input->shader->qtangentOffset + input->shader->curVertexes * sizeof(input->qtangent[0]);
+		size = input->numVertexes * sizeof(input->qtangent[0]);
+		if (offs + size > vbo->vbo_size) {
+			ri.Error(ERR_DROP, "Qtangent overflow");
+		}
+		//Com_Printf( "v offs=%i size=%i\n", offs, size );
+		memcpy(vbo->vbo_buffer + offs, input->qtangent, size);
+
+		// lightdir
+		offs = input->shader->lightdirOffset + input->shader->curVertexes * sizeof(input->lightdir[0]);
+		size = input->numVertexes * sizeof(input->lightdir[0]);
+		if (offs + size > vbo->vbo_size) {
+			ri.Error(ERR_DROP, "Lightdir overflow");
+		}
+		//Com_Printf( "v offs=%i size=%i\n", offs, size );
+		memcpy(vbo->vbo_buffer + offs, input->lightdir, size);
+	}
+#endif
 
 	vi->num_indexes += input->numIndexes;
 	vi->num_vertexes += input->numVertexes;
@@ -518,6 +552,10 @@ void R_BuildWorldVBO( msurface_t *surf, int surfCount )
 			numStaticIndexes += face->numIndices;
 
 			vbo_size += face->numPoints * (sf->shader->svarsSize + sizeof( tess.xyz[0] ) + sizeof( tess.normal[0] ) );
+#ifdef USE_VK_PBR
+			if ( vk.pbrActive )
+				vbo_size += face->numPoints * ( sizeof(tess.qtangent[0]) +  sizeof(tess.lightdir[0]) );
+#endif
 			sf->shader->numVertexes += face->numPoints;
 			sf->shader->numIndexes += face->numIndices;
 			continue;
@@ -529,6 +567,10 @@ void R_BuildWorldVBO( msurface_t *surf, int surfCount )
 			numStaticIndexes += tris->numIndexes;
 
 			vbo_size += tris->numVerts * (sf->shader->svarsSize + sizeof( tess.xyz[0] ) + sizeof( tess.normal[0] ) );
+#ifdef USE_VK_PBR
+			if ( vk.pbrActive )
+				vbo_size += tris->numVerts * ( sizeof(tess.qtangent[0]) + sizeof(tess.lightdir[0]) );
+#endif
 			sf->shader->numVertexes += tris->numVerts;
 			sf->shader->numIndexes += tris->numIndexes;
 			continue;
@@ -541,6 +583,10 @@ void R_BuildWorldVBO( msurface_t *surf, int surfCount )
 			numStaticIndexes += grid->vboExpectIndices;
 
 			vbo_size += grid->vboExpectVertices * (sf->shader->svarsSize + sizeof( tess.xyz[0] ) + sizeof( tess.normal[0] ) );
+#ifdef USE_VK_PBR
+			if ( vk.pbrActive )
+				vbo_size += grid->vboExpectVertices * ( sizeof(tess.qtangent[0]) + sizeof(tess.lightdir[0]) );
+#endif
 			sf->shader->numVertexes += grid->vboExpectVertices;
 			sf->shader->numIndexes += grid->vboExpectIndices;
 			continue;

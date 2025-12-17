@@ -34,14 +34,15 @@ typedef enum
 	IMGFLAG_NONE           = 0x0000,
 	IMGFLAG_MIPMAP         = 0x0001,
 	IMGFLAG_PICMIP         = 0x0002,
-	IMGFLAG_CLAMPTOEDGE    = 0x0004,
-	IMGFLAG_CLAMPTOBORDER  = 0x0008,
-	IMGFLAG_NO_COMPRESSION = 0x0010,
-	IMGFLAG_NOLIGHTSCALE   = 0x0020,
-	IMGFLAG_LIGHTMAP       = 0x0040,
-	IMGFLAG_NOSCALE        = 0x0080,
-	IMGFLAG_RGB            = 0x0100,
-	IMGFLAG_COLORSHIFT     = 0x0200,
+	IMGFLAG_CUBEMAP		   = 0x0004,
+	IMGFLAG_CLAMPTOEDGE    = 0x0008,
+	IMGFLAG_CLAMPTOBORDER  = 0x0010,
+	IMGFLAG_NO_COMPRESSION = 0x0020,
+	IMGFLAG_NOLIGHTSCALE   = 0x0040,
+	IMGFLAG_LIGHTMAP       = 0x0080,
+	IMGFLAG_NOSCALE        = 0x0100,
+	IMGFLAG_RGB            = 0x0200,
+	IMGFLAG_COLORSHIFT     = 0x0400,
 } imgFlags_t;
 
 typedef enum {
@@ -92,8 +93,8 @@ extern cvar_t *r_ext_max_anisotropy;
 float R_NoiseGet4f( float x, float y, float z, double t );
 void  R_NoiseInit( void );
 
-image_t *R_FindImageFile( const char *name, imgFlags_t flags );
-image_t *R_CreateImage( const char *name, const char *name2, byte *pic, int width, int height, imgFlags_t flags );
+image_t *R_FindImageFile( const char *name, imgFlags_t flags, uint32_t type );
+image_t *R_CreateImage( const char *name, const char *name2, byte *pic, int width, int height, imgFlags_t flags, int format, uint32_t type );
 void R_UploadSubImage( byte *data, int x, int y, int width, int height, image_t *image );
 
 qhandle_t RE_RegisterShaderLightMap( const char *name, int lightmapIndex );

@@ -449,6 +449,18 @@ typedef struct {
 	color4ub_t	color;
 } drawVert_t;
 
+typedef struct {
+	vec3_t		xyz;
+	float		st[2];
+	float		lightmap[2];
+	vec3_t		normal;
+#ifdef USE_VK_PBR
+	vec4_t		qtangent;
+	vec4_t		lightdir;
+#endif
+	color4ub_t	color;
+} srfVert_t;
+
 typedef enum {
 	MST_BAD,
 	MST_PLANAR,

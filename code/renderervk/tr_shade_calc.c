@@ -821,9 +821,9 @@ void RB_CalcFogTexCoords( float *st ) {
 
 	// all fogging distance is based on world Z units
 	VectorSubtract( backEnd.or.origin, backEnd.viewParms.or.origin, local );
-	fogDistanceVector[0] = -backEnd.or.modelMatrix[2];
-	fogDistanceVector[1] = -backEnd.or.modelMatrix[6];
-	fogDistanceVector[2] = -backEnd.or.modelMatrix[10];
+	fogDistanceVector[0] = -backEnd.or.modelViewMatrix[2];
+	fogDistanceVector[1] = -backEnd.or.modelViewMatrix[6];
+	fogDistanceVector[2] = -backEnd.or.modelViewMatrix[10];
 	fogDistanceVector[3] = DotProduct( local, backEnd.viewParms.or.axis[0] );
 
 	// scale the fog vectors based on the fog's thickness
@@ -903,9 +903,9 @@ const fogProgramParms_t *RB_CalcFogProgramParms( void )
 
 	// all fogging distance is based on world Z units
 	VectorSubtract( backEnd.or.origin, backEnd.viewParms.or.origin, local );
-	parm.fogDistanceVector[0] = -backEnd.or.modelMatrix[2];
-	parm.fogDistanceVector[1] = -backEnd.or.modelMatrix[6];
-	parm.fogDistanceVector[2] = -backEnd.or.modelMatrix[10];
+	parm.fogDistanceVector[0] = -backEnd.or.modelViewMatrix[2];
+	parm.fogDistanceVector[1] = -backEnd.or.modelViewMatrix[6];
+	parm.fogDistanceVector[2] = -backEnd.or.modelViewMatrix[10];
 	parm.fogDistanceVector[3] = DotProduct( local, backEnd.viewParms.or.axis[0] );
 
 	// scale the fog vectors based on the fog's thickness
@@ -1284,3 +1284,186 @@ void RB_CalcDiffuseColor( unsigned char *colors )
 {
 	RB_CalcDiffuseColor_scalar( colors );
 }
+
+#ifdef USE_VK_PBR
+// source: https://github.com/DaemonEngine/Daemon
+void R_CalcTangents( vec3_t tangent, vec3_t binormal,
+		     const vec3_t v0, const vec3_t v1, const vec3_t v2,
+		     const vec2_t t0, const vec2_t t1, const vec2_t t2 )
+{
+	vec3_t dpx, dpy;
+	vec2_t dtx, dty;
+
+	VectorSubtract(v1, v0, dpx);
+	VectorSubtract(v2, v0, dpy);
+	Vector2Subtract(t1, t0, dtx);
+	Vector2Subtract(t2, t0, dty);
+
+	float area = dtx[0] * dty[1] - dtx[1] * dty[0];
+	if( area < 0.0f ) {
+		dtx[0] = -dtx[0];
+		dtx[1] = -dtx[1];
+		dty[0] = -dty[0];
+		dty[1] = -dty[1];
+	}
+
+	tangent[0] = dpx[0] * dty[1] - dtx[1] * dpy[0];
+	tangent[1] = dpx[1] * dty[1] - dtx[1] * dpy[1];
+	tangent[2] = dpx[2] * dty[1] - dtx[1] * dpy[2];
+
+	binormal[0] = dtx[0] * dpy[0] - dpx[0] * dty[0];
+	binormal[1] = dtx[0] * dpy[1] - dpx[1] * dty[0];
+	binormal[2] = dtx[0] * dpy[2] - dpx[2] * dty[0];
+
+	VectorNormalize( tangent );
+	VectorNormalize( binormal );
+}
+
+void R_TBNtoQtangents( const vec3_t tangent, const vec3_t binormal,
+		       const vec3_t normal, vec4_t qtangent )
+{
+	vec3_t tangent2, binormal2, normal2;
+	vec4_t q;
+	qboolean flipped = qfalse;
+	float trace, scale, dot;
+	vec3_t mid, tangent3, binormal3;
+
+	// orthogonalize the input vectors
+	// preserve normal vector as precise as possible
+	if( VectorLengthSquared( normal ) < 0.001f ) {
+		// degenerate case, compute new normal
+		CrossProduct( tangent, binormal, normal2 );
+		VectorNormalizeFast( normal2 );
+	} else {
+		VectorCopy( normal, normal2 );
+	}
+
+	// project tangent and binormal onto the normal orthogonal plane
+	VectorMA(tangent, -DotProduct(normal2, tangent), normal2, tangent2 );
+	VectorMA(binormal, -DotProduct(normal2, binormal), normal2, binormal2 );
+
+	// check for several degenerate cases
+	if( VectorLengthSquared( tangent2 ) < 0.001f ) {
+		if( VectorLengthSquared( binormal2 ) < 0.001f ) {
+			PerpendicularVector( tangent2, normal2 );
+			CrossProduct( normal2, tangent2, binormal2 );
+		} else {
+			VectorNormalizeFast( binormal2 );
+			CrossProduct( binormal2, normal2, tangent2 );
+		}
+	} else {
+		VectorNormalizeFast( tangent2 );
+		if( VectorLengthSquared( binormal2 ) < 0.001f ) {
+			CrossProduct( normal2, tangent2, binormal2 );
+		} else {
+			// compute mid vector and project into mid-orthogonal plane
+			VectorNormalizeFast( binormal2 );
+			VectorAdd( tangent2, binormal2, mid );
+			if( VectorLengthSquared( mid ) < 0.001f ) {
+				CrossProduct( binormal2, normal2, mid );
+			} else {
+				VectorNormalizeFast( mid );
+			}
+
+			VectorMA(tangent2, -DotProduct(mid, tangent2), mid, tangent3 );
+			VectorMA(binormal2, -DotProduct(mid, binormal2), mid, binormal3 );
+			
+			if( VectorLengthSquared( tangent3 ) < 0.001f ) {
+				CrossProduct( mid, normal2, tangent3 );
+				VectorNegate( tangent3, binormal3 );
+			}
+
+			VectorNormalizeFast( tangent3 );
+			VectorNormalizeFast( binormal3 );
+
+			VectorAdd( mid, tangent3, tangent2 );
+			VectorAdd( mid, binormal3, binormal2 );
+
+			VectorNormalizeFast( tangent2 );
+			VectorNormalizeFast( binormal2 );
+		}
+	}
+
+	// check of orientation
+	CrossProduct( binormal2, normal2, tangent3 );
+	dot = DotProduct( tangent2, tangent3 );
+	if( dot < 0.0f ) {
+		flipped = qtrue;
+		VectorNegate( tangent2, tangent2 );
+	}
+
+	if ( ( trace = tangent2[ 0 ] + binormal2[ 1 ] + normal2[ 2 ] ) > 0.0f )
+	{
+		trace += 1.0f;
+		scale = 0.5f * Q_rsqrt( trace );
+
+		q[ 3 ] = trace * scale;
+		q[ 2 ] = ( tangent2 [ 1 ] - binormal2[ 0 ] ) * scale;
+		q[ 1 ] = ( normal2  [ 0 ] - tangent2 [ 2 ] ) * scale;
+		q[ 0 ] = ( binormal2[ 2 ] - normal2  [ 1 ] ) * scale;
+	}
+
+	else if ( tangent2[ 0 ] > binormal2[ 1 ] && tangent2[ 0 ] > normal2[ 2 ] )
+	{
+		trace = tangent2[ 0 ] - binormal2[ 1 ] - normal2[ 2 ] + 1.0f;
+		scale = 0.5f * Q_rsqrt( trace );
+
+		q[ 0 ] = trace * scale;
+		q[ 1 ] = ( tangent2 [ 1 ] + binormal2[ 0 ] ) * scale;
+		q[ 2 ] = ( normal2  [ 0 ] + tangent2 [ 2 ] ) * scale;
+		q[ 3 ] = ( binormal2[ 2 ] - normal2  [ 1 ] ) * scale;
+	}
+
+	else if ( binormal2[ 1 ] > normal2[ 2 ] )
+	{
+		trace = -tangent2[ 0 ] + binormal2[ 1 ] - normal2[ 2 ] + 1.0f;
+		scale = 0.5f * Q_rsqrt( trace );
+
+		q[ 1 ] = trace * scale;
+		q[ 0 ] = ( tangent2 [ 1 ] + binormal2[ 0 ] ) * scale;
+		q[ 3 ] = ( normal2  [ 0 ] - tangent2 [ 2 ] ) * scale;
+		q[ 2 ] = ( binormal2[ 2 ] + normal2  [ 1 ] ) * scale;
+	}
+
+	else
+	{
+		trace = -tangent2[ 0 ] - binormal2[ 1 ] + normal2[ 2 ] + 1.0f;
+		scale = 0.5f * Q_rsqrt( trace );
+
+		q[ 2 ] = trace * scale;
+		q[ 3 ] = ( tangent2 [ 1 ] - binormal2[ 0 ] ) * scale;
+		q[ 0 ] = ( normal2  [ 0 ] + tangent2 [ 2 ] ) * scale;
+		q[ 1 ] = ( binormal2[ 2 ] + normal2  [ 1 ] ) * scale;
+	}
+
+	if( q[ 3 ] < 0.0f ) {
+		q[ 0 ] = -q[ 0 ];
+		q[ 1 ] = -q[ 1 ];
+		q[ 2 ] = -q[ 2 ];
+		q[ 3 ] = -q[ 3 ];
+	}
+
+	//i16vec4_t resqtangent;
+	//floatToSnorm16( q, resqtangent );
+
+	if( q[ 3 ] == 0 )
+	{
+		q[ 3 ] = 1;
+	} 
+
+	if( flipped )
+	{
+		qtangent[ 0 ] = -q[ 0 ];
+		qtangent[ 1 ] = -q[ 1 ];
+		qtangent[ 2 ] = -q[ 2 ];
+		qtangent[ 3 ] = -q[ 3 ];
+	}
+	else
+	{
+		qtangent[ 0 ] = q[ 0 ];
+		qtangent[ 1 ] = q[ 1 ];
+		qtangent[ 2 ] = q[ 2 ];
+		qtangent[ 3 ] = q[ 3 ];
+	}
+}
+#endif
