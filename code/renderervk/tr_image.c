@@ -1522,7 +1522,7 @@ qboolean vk_create_phyisical_texture( shaderStage_t *stage, const char *name, im
 	else
 		stage->physicalMap = R_CreateImage( packedName, NULL, packedPic, packedWidth, packedHeight, flags, 0, stage->physicalMapType );
 
-	Z_Free( packedPic );
+	ri.Free( packedPic );
 
 	stage->vk_pbr_flags |= PBR_HAS_PHYSICALMAP;
 	return qtrue;
