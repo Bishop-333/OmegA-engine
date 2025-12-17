@@ -305,12 +305,8 @@ ifeq ($(USE_SYSTEM_VORBIS),1)
 endif
 
 # extract version info
-ifneq ($(COMPILE_PLATFORM),darwin)
-VERSION=$(shell grep ".\+define[ \t]\+Q3_VERSION[ \t]\+\+" $(CMDIR)/q_shared.h | \
+VERSION=$(shell grep "define.*Q3_VERSION.*\"" $(CMDIR)/q_shared.h | \
   sed -e 's/.*".* \([^ ]*\)"/\1/')
-else
-VERSION=OMG 3.3.5
-endif
 
 # common qvm definition
 ifeq ($(ARCH),x86_64)

@@ -143,7 +143,7 @@ fi
 
 AVAILABLE_ARCHS=""
 
-OMG_VERSION=`grep '^VERSION=' Makefile | sed -e 's/.*=\(.*\)/\1/'`
+OMG_VERSION=`grep "define.*Q3_VERSION.*\"" code/qcommon/q_shared.h | sed -e 's/.*".* \([^ ]*\)"/\1/'`
 OMG_CLIENT_ARCHS=""
 OMG_SERVER_ARCHS=""
 OMG_RENDERER_VK_ARCHS=""
