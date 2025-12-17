@@ -143,7 +143,7 @@ fi
 
 AVAILABLE_ARCHS=""
 
-OMG_VERSION="3.3.5"
+OMG_VERSION=`grep '^VERSION=' Makefile | sed -e 's/.*=\(.*\)/\1/'`
 OMG_CLIENT_ARCHS=""
 OMG_SERVER_ARCHS=""
 OMG_RENDERER_VK_ARCHS=""
@@ -302,6 +302,27 @@ PLIST="<?xml version=\"1.0\" encoding=\"UTF-8\"?>
     <true/>
     <key>LSMinimumSystemVersion</key>
     <string>${MACOSX_DEPLOYMENT_TARGET}</string>"
+
+if [ -n "${MACOSX_DEPLOYMENT_TARGET_X86_64}" ] || [ -n "${MACOSX_DEPLOYMENT_TARGET_ARM64}" ]; then
+	PLIST="${PLIST}
+    <key>LSMinimumSystemVersionByArchitecture</key>
+    <dict>"
+
+	if [ -n "${MACOSX_DEPLOYMENT_TARGET_X86_64}" ]; then
+	PLIST="${PLIST}
+        <key>x86_64</key>
+        <string>${MACOSX_DEPLOYMENT_TARGET_X86_64}</string>"
+	fi
+	
+	if [ -n "${MACOSX_DEPLOYMENT_TARGET_ARM64}" ]; then
+	PLIST="${PLIST}
+        <key>arm64</key>
+        <string>${MACOSX_DEPLOYMENT_TARGET_ARM64}</string>"
+	fi
+
+	PLIST="${PLIST}
+    </dict>"
+fi
 
 PLIST="${PLIST}
     <key>NSHumanReadableCopyright</key>

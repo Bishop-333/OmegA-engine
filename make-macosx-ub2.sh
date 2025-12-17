@@ -9,6 +9,16 @@ fi
 # This script is to build a Universal 2 binary
 # (Apple's term for an x86_64 and arm64 binary)
 
+unset X86_64_SDK
+unset X86_64_CFLAGS
+unset X86_64_MACOSX_VERSION_MIN
+unset ARM64_SDK
+unset ARM64_CFLAGS
+unset ARM64_MACOSX_VERSION_MIN
+
+X86_64_MACOSX_VERSION_MIN="10.9"
+ARM64_MACOSX_VERSION_MIN="11.0"
+
 echo "Building X86_64 Client/Dedicated Server"
 echo "Building ARM64 Client/Dedicated Server"
 echo
@@ -30,7 +40,7 @@ fi
 #if [ -d build/release-release-x86_64 ]; then
 #	rm -r build/release-darwin-x86_64
 #fi
-(PLATFORM=darwin ARCH=x86_64 make -j$NCPU) || exit 1;
+(PLATFORM=darwin ARCH=x86_64 CFLAGS=$X86_64_CFLAGS MACOSX_VERSION_MIN=$X86_64_MACOSX_VERSION_MIN make -j$NCPU) || exit 1;
 
 echo;echo
 
@@ -38,11 +48,15 @@ echo;echo
 #if [ -d build/release-release-arm64 ]; then
 #	rm -r build/release-darwin-arm64
 #fi
-(PLATFORM=darwin ARCH=arm64 make -j$NCPU) || exit 1;
+(PLATFORM=darwin ARCH=arm64 CFLAGS=$ARM64_CFLAGS MACOSX_VERSION_MIN=$ARM64_MACOSX_VERSION_MIN make -j$NCPU) || exit 1;
 
 echo
 
 # use the following shell script to build a universal 2 application bundle
+export MACOSX_DEPLOYMENT_TARGET="10.9"
+export MACOSX_DEPLOYMENT_TARGET_X86_64="$X86_64_MACOSX_VERSION_MIN"
+export MACOSX_DEPLOYMENT_TARGET_ARM64="$ARM64_MACOSX_VERSION_MIN"
+
 if [ -d build/release-darwin-universal2 ]; then
 	rm -r build/release-darwin-universal2
 fi
