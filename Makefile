@@ -970,50 +970,113 @@ endif
 JPGOBJ = \
   $(B)/client/jaricom.o \
   $(B)/client/jcapimin.o \
-  $(B)/client/jcapistd.o \
   $(B)/client/jcarith.o \
-  $(B)/client/jccoefct.o  \
-  $(B)/client/jccolor.o \
-  $(B)/client/jcdctmgr.o \
-  $(B)/client/jchuff.o   \
+  $(B)/client/jchuff.o \
+  $(B)/client/jcicc.o \
   $(B)/client/jcinit.o \
-  $(B)/client/jcmainct.o \
+  $(B)/client/jclhuff.o \
   $(B)/client/jcmarker.o \
   $(B)/client/jcmaster.o \
   $(B)/client/jcomapi.o \
   $(B)/client/jcparam.o \
-  $(B)/client/jcprepct.o \
-  $(B)/client/jcsample.o \
+  $(B)/client/jcphuff.o \
   $(B)/client/jctrans.o \
   $(B)/client/jdapimin.o \
-  $(B)/client/jdapistd.o \
   $(B)/client/jdarith.o \
   $(B)/client/jdatadst.o \
   $(B)/client/jdatasrc.o \
-  $(B)/client/jdcoefct.o \
-  $(B)/client/jdcolor.o \
-  $(B)/client/jddctmgr.o \
   $(B)/client/jdhuff.o \
+  $(B)/client/jdicc.o \
   $(B)/client/jdinput.o \
-  $(B)/client/jdmainct.o \
+  $(B)/client/jdlhuff.o \
   $(B)/client/jdmarker.o \
   $(B)/client/jdmaster.o \
-  $(B)/client/jdmerge.o \
-  $(B)/client/jdpostct.o \
-  $(B)/client/jdsample.o \
+  $(B)/client/jdphuff.o \
   $(B)/client/jdtrans.o \
   $(B)/client/jerror.o \
   $(B)/client/jfdctflt.o \
-  $(B)/client/jfdctfst.o \
-  $(B)/client/jfdctint.o \
-  $(B)/client/jidctflt.o \
-  $(B)/client/jidctfst.o \
-  $(B)/client/jidctint.o \
   $(B)/client/jmemmgr.o \
   $(B)/client/jmemnobs.o \
-  $(B)/client/jquant1.o \
-  $(B)/client/jquant2.o \
-  $(B)/client/jutils.o
+  $(B)/client/jpeg_nbits.o
+
+JPGOBJ += \
+  $(B)/client/jcapistd-8.o \
+  $(B)/client/jccoefct-8.o \
+  $(B)/client/jccolor-8.o \
+  $(B)/client/jcdctmgr-8.o \
+  $(B)/client/jcdiffct-8.o \
+  $(B)/client/jclossls-8.o \
+  $(B)/client/jcmainct-8.o \
+  $(B)/client/jcprepct-8.o \
+  $(B)/client/jcsample-8.o \
+  $(B)/client/jdapistd-8.o \
+  $(B)/client/jdcoefct-8.o \
+  $(B)/client/jdcolor-8.o \
+  $(B)/client/jddctmgr-8.o \
+  $(B)/client/jddiffct-8.o \
+  $(B)/client/jdlossls-8.o \
+  $(B)/client/jdmainct-8.o \
+  $(B)/client/jdmerge-8.o \
+  $(B)/client/jdpostct-8.o \
+  $(B)/client/jdsample-8.o \
+  $(B)/client/jfdctfst-8.o \
+  $(B)/client/jfdctint-8.o \
+  $(B)/client/jidctflt-8.o \
+  $(B)/client/jidctfst-8.o \
+  $(B)/client/jidctint-8.o \
+  $(B)/client/jidctred-8.o \
+  $(B)/client/jquant1-8.o \
+  $(B)/client/jquant2-8.o \
+  $(B)/client/jutils-8.o
+
+JPGOBJ += \
+$(B)/client/jcapistd-12.o \
+  $(B)/client/jccoefct-12.o \
+  $(B)/client/jccolor-12.o \
+  $(B)/client/jcdctmgr-12.o \
+  $(B)/client/jcdiffct-12.o \
+  $(B)/client/jclossls-12.o \
+  $(B)/client/jcmainct-12.o \
+  $(B)/client/jcprepct-12.o \
+  $(B)/client/jcsample-12.o \
+  $(B)/client/jdapistd-12.o \
+  $(B)/client/jdcoefct-12.o \
+  $(B)/client/jdcolor-12.o \
+  $(B)/client/jddctmgr-12.o \
+  $(B)/client/jddiffct-12.o \
+  $(B)/client/jdlossls-12.o \
+  $(B)/client/jdmainct-12.o \
+  $(B)/client/jdmerge-12.o \
+  $(B)/client/jdpostct-12.o \
+  $(B)/client/jdsample-12.o \
+  $(B)/client/jfdctfst-12.o \
+  $(B)/client/jfdctint-12.o \
+  $(B)/client/jidctflt-12.o \
+  $(B)/client/jidctfst-12.o \
+  $(B)/client/jidctint-12.o \
+  $(B)/client/jidctred-12.o \
+  $(B)/client/jquant1-12.o \
+  $(B)/client/jquant2-12.o \
+  $(B)/client/jutils-12.o
+
+JPGOBJ += \
+  $(B)/client/jcapistd-16.o \
+  $(B)/client/jccolor-16.o \
+  $(B)/client/jcdiffct-16.o \
+  $(B)/client/jclossls-16.o \
+  $(B)/client/jcmainct-16.o \
+  $(B)/client/jcprepct-16.o \
+  $(B)/client/jcsample-16.o \
+  $(B)/client/jdapistd-16.o \
+  $(B)/client/jdcolor-16.o \
+  $(B)/client/jddiffct-16.o \
+  $(B)/client/jdlossls-16.o \
+  $(B)/client/jdmainct-16.o \
+  $(B)/client/jdpostct-16.o \
+  $(B)/client/jdsample-16.o \
+  $(B)/client/jutils-16.o \
+  $(B)/client/rdppm-16.o \
+  $(B)/client/wrppm-16.o
 
 Q3OBJ = \
   $(B)/client/cl_cgame.o \
@@ -1409,6 +1472,9 @@ $(B)/client/vorbis/%.o: $(VORBISDIR)/lib/%.c
 	$(DO_CC)
 
 $(B)/client/%.o: $(JPDIR)/%.c
+	$(DO_CC)
+
+$(B)/client/%.o: $(JPDIR)/wrapper/%.c
 	$(DO_CC)
 
 $(B)/client/%.o: $(SDLDIR)/%.c
