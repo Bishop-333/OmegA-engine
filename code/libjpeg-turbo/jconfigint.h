@@ -1,6 +1,9 @@
 /* libjpeg-turbo build number */
 #define BUILD  ""
 
+/* How to hide global symbols. */
+#define HIDDEN  __attribute__((visibility("hidden")))
+
 /* Compiler's inline keyword */
 #undef inline
 
@@ -29,12 +32,7 @@
 #define VERSION  "3.1.3"
 
 /* The size of `size_t', as computed by sizeof. */
-#if __WORDSIZE==64 || defined(_WIN64)
 #define SIZEOF_SIZE_T  8
-#else
-#define SIZEOF_SIZE_T  4
-#endif
-
 
 /* Define if your compiler has __builtin_ctzl() and sizeof(unsigned long) == sizeof(size_t). */
 #define HAVE_BUILTIN_CTZL
