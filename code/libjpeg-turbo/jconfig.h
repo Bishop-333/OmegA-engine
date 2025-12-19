@@ -55,6 +55,6 @@ typedef signed int INT32;
 
 /* Define if your (broken) compiler shifts signed values as if they were
    unsigned. */
-#define RIGHT_SHIFT_IS_UNSIGNED 1
+/* #undef RIGHT_SHIFT_IS_UNSIGNED */
 
 #endif
