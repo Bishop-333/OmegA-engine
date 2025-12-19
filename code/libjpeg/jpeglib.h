@@ -50,14 +50,6 @@ extern "C" {
 #endif
 #endif
 
-/* Version IDs for the JPEG library.
- * Might be useful for tests like "#if JPEG_LIB_VERSION >= 90".
- */
-
-#define JPEG_LIB_VERSION        90	/* Compatibility version 9.0 */
-#define JPEG_LIB_VERSION_MAJOR  9
-#define JPEG_LIB_VERSION_MINOR  5
-
 
 /* Various constants determining the sizes of things.
  * All of these are specified by the JPEG standard, so don't change them
