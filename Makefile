@@ -1466,7 +1466,7 @@ $(B)/client/%.o: $(OGGDIR)/src/%.c
 $(B)/client/vorbis/%.o: $(VORBISDIR)/lib/%.c
 	$(DO_CC)
 
-$(B)/client/libmad/%.o: $(MP3DIR)/%.c
+$(B)/client/%.o: $(MP3DIR)/%.c
 	$(DO_CC)
 
 $(B)/client/%.o: $(JPDIR)/%.c
