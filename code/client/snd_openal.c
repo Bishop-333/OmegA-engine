@@ -113,8 +113,15 @@ S_AL_ClearError
 */
 static void S_AL_ClearError( qboolean quiet )
 {
+	int error = qalGetError();
+
 	if( quiet )
 		return;
+	if(error != AL_NO_ERROR)
+	{
+		Com_WPrintf("WARNING: unhandled AL error: %s\n",
+			S_AL_ErrorMsg(error));
+	}
 }
 
 
@@ -642,7 +649,7 @@ Adapt the gain if necessary to get a quicker fadeout when the source is too far 
 
 static void S_AL_ScaleGain(src_t *chksrc, vec3_t origin)
 {
-	float distance;
+	float distance = 0.0f;
 	
 	if(!chksrc->local)
 		distance = Distance(origin, lastListenerOrigin);
@@ -2179,6 +2186,7 @@ void S_AL_MusicUpdate( void )
 	// it is no longer playing, and if there are buffers available
 	qalGetSourcei( musicSource, AL_SOURCE_STATE, &state );
 	qalGetSourcei( musicSource, AL_BUFFERS_QUEUED, &numBuffers );
+	qalSourcei( musicSource, AL_LOOPING, AL_FALSE );
 	if( state == AL_STOPPED && numBuffers )
 	{
 		Com_DPrintf( S_COLOR_YELLOW "Restarted OpenAL music\n" );
@@ -2592,7 +2600,7 @@ qboolean S_AL_Init( soundInterface_t *si )
 			while((curlen = strlen(devicelist)))
 			{
 				Q_strcat(devicenames, sizeof(devicenames), devicelist);
-				Q_strcat(devicenames, sizeof(devicenames), "");
+				Q_strcat(devicenames, sizeof(devicenames), "\n");
 
 				devicelist += curlen + 1;
 			}
