@@ -1452,10 +1452,10 @@ $(B)/client/%.o: $(OGGDIR)/src/%.c
 $(B)/client/vorbis/%.o: $(VORBISDIR)/lib/%.c
 	$(DO_CC)
 
-$(B)/client/%.o: $(JPDIR)/%.c
+$(B)/client/%.o: $(JPDIR)/src/%.c
 	$(DO_CC)
 
-$(B)/client/%.o: $(JPDIR)/wrapper/%.c
+$(B)/client/%.o: $(JPDIR)/src/wrapper/%.c
 	$(DO_CC)
 
 $(B)/client/%.o: $(JPDIR)/simd/%.c
