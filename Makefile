@@ -39,6 +39,9 @@ USE_OGG_VORBIS    = 1
 USE_SYSTEM_OGG    = 0
 USE_SYSTEM_VORBIS = 0
 
+USE_MP3           = 1
+USE_SYSTEM_MP3    = 1
+
 USE_VULKAN       = 1
 USE_OPENGL       = 1
 USE_OPENGL_API   = 1
@@ -163,6 +166,10 @@ ifndef USE_CODEC_VORBIS
 USE_CODEC_VORBIS=1
 endif
 
+ifndef USE_CODEC_MP3
+USE_CODEC_MP3=1
+endif
+
 ifndef USE_INTERNAL_LIBS
 USE_INTERNAL_LIBS=1
 endif
@@ -173,6 +180,10 @@ endif
 
 ifndef USE_INTERNAL_VORBIS
 USE_INTERNAL_VORBIS=$(USE_INTERNAL_LIBS)
+endif
+
+ifndef USE_INTERNAL_MP3
+USE_INTERNAL_MP3=$(USE_INTERNAL_LIBS)
 endif
 
 ifndef USE_CCACHE
@@ -241,6 +252,7 @@ UIDIR=$(MOUNT_DIR)/ui
 JPDIR=$(MOUNT_DIR)/libjpeg
 OGGDIR=$(MOUNT_DIR)/libogg
 VORBISDIR=$(MOUNT_DIR)/libvorbis
+MP3DIR=$(MOUNT_DIR)/libmad
 OPENALDIR=$(MOUNT_DIR)/libopenal
 VULKANDIR=$(MOUNT_DIR)/libvulkan
 
@@ -266,6 +278,10 @@ ifneq ($(call bin_path, $(PKG_CONFIG)),)
   ifeq ($(USE_SYSTEM_VORBIS),1)
     VORBIS_CFLAGS ?= $(shell $(PKG_CONFIG) --silence-errors --cflags vorbisfile || true)
     VORBIS_LIBS ?= $(shell $(PKG_CONFIG) --silence-errors --libs vorbisfile || echo -lvorbisfile)
+  endif
+  ifeq ($(USE_SYSTEM_MP3),1)
+    MP3_CFLAGS ?= $(shell $(PKG_CONFIG) --silence-errors --cflags mad || true)
+    MP3_LIBS ?= $(shell $(PKG_CONFIG) --silence-errors --libs mad || echo -lmad)
   endif
   ifeq ($(USE_OPENAL),1)
     OPENAL_INCLUDE ?= $(shell $(PKG_CONFIG) --silence-errors --cflags-only-I openal)
@@ -302,6 +318,16 @@ endif
 ifeq ($(USE_SYSTEM_VORBIS),1)
   ifeq ($(VORBIS_LIBS),)
     VORBIS_LIBS = -lvorbisfile
+  endif
+endif
+
+# supply some reasonable defaults for mp3
+ifeq ($(MP3_FLAGS),)
+  MP3_FLAGS = -I$(MP3DIR)/include
+endif
+ifeq ($(USE_SYSTEM_MP3),1)
+  ifeq ($(MP3_LIBS),)
+    MP3_LIBS = -lmad
   endif
 endif
 
@@ -794,6 +820,18 @@ ifeq ($(NEED_OGG),1)
   CLIENT_LDFLAGS += $(OGG_LIBS)
 endif
 
+ifeq ($(USE_CODEC_MP3),1)
+  BASE_CFLAGS += -DUSE_CODEC_MP3
+  ifeq ($(USE_INTERNAL_MP3),1)
+    BASE_CFLAGS += -I$(MP3DIR)/include
+  else
+    MP3_CFLAGS ?= $(shell $(PKG_CONFIG) --silence-errors --cflags mad || true)
+    MP3_LIBS ?= $(shell $(PKG_CONFIG) --silence-errors --libs mad || echo -lmad)
+  endif
+  BASE_CFLAGS += $(MP3_CFLAGS)
+  CLIENT_LDFLAGS += $(MP3_LIBS)
+endif
+
 #############################################################################
 # MAIN TARGETS
 #############################################################################
@@ -874,6 +912,9 @@ ifeq ($(USE_SYSTEM_OGG),0)
 endif
 ifeq ($(USE_SYSTEM_VORBIS),0)
 	@if [ ! -d $(B)/client/vorbis ];then $(MKDIR) $(B)/client/vorbis;fi
+endif
+ifeq ($(USE_SYSTEM_MP3),0)
+	@if [ ! -d $(B)/client/libmad ];then $(MKDIR) $(B)/client/libmad;fi
 endif
 	@if [ ! -d $(B)/rend1 ];then $(MKDIR) $(B)/rend1;fi
 	@if [ ! -d $(B)/rendv ];then $(MKDIR) $(B)/rendv;fi
@@ -1164,6 +1205,23 @@ Q3OBJ += \
 endif
 endif
 
+ifeq ($(USE_CODEC_MP3),1)
+ifeq ($(USE_INTERNAL_MP3),1)
+Q3OBJ += \
+  $(B)/client/libmad/bit.o \
+  $(B)/client/libmad/decoder.o \
+  $(B)/client/libmad/fixed.o \
+  $(B)/client/libmad/frame.o \
+  $(B)/client/libmad/huffman.o \
+  $(B)/client/libmad/layer3.o \
+  $(B)/client/libmad/layer12.o \
+  $(B)/client/libmad/stream.o \
+  $(B)/client/libmad/synth.o \
+  $(B)/client/libmad/timer.o \
+  $(B)/client/libmad/version.o
+endif
+endif
+
 ifeq ($(ARCH),x86_64)
   Q3OBJ += \
     $(B)/client/snd_mix_x86_64.o
@@ -1406,6 +1464,9 @@ $(B)/client/%.o: $(OGGDIR)/src/%.c
 	$(DO_CC)
 
 $(B)/client/vorbis/%.o: $(VORBISDIR)/lib/%.c
+	$(DO_CC)
+
+$(B)/client/libmad/%.o: $(MP3DIR)/%.c
 	$(DO_CC)
 
 $(B)/client/%.o: $(JPDIR)/%.c
