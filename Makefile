@@ -1059,25 +1059,6 @@ JPGOBJ += \
   $(B)/client/jquant2-12.o \
   $(B)/client/jutils-12.o
 
-JPGOBJ += \
-  $(B)/client/jcapistd-16.o \
-  $(B)/client/jccolor-16.o \
-  $(B)/client/jcdiffct-16.o \
-  $(B)/client/jclossls-16.o \
-  $(B)/client/jcmainct-16.o \
-  $(B)/client/jcprepct-16.o \
-  $(B)/client/jcsample-16.o \
-  $(B)/client/jdapistd-16.o \
-  $(B)/client/jdcolor-16.o \
-  $(B)/client/jddiffct-16.o \
-  $(B)/client/jdlossls-16.o \
-  $(B)/client/jdmainct-16.o \
-  $(B)/client/jdpostct-16.o \
-  $(B)/client/jdsample-16.o \
-  $(B)/client/jutils-16.o \
-  $(B)/client/rdppm-16.o \
-  $(B)/client/wrppm-16.o
-
 Q3OBJ = \
   $(B)/client/cl_cgame.o \
   $(B)/client/cl_cin.o \
