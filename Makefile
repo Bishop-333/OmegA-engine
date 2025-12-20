@@ -1030,7 +1030,7 @@ JPGOBJ += \
   $(B)/client/jutils-8.o
 
 JPGOBJ += \
-$(B)/client/jcapistd-12.o \
+  $(B)/client/jcapistd-12.o \
   $(B)/client/jccoefct-12.o \
   $(B)/client/jccolor-12.o \
   $(B)/client/jcdctmgr-12.o \
@@ -1475,6 +1475,9 @@ $(B)/client/%.o: $(JPDIR)/%.c
 	$(DO_CC)
 
 $(B)/client/%.o: $(JPDIR)/wrapper/%.c
+	$(DO_CC)
+
+$(B)/client/%.o: $(JPDIR)/simd/%.c
 	$(DO_CC)
 
 $(B)/client/%.o: $(SDLDIR)/%.c
