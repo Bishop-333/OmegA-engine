@@ -40,7 +40,7 @@ USE_SYSTEM_OGG    = 0
 USE_SYSTEM_VORBIS = 0
 
 USE_MP3           = 1
-USE_SYSTEM_MP3    = 1
+USE_SYSTEM_MP3    = 0
 
 USE_VULKAN       = 1
 USE_OPENGL       = 1
@@ -1109,6 +1109,7 @@ Q3OBJ = \
   $(B)/client/snd_codec.o \
   $(B)/client/snd_codec_wav.o \
   $(B)/client/snd_codec_ogg.o \
+  $(B)/client/snd_codec_mp3.o \
   \
   $(B)/client/qal.o \
   $(B)/client/snd_openal.o \
@@ -1217,17 +1218,17 @@ endif
 ifeq ($(USE_CODEC_MP3),1)
 ifeq ($(USE_INTERNAL_MP3),1)
 Q3OBJ += \
-  $(B)/client/bit.o \
-  $(B)/client/decoder.o \
-  $(B)/client/fixed.o \
-  $(B)/client/frame.o \
-  $(B)/client/huffman.o \
-  $(B)/client/layer3.o \
-  $(B)/client/layer12.o \
-  $(B)/client/stream.o \
-  $(B)/client/synth.o \
-  $(B)/client/timer.o \
-  $(B)/client/version.o
+  $(B)/client/libmad/bit.o \
+  $(B)/client/libmad/decoder.o \
+  $(B)/client/libmad/fixed.o \
+  $(B)/client/libmad/frame.o \
+  $(B)/client/libmad/huffman.o \
+  $(B)/client/libmad/layer3.o \
+  $(B)/client/libmad/layer12.o \
+  $(B)/client/libmad/stream.o \
+  $(B)/client/libmad/synth.o \
+  $(B)/client/libmad/timer.o \
+  $(B)/client/libmad/version.o
 endif
 endif
 
@@ -1475,7 +1476,7 @@ $(B)/client/%.o: $(OGGDIR)/src/%.c
 $(B)/client/vorbis/%.o: $(VORBISDIR)/lib/%.c
 	$(DO_CC)
 
-$(B)/client/%.o: $(MP3DIR)/%.c
+$(B)/client/libmad/%.o: $(MP3DIR)/%.c
 	$(DO_CC)
 
 $(B)/client/%.o: $(JPDIR)/%.c
