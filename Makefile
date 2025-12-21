@@ -824,6 +824,15 @@ ifeq ($(USE_CODEC_MP3),1)
   BASE_CFLAGS += -DUSE_CODEC_MP3
   ifeq ($(USE_INTERNAL_MP3),1)
     BASE_CFLAGS += -I$(MP3DIR)/include
+    ifeq ($(ARCH),x86)
+      MP3CFLAGS += -DFPM_INTEL
+    else ifeq ($(ARCH),x86_64)
+      MP3CFLAGS += -DFPM_64BIT
+    else ifeq ($(ARCH),arm64)
+        MP3CFLAGS += -DFPM_ARM
+    else
+      MP3CFLAGS += -DFPM_DEFAULT
+    endif
   else
     MP3_CFLAGS ?= $(shell $(PKG_CONFIG) --silence-errors --cflags mad || true)
     MP3_LIBS ?= $(shell $(PKG_CONFIG) --silence-errors --libs mad || echo -lmad)
@@ -1208,17 +1217,17 @@ endif
 ifeq ($(USE_CODEC_MP3),1)
 ifeq ($(USE_INTERNAL_MP3),1)
 Q3OBJ += \
-  $(B)/client/libmad/bit.o \
-  $(B)/client/libmad/decoder.o \
-  $(B)/client/libmad/fixed.o \
-  $(B)/client/libmad/frame.o \
-  $(B)/client/libmad/huffman.o \
-  $(B)/client/libmad/layer3.o \
-  $(B)/client/libmad/layer12.o \
-  $(B)/client/libmad/stream.o \
-  $(B)/client/libmad/synth.o \
-  $(B)/client/libmad/timer.o \
-  $(B)/client/libmad/version.o
+  $(B)/client/bit.o \
+  $(B)/client/decoder.o \
+  $(B)/client/fixed.o \
+  $(B)/client/frame.o \
+  $(B)/client/huffman.o \
+  $(B)/client/layer3.o \
+  $(B)/client/layer12.o \
+  $(B)/client/stream.o \
+  $(B)/client/synth.o \
+  $(B)/client/timer.o \
+  $(B)/client/version.o
 endif
 endif
 
