@@ -825,13 +825,13 @@ ifeq ($(USE_CODEC_MP3),1)
   ifeq ($(USE_INTERNAL_MP3),1)
     BASE_CFLAGS += -I$(MP3DIR)/include
     ifeq ($(ARCH),x86)
-      MP3CFLAGS += -DFPM_INTEL
+      BASE_CFLAGS += -DFPM_INTEL
     else ifeq ($(ARCH),x86_64)
-      MP3CFLAGS += -DFPM_64BIT
-    else ifeq ($(ARCH),arm64)
-        MP3CFLAGS += -DFPM_ARM
+      BASE_CFLAGS += -DFPM_64BIT
+    else ifeq ($(ARCH),arm)
+      BASE_CFLAGS += -DFPM_ARM
     else
-      MP3CFLAGS += -DFPM_DEFAULT
+      BASE_CFLAGS += -DFPM_DEFAULT
     endif
   else
     MP3_CFLAGS ?= $(shell $(PKG_CONFIG) --silence-errors --cflags mad || true)
