@@ -326,7 +326,7 @@ fi
 
 PLIST="${PLIST}
     <key>NSHumanReadableCopyright</key>
-    <string>OmegA Copyright © 2021-2025 Ekip, Inc. All rights reserved.</string>
+    <string>OmegA© 2021-2026 Bishop-333</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
     <key>NSHighResolutionCapable</key>

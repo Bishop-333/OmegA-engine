@@ -26,7 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // q_shared.h -- included first by ALL program modules.
 // A user mod should never modify this file
 
-#define Q3_VERSION            "OMG 3.3.5"
+#define Q3_VERSION            "OMG 3.3.6"
 #ifndef SVN_VERSION
   #define SVN_VERSION Q3_VERSION
 #endif
