@@ -35,13 +35,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // 1.32 released 7-10-2002
 
 #ifndef QUAKE3
-  #ifdef OMEGA
-    #define DEFAULT_GAME			"omega"
-  #elif RATMOD
-    #define DEFAULT_GAME			"rat"
-  #elif AFTERSHOCK
-    #define DEFAULT_GAME			"aftershock"
-  #endif
+  #define DEFAULT_GAME          MOD_DEFAULT
 #endif
 
 #ifdef QUAKE3
