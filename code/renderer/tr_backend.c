@@ -1299,6 +1299,10 @@ RB_DrawBuffer
 =============
 */
 static const void *RB_DrawBuffer( const void *data ) {
+	static float clearColorValue[3] = { 0.0, 0.0, 0.0 };
+	static char clearColorString[ MAX_CVAR_VALUE_STRING ] = { '\0' };
+	int i;
+	char buf[ MAX_CVAR_VALUE_STRING ], *v[3];
 	const drawBufferCommand_t	*cmd;
 
 	cmd = (const drawBufferCommand_t *)data;
@@ -1316,7 +1320,20 @@ static const void *RB_DrawBuffer( const void *data ) {
 
 	// clear screen for debugging
 	if ( r_clear->integer ) {
-		qglClearColor( 1, 0, 0.5, 1 );
+		if ( strcmp( r_clearColor->string, clearColorString ) ) {
+			Q_strncpyz( clearColorString, r_clearColor->string, sizeof( clearColorString ) );
+			Q_strncpyz( buf, r_clearColor->string, sizeof( buf ) );
+			Com_Split( buf, v, 3, ' ' );
+			for ( i = 0; i < 3 ; i++ ) {
+				clearColorValue[ i ] = Q_atof( v[ i ] ) / 255.0f;
+				if ( clearColorValue[ i ] > 1.0f ) {
+					clearColorValue[ i ] = 1.0f;
+				} else if ( clearColorValue[ i ] < 0.0f ) {
+					clearColorValue[ i ] = 0.0f;
+				}
+			}
+		}
+		qglClearColor( clearColorValue[0], clearColorValue[1], clearColorValue[2], 1 );
 		qglClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 	}
 

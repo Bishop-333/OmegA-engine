@@ -153,6 +153,7 @@ cvar_t	*r_showsky;
 cvar_t	*r_shownormals;
 cvar_t	*r_finish;
 cvar_t	*r_clear;
+cvar_t	*r_clearColor;
 cvar_t	*r_textureMode;
 cvar_t	*r_offsetFactor;
 cvar_t	*r_offsetUnits;
@@ -1731,6 +1732,8 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_shownormals, "Debugging tool: Show wireframe surface normals." );
 	r_clear = ri.Cvar_Get( "r_clear", "0", 0 );
 	ri.Cvar_SetDescription( r_clear, "Forces screen buffer clearing every frame, removing any hall of mirrors effect in void.\n Use \\r_clearColor to set color." );
+	r_clearColor = ri.Cvar_Get( "r_clearColor", "255 0 128", 0 );
+	ri.Cvar_SetDescription( r_clearColor, "Clear screen color, set as R G B values from 0-255, use with \\seta to save in config." );
 	r_offsetFactor = ri.Cvar_Get( "r_offsetFactor", "-1", CVAR_CHEAT );
 	ri.Cvar_SetDescription( r_offsetFactor, "Offset factor for shaders with polygonOffset stages." );
 	r_offsetUnits = ri.Cvar_Get( "r_offsetunits", "-2", CVAR_CHEAT );
