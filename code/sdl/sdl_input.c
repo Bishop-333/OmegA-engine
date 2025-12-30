@@ -1394,7 +1394,7 @@ void IN_Frame( void )
 	//in_eventTime = Sys_Milliseconds();
 
 	// In case we had to delay actual restart of video system
-	if( ( vidRestartTime != 0 ) && ( vidRestartTime < Sys_Milliseconds( ) ) && !glw_state.isFullscreen )
+	if( ( vidRestartTime != 0 ) && ( vidRestartTime < Sys_Milliseconds( ) ) )
 	{
 		vidRestartTime = 0;
 		Cbuf_AddText( "vid_restart\n" );
