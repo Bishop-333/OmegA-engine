@@ -357,10 +357,12 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 		Com_Printf( "Initializing OpenGL display\n");
 	}
 
+#ifndef USE_VULKAN_API
 	if ( r_allowResize->integer )
 	{
 		flags |= SDL_WINDOW_RESIZABLE;
 	}
+#endif
 
 	// If a window exists, note its display index
 	if ( SDL_window != NULL )
@@ -780,7 +782,9 @@ void GLimp_Init( glconfig_t *config )
 	Cvar_SetDescription( in_nograb, "Do not capture mouse in game, may be useful during online streaming." );
 
 	r_allowSoftwareGL = Cvar_Get( "r_allowSoftwareGL", "0", CVAR_LATCH );
+#ifndef USE_VULKAN_API
 	r_allowResize = Cvar_Get( "r_allowResize", "1", CVAR_ARCHIVE | CVAR_LATCH );
+#endif
 
 	r_swapInterval = Cvar_Get( "r_swapInterval", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	r_stereoEnabled = Cvar_Get( "r_stereoEnabled", "0", CVAR_ARCHIVE | CVAR_LATCH );
