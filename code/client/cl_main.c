@@ -4185,7 +4185,7 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 	Cmd_RemoveCommand ("stopvideo");
 	Cmd_RemoveCommand ("serverinfo");
 	Cmd_RemoveCommand ("systeminfo");
-        Cmd_RemoveCommand ("fwdinfo");
+	Cmd_RemoveCommand ("fwdinfo");
 	Cmd_RemoveCommand ("modelist");
 
 #ifdef USE_CURL

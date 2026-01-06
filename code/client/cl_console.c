@@ -116,6 +116,7 @@ cvar_t		*con_notifytime;
 cvar_t		*con_scale;
 cvar_t		*con_fps;
 cvar_t		*con_clock;
+cvar_t		*con_drawHelp;
 
 int			g_console_field_width;
 
@@ -583,6 +584,8 @@ void Con_Init( void )
 	Cvar_SetDescription( con_fps, "Enable/disable console fps display." );
 	con_clock = Cvar_Get( "con_clock", "1", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( con_clock, "Console clock.\n 1: 24-hour clock\n 2: 12-hour clock" );
+	con_drawHelp = Cvar_Get( "con_drawHelp", "1", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( con_drawHelp, "Enable/disable automatic CVAR description display." );
 
 	Field_Clear( &g_consoleField );
 	g_consoleField.widthInChars = g_console_field_width;
@@ -1096,6 +1099,44 @@ static void Con_DrawFPS(float y) {
 
 /*
 ================
+Con_DrawHelp
+================
+*/
+static void Con_DrawHelp( int y ) {
+	int		i;
+	char	buf[ MAX_CVAR_VALUE_STRING ];
+	cvar_t	*cv;
+
+    if ( !con_drawHelp->integer ) {
+        return;
+    }
+
+    Q_strncpyz( buf, g_consoleField.buffer, sizeof( buf ) );
+
+	if ( buf[0] == '\\' || buf[0] == '/' ) {
+		for ( i = 0 ; buf[i] != '\0' ; i++ ) {
+			buf[i] = buf[i+1];
+		}
+	}
+
+	for ( i = 0 ; buf[i] != '\0' ; i++ ) {
+		if ( buf[i] <= ' ' ) {
+			buf[i] = '\0';
+			break;
+		}
+	}
+
+	cv = Cvar_FindVar( buf );
+	if ( !cv || !cv->description ) {
+		return;
+	}
+
+	SCR_DrawSmallStringExt( activeCon->xadjust + smallchar_width, y, cv->description, g_color_table[ ColorIndex( COLOR_GREEN ) ], qfalse, qtrue );
+}
+
+
+/*
+================
 Con_DrawSolidConsole
 
 Draws the console with the solid background
@@ -1112,6 +1153,7 @@ static void Con_DrawSolidConsole( float frac ) {
 	short			*text;
 	int				row;
 	int				lines;
+	int				helpLine;
 	int				currentColorIndex;
 	int				colorIndex;
 	float			yf, wf;
@@ -1182,10 +1224,16 @@ static void Con_DrawSolidConsole( float frac ) {
 		lines - smallchar_height, Q3_VERSION, ARRAY_LEN( Q3_VERSION ) - 1 );
 
 	// draw the text
+	if ( con_drawHelp->integer ) {
+		helpLine = 1;
+	} else {
+		helpLine = 0;
+	}
+
 	activeCon->vislines = lines;
 	rows = lines / smallchar_width - 1;	// rows of text to draw
 
-	y = lines - (smallchar_height * 3);
+	y = lines - (smallchar_height * (3 + helpLine));
 
 	row = activeCon->display;
 
@@ -1296,6 +1344,8 @@ static void Con_DrawSolidConsole( float frac ) {
 
 	// draw the input prompt, user text, and cursor if desired
 	Con_DrawInput();
+
+	Con_DrawHelp( lines - smallchar_height * 3 );
 
 	re.SetColor( NULL );
 }
