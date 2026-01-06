@@ -1060,7 +1060,7 @@ Con_DrawFPS
 ================
 */
 #define FPS_FRAMES 4
-static void Con_DrawFPS(float y) {
+static float Con_DrawFPS( float y ) {
 	const char		*s;
 	int			w;
 	static int	previousTimes[FPS_FRAMES];
@@ -1092,8 +1092,41 @@ static void Con_DrawFPS(float y) {
 		s = va( "%ifps", fps );
 		w = strlen( s ) * smallchar_width;
 
-		SCR_DrawSmallStringExt( cls.glconfig.vidWidth - w - 8, y + 2, s, g_color_table[1], qfalse, qtrue);
+		SCR_DrawSmallStringExt( cls.glconfig.vidWidth - w - 8, y + 2, s, g_color_table[ conColors[ activeConsoleNum ] ], qfalse, qtrue);
 	}
+
+	return y + smallchar_height + 4;
+}
+
+
+/*
+================
+Con_DrawClock
+================
+*/
+static float Con_DrawClock( float y ) {
+	qtime_t		qt;
+	const char	*time;
+	char		*meridiem;
+	int			hour;
+
+	Com_RealTime( &qt );
+	if ( con_clock->integer == 2 ) {
+		if ( qt.tm_hour < 13 ) {
+			meridiem = "AM";
+			hour = qt.tm_hour;
+		} else {
+			meridiem = "PM";
+			hour = qt.tm_hour - 12;
+		}
+		time = va( "%02i:%02i%s", hour, qt.tm_min, meridiem );
+	} else {
+		time = va( "%02i:%02i:%02i", qt.tm_hour, qt.tm_min, qt.tm_sec );
+	}
+
+	SCR_DrawSmallStringExt( cls.glconfig.vidWidth - ( strlen( time ) ) * smallchar_width - 8, y, time, g_color_table[ conColors[ activeConsoleNum ] ], qfalse, qtrue);
+
+	return y + smallchar_height + 4;
 }
 
 
@@ -1131,7 +1164,7 @@ static void Con_DrawHelp( int y ) {
 		return;
 	}
 
-	SCR_DrawSmallStringExt( activeCon->xadjust + smallchar_width, y, cv->description, g_color_table[ ColorIndex( COLOR_GREEN ) ], qfalse, qtrue );
+	SCR_DrawSmallStringExt( activeCon->xadjust + smallchar_width, y, cv->description, g_color_table[ conColors[ activeConsoleNum ] ], qfalse, qtrue );
 }
 
 
@@ -1156,12 +1189,8 @@ static void Con_DrawSolidConsole( float frac ) {
 	int				helpLine;
 	int				currentColorIndex;
 	int				colorIndex;
-	float			yf, wf;
+	float			yf, wf, yy;
 	char			buf[ MAX_CVAR_VALUE_STRING ], *v[4];
-	qtime_t			qt;
-	const char		*time;
-	char			*meridiem;
-	int			hour;
 	int			j;
 	int			margin;
 	vec4_t			darkTextColor;
@@ -1214,7 +1243,7 @@ static void Con_DrawSolidConsole( float frac ) {
 
 	}
 
-	re.SetColor( g_color_table[ ColorIndex( COLOR_RED ) ] );
+	re.SetColor( g_color_table[ conColors[ activeConsoleNum ] ] );
 	re.DrawStretchPic( 0, yf, wf, 2, 0, 0, 1, 1, cls.whiteShader );
 
 	//y = yf;
@@ -1248,32 +1277,16 @@ static void Con_DrawSolidConsole( float frac ) {
 		row--;
 	}
 
+	yy = 2;
+
 	// draw console fps frames
 	if ( con_fps->integer ) {
-		Con_DrawFPS( 2 );
+		yy = Con_DrawFPS( yy );
 	}
 
 	// draw console clock (fx3)
 	if ( con_clock->integer ) {
-		Com_RealTime( &qt );
-		if ( con_clock->integer == 2 ) {
-			if ( qt.tm_hour < 13 ) {
-				meridiem = "AM";
-				hour = qt.tm_hour;
-			} else {
-				meridiem = "PM";
-				hour = qt.tm_hour - 12;
-			}
-			time = va( "%02i:%02i%s", hour, qt.tm_min, meridiem );
-		} else {
-			time = va( "%02i:%02i:%02i", qt.tm_hour, qt.tm_min, qt.tm_sec );
-		}
-
-		if ( con_fps->integer ) {
-			SCR_DrawSmallStringExt( cls.glconfig.vidWidth - ( strlen( time ) ) * smallchar_width - 8, smallchar_height + 6, time, g_color_table[1], qfalse, qtrue);
-		} else {
-			SCR_DrawSmallStringExt( cls.glconfig.vidWidth - ( strlen( time ) ) * smallchar_width - 8, 2, time, g_color_table[1], qfalse, qtrue);
-		}
+		yy = Con_DrawClock( yy );
 	}
 
 	// draw console tabs (fX3)
