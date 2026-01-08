@@ -675,9 +675,13 @@ void Com_InitKeyCommands( void )
 {
 	// register client functions
 	Cmd_AddCommand( "bind", Key_Bind_f );
+	Cmd_SetDescription( "bind", "Binds a command to a key." );
 	Cmd_SetCommandCompletionFunc( "bind", Key_CompleteBind );
 	Cmd_AddCommand( "unbind", Key_Unbind_f );
+	Cmd_SetDescription( "unbind", "Unbinds a key." );
 	Cmd_SetCommandCompletionFunc( "unbind", Key_CompleteUnbind );
 	Cmd_AddCommand( "unbindall", Key_Unbindall_f );
+	Cmd_SetDescription( "unbindall", "Unbinds all keys." );
 	Cmd_AddCommand( "bindlist", Key_Bindlist_f );
+	Cmd_SetDescription( "bindlist", "Prints all bound keys." );
 }

@@ -592,6 +592,7 @@ void Con_Init( void )
 
 	Cmd_AddCommand( "clear", Con_Clear_f );
 	Cmd_AddCommand( "condump", Con_Dump_f );
+	Cmd_SetDescription( "condump", "Save the console contents out to a file." );
 	Cmd_SetCommandCompletionFunc( "condump", Cmd_CompleteTxtName );
 	Cmd_AddCommand( "toggleconsole", Con_ToggleConsole_f );
 	Cmd_AddCommand( "messagemode", Con_MessageMode_f );
@@ -1135,36 +1136,82 @@ static float Con_DrawClock( float y ) {
 Con_DrawHelp
 ================
 */
-static void Con_DrawHelp( int y ) {
+static void Con_DrawHelp( int y, float conColorValue[4] ) {
 	int		i;
-	char	buf[ MAX_CVAR_VALUE_STRING ];
-	cvar_t	*cv;
+	char	help[ MAX_CVAR_VALUE_STRING ];
 
-    if ( !con_drawHelp->integer ) {
-        return;
-    }
+	if ( *g_consoleField.buffer == '\0' )
+		return;
+	
+	if ( activeCon->displayFrac == 0.0f || activeCon->displayFrac < activeCon->finalFrac )
+		return;
 
-    Q_strncpyz( buf, g_consoleField.buffer, sizeof( buf ) );
+	Cmd_TokenizeString( g_consoleField.buffer );
+	if ( Cmd_Argc() < 1 )
+		return;
 
-	if ( buf[0] == '\\' || buf[0] == '/' ) {
-		for ( i = 0 ; buf[i] != '\0' ; i++ ) {
-			buf[i] = buf[i+1];
-		}
+	const char* name = Cmd_Argv(0);
+	if ( *name == '/' || *name == '\\' )
+		name++;
+
+	if ( *name == '\0' )
+		return;
+
+	const char *desc = Cvar_GetDescription( name );
+	if ( !desc ) {
+		desc = Cmd_GetDescription( name );
 	}
 
-	for ( i = 0 ; buf[i] != '\0' ; i++ ) {
-		if ( buf[i] <= ' ' ) {
-			buf[i] = '\0';
-			break;
-		}
-	}
-
-	cv = Cvar_FindVar( buf );
-	if ( !cv || !cv->description ) {
+	if ( !desc ) {
 		return;
 	}
 
-	SCR_DrawSmallStringExt( activeCon->xadjust + smallchar_width, y, cv->description, g_color_table[ conColors[ activeConsoleNum ] ], qfalse, qtrue );
+	const char *s = desc;
+	int lines = 1;
+	int len = 0;
+	int maxLen = 0;
+
+	while ( *s ) {
+		if ( *s == '\n' ) {
+			lines++;
+			len = 0;
+		} else {
+			len++;
+			if ( len > maxLen ) {
+				maxLen = len;
+			}
+		}
+		s++;
+	}
+
+	int x = activeCon->xadjust + smallchar_width;
+	int w = maxLen * smallchar_width + 16;
+	int h = lines * smallchar_height + 8;
+
+	re.SetColor( conColorValue );
+	re.DrawStretchPic( x, y, w, h, 0, 0, 0, 0, cls.whiteShader );
+	re.SetColor( NULL );
+
+	re.SetColor( g_color_table[ conColors[ activeConsoleNum ] ] );
+	re.DrawStretchPic( x + 1, y + h + 0, w - 1, 1, 0, 0, 0, 0, cls.whiteShader );
+	re.DrawStretchPic( x + 2, y + h + 1, w - 2, 1, 0, 0, 0, 0, cls.whiteShader );
+	re.DrawStretchPic( x + w + 0, y + 1, 1, h + 1, 0, 0, 0, 0, cls.whiteShader );
+	re.DrawStretchPic( x + w + 1, y + 2, 1, h + 0, 0, 0, 0, 0, cls.whiteShader );
+	re.SetColor( NULL );
+
+	while ( *desc ) {
+		for ( i = 0; *desc && *desc != '\n' && i < sizeof( help ) - 1; i++ ) {
+			help[i] = *desc++;
+		}
+		help[i] = '\0';
+
+		SCR_DrawSmallStringExt( x + 6, y + 4, help, g_color_table[ ColorIndex( COLOR_WHITE ) ], qfalse, qtrue );
+		y += smallchar_height;
+
+		if ( *desc == '\n' ) {
+			desc++;
+		}
+	}
 }
 
 
@@ -1186,7 +1233,6 @@ static void Con_DrawSolidConsole( float frac ) {
 	short			*text;
 	int				row;
 	int				lines;
-	int				helpLine;
 	int				currentColorIndex;
 	int				colorIndex;
 	float			yf, wf, yy;
@@ -1253,16 +1299,10 @@ static void Con_DrawSolidConsole( float frac ) {
 		lines - smallchar_height, Q3_VERSION, ARRAY_LEN( Q3_VERSION ) - 1 );
 
 	// draw the text
-	if ( con_drawHelp->integer ) {
-		helpLine = 1;
-	} else {
-		helpLine = 0;
-	}
-
 	activeCon->vislines = lines;
 	rows = lines / smallchar_width - 1;	// rows of text to draw
 
-	y = lines - (smallchar_height * (3 + helpLine));
+	y = lines - (smallchar_height * 3);
 
 	row = activeCon->display;
 
@@ -1270,7 +1310,7 @@ static void Con_DrawSolidConsole( float frac ) {
 	if ( activeCon->display != activeCon->current )
 	{
 		// draw arrows to show the buffer is backscrolled
-		re.SetColor( g_color_table[ ColorIndex( COLOR_RED ) ] );
+		re.SetColor( g_color_table[ conColors[ activeConsoleNum ] ] );
 		for ( x = 0 ; x < activeCon->linewidth ; x += 4 )
 			SCR_DrawSmallChar( activeCon->xadjust + (x+1)*smallchar_width, y, '^' );
 		y -= smallchar_height;
@@ -1358,7 +1398,9 @@ static void Con_DrawSolidConsole( float frac ) {
 	// draw the input prompt, user text, and cursor if desired
 	Con_DrawInput();
 
-	Con_DrawHelp( lines - smallchar_height * 3 );
+	if ( con_drawHelp->integer ) {
+		Con_DrawHelp( lines + smallchar_height, conColorValue );
+	}
 
 	re.SetColor( NULL );
 }

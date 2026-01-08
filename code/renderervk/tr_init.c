@@ -1490,15 +1490,24 @@ static void R_Register( void )
 {
 	// make sure all the commands added here are also removed in R_Shutdown
 	ri.Cmd_AddCommand( "imagelist", R_ImageList_f );
+	ri.Cmd_SetDescription( "imagelist", "Prints loaded images." );
 	ri.Cmd_AddCommand( "shaderlist", R_ShaderList_f );
+	ri.Cmd_SetDescription( "shaderlist", "Prints loaded shaders." );
 	ri.Cmd_AddCommand( "skinlist", R_SkinList_f );
+	ri.Cmd_SetDescription( "skinlist", "Prints loaded skins." );
 	ri.Cmd_AddCommand( "modellist", R_Modellist_f );
+	ri.Cmd_SetDescription( "modellist", "Prints loaded models." );
 	ri.Cmd_AddCommand( "screenshot", R_ScreenShot_f );
+	ri.Cmd_SetDescription( "screenshot", "Takes a TARGA (.tga) screenshot." );
 	ri.Cmd_AddCommand( "screenshotJPEG", R_ScreenShot_f );
+	ri.Cmd_SetDescription( "screenshotJPEG", "Takes a JPEG (.jpg) screenshot." );
 	ri.Cmd_AddCommand( "screenshotBMP", R_ScreenShot_f );
+	ri.Cmd_SetDescription( "screenshotBMP", "Takes a BMP (.bmp) screenshot." );
 	ri.Cmd_AddCommand( "gfxinfo", GfxInfo_f );
+	ri.Cmd_SetDescription( "gfxinfo", "Prints display mode info." );
 #ifdef USE_VULKAN
 	ri.Cmd_AddCommand( "vkinfo", VkInfo_f );
+	ri.Cmd_SetDescription( "vkinfo", "Prints vulkan renderer info." );
 #endif
 
 	//

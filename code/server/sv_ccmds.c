@@ -1542,43 +1542,63 @@ void SV_AddOperatorCommands( void ) {
 	initialized = qtrue;
 
 	Cmd_AddCommand ("heartbeat", SV_Heartbeat_f);
+	Cmd_SetDescription( "heartbeat", "Sends a heatbeat to master servers." );
 	Cmd_AddCommand ("kick", SV_Kick_f);
+	Cmd_SetDescription( "kick", "Kicks a player by name." );
 #ifndef STANDALONE
 #ifdef USE_BANS
 	if(!Cvar_VariableIntegerValue("com_standalone"))
 	{
 		Cmd_AddCommand ("banUser", SV_Ban_f);
+		Cmd_SetDescription( "banUser", "Bans a player by name." );
 		Cmd_AddCommand ("banClient", SV_BanNum_f);
+		Cmd_SetDescription( "banClient", "Bans a player by client number." );
 	}
 #endif
 #endif
 	Cmd_AddCommand ("kickbots", SV_KickBots_f);
+	Cmd_SetDescription( "kickbots", "Kick all bots off of the server." );
 	Cmd_AddCommand ("kickall", SV_KickAll_f);
+	Cmd_SetDescription( "kickall", "Kick all users off of the server." );
 	Cmd_AddCommand ("kicknum", SV_KickNum_f);
+	Cmd_SetDescription( "kicknum", "Kick a user off of the server." );
 	Cmd_AddCommand ("clientkick", SV_KickNum_f); // Legacy command
+	Cmd_SetDescription( "clientkick", "Kick a user off of the server." );
 	Cmd_AddCommand ("status", SV_Status_f);
+	Cmd_SetDescription( "status", "Prints the current player list." );
 	Cmd_AddCommand ("dumpuser", SV_DumpUser_f);
+	Cmd_SetDescription( "dumpuser", "Prints a user's info cvars." );
 	Cmd_AddCommand ("map_restart", SV_MapRestart_f);
+	Cmd_SetDescription( "map_restart", "Resets the game without reloading the map." );
 	Cmd_AddCommand ("sectorlist", SV_SectorList_f);
+	Cmd_SetDescription( "sectorlist", "Prints entity count for all sectors." );
 	Cmd_AddCommand ("map", SV_Map_f);
+	Cmd_SetDescription( "map", "Loads a map." );
 	Cmd_SetCommandCompletionFunc( "map", SV_CompleteMapName );
 #ifndef PRE_RELEASE_DEMO
 	Cmd_AddCommand ("devmap", SV_Map_f);
+	Cmd_SetDescription( "devmap", "Loads a map with cheats enabled." );
 	Cmd_SetCommandCompletionFunc( "devmap", SV_CompleteMapName );
 	Cmd_AddCommand ("spmap", SV_Map_f);
+	Cmd_SetDescription( "spmap", "Loads a singleplayer map." );
 	Cmd_SetCommandCompletionFunc( "spmap", SV_CompleteMapName );
 	Cmd_AddCommand ("spdevmap", SV_Map_f);
+	Cmd_SetDescription( "spdevmap", "Loads a singleplayer map with cheats enabled." );
 	Cmd_SetCommandCompletionFunc( "spdevmap", SV_CompleteMapName );
 #endif
 	Cmd_AddCommand ("killserver", SV_KillServer_f);
+	Cmd_SetDescription( "killserver", "Shuts the server down." );
 #ifdef USE_BANS	
 	Cmd_AddCommand("rehashbans", SV_RehashBans_f);
+	Cmd_SetDescription( "rehashbans", "Load saved bans from file." );
 	Cmd_AddCommand("listbans", SV_ListBans_f);
+	Cmd_SetDescription( "listbans", "List all bans and exceptions on console." );
 	Cmd_AddCommand("banaddr", SV_BanAddr_f);
 	Cmd_AddCommand("exceptaddr", SV_ExceptAddr_f);
 	Cmd_AddCommand("bandel", SV_BanDel_f);
 	Cmd_AddCommand("exceptdel", SV_ExceptDel_f);
 	Cmd_AddCommand("flushbans", SV_FlushBans_f);
+	Cmd_SetDescription( "flushbans", "Delete all bans and exceptions." );
 #endif
 	Cmd_AddCommand( "filter", SV_AddFilter_f );
 	Cmd_AddCommand( "filtercmd", SV_AddFilterCmd_f );

@@ -4774,7 +4774,7 @@ static void FS_Startup( void ) {
 	Cvar_CheckRange( fs_mod_settings, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( fs_mod_settings, "Set file handle policy for q3config.cfg files:\n"
 		" 0 - All settings are loaded and saved in the q3config.cfg in "BASEGAME", only for "DEFAULT_GAME".\n"
-		" 1 - Existing behavior, with separately stored settings for each mod.\n" );
+		" 1 - Existing behavior, with separately stored settings for each mod." );
 #endif
 
 	start = Sys_Milliseconds();
@@ -4857,13 +4857,17 @@ static void FS_Startup( void ) {
 
 	// add our commands
 	Cmd_AddCommand( "path", FS_Path_f );
+	Cmd_SetDescription( "path", "Prints info about the current search path.");
 	Cmd_AddCommand( "dir", FS_Dir_f );
+	Cmd_SetDescription( "dir", "Prints an extension-filtered file list.");
 	Cmd_AddCommand( "fdir", FS_NewDir_f );
+	Cmd_SetDescription( "fdir", "Prints an pattern-filtered file list.");
 	Cmd_AddCommand( "touchFile", FS_TouchFile_f );
 	Cmd_AddCommand( "lsof", FS_ListOpenFiles_f );
  	Cmd_AddCommand( "which", FS_Which_f );
 	Cmd_SetCommandCompletionFunc( "which", FS_CompleteFileName );
 	Cmd_AddCommand( "fs_restart", FS_Reload );
+	Cmd_SetDescription( "fs_restart", "Restarts the file system.");
 
 	// print the current search paths
 	FS_Path_f();

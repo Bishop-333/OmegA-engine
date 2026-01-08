@@ -1495,6 +1495,7 @@ void IN_Init( void )
 #endif
 
 	Cmd_AddCommand( "minimize", IN_Minimize );
+	Cmd_SetDescription( "minimize", "Minimizes the game and returns to the desktop." );
 	Cmd_AddCommand( "in_restart", IN_Restart );
 
 	Com_DPrintf( "------------------------------------\n" );

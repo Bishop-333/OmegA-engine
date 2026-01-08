@@ -3447,6 +3447,7 @@ static void CL_InitRef( void ) {
 	Com_Memset( &rimp, 0, sizeof( rimp ) );
 
 	rimp.Cmd_AddCommand = Cmd_AddCommand;
+	rimp.Cmd_SetDescription = Cmd_SetDescription;
 	rimp.Cmd_RemoveCommand = Cmd_RemoveCommand;
 	rimp.Cmd_Argc = Cmd_Argc;
 	rimp.Cmd_Argv = Cmd_Argv;
@@ -4074,40 +4075,69 @@ void CL_Init( void ) {
 	// register client commands
 	//
 	Cmd_AddCommand ("cmd", CL_ForwardToServer_f);
+	Cmd_SetDescription( "cmd", "Forwards all arguments as a command to the server.");
 	Cmd_AddCommand ("configstrings", CL_Configstrings_f);
+	Cmd_SetDescription( "configstrings", "Prints all non-empty config strings.");
 	Cmd_AddCommand ("clientinfo", CL_Clientinfo_f);
+	Cmd_SetDescription( "clientinfo", "Prints some client settings.");
 	Cmd_AddCommand ("snd_restart", CL_Snd_Restart_f);
+	Cmd_SetDescription( "snd_restart", "Restarts the sound system.");
 	Cmd_AddCommand ("vid_restart", CL_Vid_Restart_f);
+	Cmd_SetDescription( "vid_restart", "Restarts the video system.");
 	Cmd_AddCommand ("disconnect", CL_Disconnect_f);
+	Cmd_SetDescription( "disconnect", "Disconnects from the current server.");
 	Cmd_AddCommand ("record", CL_Record_f);
+	Cmd_SetDescription( "record", "Starts recording a demo.");
 	Cmd_SetCommandCompletionFunc( "record", CL_CompleteRecordName );
 	Cmd_AddCommand ("demo", CL_PlayDemo_f);
+	Cmd_SetDescription( "demo", "Starts demo playback.");
 	Cmd_SetCommandCompletionFunc( "demo", CL_CompleteDemoName );
 	Cmd_AddCommand ("cinematic", CL_PlayCinematic_f);
+	Cmd_SetDescription( "cinematic", "Starts playback of a .roq video file.");
 	Cmd_AddCommand ("stoprecord", CL_StopRecord_f);
+	Cmd_SetDescription( "stoprecord", "Stops demo recording.");
 	Cmd_AddCommand ("connect", CL_Connect_f);
+	Cmd_SetDescription( "connect", "Connects to a server.");
 	Cmd_AddCommand ("reconnect", CL_Reconnect_f);
+	Cmd_SetDescription( "reconnect", "Reconnects to the current or last server.");
 	Cmd_AddCommand ("localservers", CL_LocalServers_f);
+	Cmd_SetDescription( "localservers", "Finds and prints local LAN servers.");
 	Cmd_AddCommand ("globalservers", CL_GlobalServers_f);
+	Cmd_SetDescription( "globalservers", "Requests server lists from master servers.");
 	Cmd_AddCommand ("rcon", CL_Rcon_f);
+	Cmd_SetDescription( "rcon", "Executes the arguments as a command on the server.");
 	Cmd_SetCommandCompletionFunc( "rcon", CL_CompleteRcon );
 	Cmd_AddCommand ("ping", CL_Ping_f );
+	Cmd_SetDescription( "ping", "Pings a server.");
 	Cmd_AddCommand ("serverstatus", CL_ServerStatus_f );
+	Cmd_SetDescription( "serverstatus", "Prints server status and player list.");
 	Cmd_AddCommand ("showip", CL_ShowIP_f );
+	Cmd_SetDescription( "showip", "Shows your open IP address(es).");
 	Cmd_AddCommand ("fs_openedList", CL_OpenedPK3List_f );
+	Cmd_SetDescription( "fs_openedList", "Prints the names of opened pak files.");
 	Cmd_AddCommand ("fs_referencedList", CL_ReferencedPK3List_f );
+	Cmd_SetDescription( "fs_referencedList", "Prints the names of referenced pak files.");
 	Cmd_AddCommand ("model", CL_SetModel_f );
+	Cmd_SetDescription( "model", "Sets your own player model.");
 	Cmd_AddCommand ("video", CL_Video_f );
+	Cmd_SetDescription( "video", "Starts writing a .avi file.");
 	Cmd_AddCommand ("video-pipe", CL_Video_f );
+	Cmd_SetDescription( "video-pipe", "Starts writing a .mp4 file.");
 	Cmd_SetCommandCompletionFunc( "video", CL_CompleteVideoName );
 	Cmd_AddCommand ("stopvideo", CL_StopVideo_f );
+	Cmd_SetDescription( "stopvideo", "Stops writing the video file.");
 	Cmd_AddCommand ("serverinfo", CL_Serverinfo_f );
+	Cmd_SetDescription( "serverinfo", "Prints all server info cvars.");
 	Cmd_AddCommand ("systeminfo", CL_Systeminfo_f );
+	Cmd_SetDescription( "systeminfo", "Prints all system info cvars.");
 	Cmd_AddCommand ("fwdinfo", CL_FWDInfo );
+	Cmd_SetDescription( "fwdinfo", "Prints all forwarder info.");
 
 #ifdef USE_CURL
 	Cmd_AddCommand( "download", CL_Download_f );
+	Cmd_SetDescription( "download", "Downloads a map." );
 	Cmd_AddCommand( "dlmap", CL_Download_f );
+	Cmd_SetDescription( "dlmap", "Downloads a map." );
 #endif
 	Cmd_AddCommand( "modelist", CL_ModeList_f );
 

@@ -170,6 +170,7 @@ typedef struct {
 	int		(*Cvar_VariableIntegerValue)( const char *var_name );
 
 	void	(*Cmd_AddCommand)( const char *name, void(*cmd)(void) );
+	void	(*Cmd_SetDescription)( const char *cmd_name, const char *cmd_description );
 	void	(*Cmd_RemoveCommand)( const char *name );
 
 	int		(*Cmd_Argc) (void);

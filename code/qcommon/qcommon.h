@@ -510,6 +510,8 @@ void	Cmd_AddCommand( const char *cmd_name, xcommand_t function );
 // The cmd_name is referenced later, so it should not be in temp memory
 // if function is NULL, the command will be forwarded to the server
 // as a clc_clientCommand instead of executed locally
+void	Cmd_SetDescription( const char *cmd_name, const char *cmd_description );
+const char	*Cmd_GetDescription( const char *cmd_name );
 
 void	Cmd_RemoveCommand( const char *cmd_name );
 void	Cmd_RemoveCgameCommands( void );
@@ -605,7 +607,7 @@ void	Cvar_SetValueSafe( const char *var_name, float value );
 
 qboolean Cvar_SetModified( const char *var_name, qboolean modified );
 
-cvar_t	*Cvar_FindVar( const char *var_name );
+const char	*Cvar_GetDescription( const char *var_name );
 float	Cvar_VariableValue( const char *var_name );
 int		Cvar_VariableIntegerValue( const char *var_name );
 // returns 0 if not defined or non numeric

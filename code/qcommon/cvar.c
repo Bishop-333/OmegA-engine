@@ -93,7 +93,7 @@ static qboolean Cvar_ValidateName( const char *name ) {
 Cvar_FindVar
 ============
 */
-cvar_t *Cvar_FindVar( const char *var_name ) {
+static cvar_t *Cvar_FindVar( const char *var_name ) {
 	cvar_t	*var;
 	long hash;
 
@@ -1936,6 +1936,23 @@ void Cvar_SetDescription2( const char *var_name, const char* var_description )
 
 /*
 =====================
+Cvar_GetDescription
+=====================
+*/
+const char *Cvar_GetDescription( const char *var_name )
+{
+	cvar_t *var;
+
+	var = Cvar_FindVar( var_name );
+	if ( !var || !var->description )
+		return NULL;
+
+	return var->description;
+}
+
+
+/*
+=====================
 Cvar_SetGroup
 =====================
 */
@@ -2115,25 +2132,36 @@ void Cvar_Init (void)
 	Cvar_SetDescription( cvar_developer, "Toggles developer mode. Prints more info to console and provides more commands." );
 
 	Cmd_AddCommand ("print", Cvar_Print_f);
+	Cmd_SetDescription( "print", "Prints the contents of a cvar." );
 	Cmd_AddCommand ("toggle", Cvar_Toggle_f);
+	Cmd_SetDescription( "toggle", "Toggles the boolean value of a variable." );
 	Cmd_SetCommandCompletionFunc( "toggle", Cvar_CompleteCvarName );
 	Cmd_AddCommand ("set", Cvar_Set_f);
+	Cmd_SetDescription( "set", "Creates or changes a cvar's value." );
 	Cmd_SetCommandCompletionFunc( "set", Cvar_CompleteCvarName );
 	Cmd_AddCommand ("sets", Cvar_Set_f);
+	Cmd_SetDescription( "sets", "Like /set with the server info flag." );
 	Cmd_SetCommandCompletionFunc( "sets", Cvar_CompleteCvarName );
 	Cmd_AddCommand ("setu", Cvar_Set_f);
+	Cmd_SetDescription( "setu", "Like /set with the user info flag." );
 	Cmd_SetCommandCompletionFunc( "setu", Cvar_CompleteCvarName );
 	Cmd_AddCommand ("seta", Cvar_Set_f);
+	Cmd_SetDescription( "seta", "Like /set with the archive info flag." );
 	Cmd_SetCommandCompletionFunc( "seta", Cvar_CompleteCvarName );
 	Cmd_AddCommand ("reset", Cvar_Reset_f);
+	Cmd_SetDescription( "reset", "Sets a cvar back to its default value." );
 	Cmd_SetCommandCompletionFunc( "reset", Cvar_CompleteCvarName );
 	Cmd_AddCommand ("unset", Cvar_Unset_f);
+	Cmd_SetDescription( "unset", "Removes a user-created cvar." );
 	Cmd_SetCommandCompletionFunc("unset", Cvar_CompleteCvarName);
 
 	Cmd_AddCommand( "varfunc", Cvar_Func_f );
 
 	Cmd_AddCommand ("cvarlist", Cvar_List_f);
+	Cmd_SetDescription( "cvarlist", "Lists and filters all cvars." );
 	Cmd_AddCommand ("cvar_modified", Cvar_ListModified_f);
 	Cmd_AddCommand ("cvar_restart", Cvar_Restart_f);
+	Cmd_SetDescription( "cvar_restart", "Restarts the cvar system." );
 	Cmd_AddCommand ("cvar_trim", Cvar_Trim_f);
+	Cmd_SetDescription( "cvar_trim", "Removes user-created cvars." );
 }

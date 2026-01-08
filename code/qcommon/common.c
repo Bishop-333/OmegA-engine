@@ -2216,6 +2216,7 @@ static void Com_InitHunkMemory( void ) {
 	Hunk_Clear();
 
 	Cmd_AddCommand( "meminfo", Com_Meminfo_f );
+	Cmd_SetDescription( "meminfo", "Prints memory allocation info." );
 #ifdef ZONE_DEBUG
 	Cmd_AddCommand( "zonelog", Z_LogHeap );
 #endif
@@ -3966,15 +3967,22 @@ void Com_Init( char *commandLine ) {
 
 	if ( com_developer->integer ) {
 		Cmd_AddCommand( "error", Com_Error_f );
+		Cmd_SetDescription( "error", "Just throw a fatal error to test error shutdown procedures." );
 		Cmd_AddCommand( "crash", Com_Crash_f );
+		Cmd_SetDescription( "crash", "A way to force a bus error for development reasons." );
 		Cmd_AddCommand( "freeze", Com_Freeze_f );
+		Cmd_SetDescription( "freeze", "Just freeze in place for a given number of seconds to test error recovery." );
 	}
 
 	Cmd_AddCommand( "quit", Com_Quit_f );
+	Cmd_SetDescription( "quit", "Closes the application." );
 	Cmd_AddCommand( "changeVectors", MSG_ReportChangeVectors_f );
+	Cmd_SetDescription( "changeVectors", "Prints out a table from the current statistics for copying to code." );
 	Cmd_AddCommand( "writeconfig", Com_WriteConfig_f );
+	Cmd_SetDescription( "writeconfig", "Writes CVars and key binds to a file." );
 	Cmd_SetCommandCompletionFunc( "writeconfig", Cmd_CompleteWriteCfgName );
 	Cmd_AddCommand( "game_restart", Com_GameRestart_f );
+	Cmd_SetDescription( "game_restart", "Restarts the game system." );
 
 	s = va( "%s %s %s", Q3_VERSION, PLATFORM_STRING, __DATE__ );
 	com_version = Cvar_Get( "version", s, CVAR_PROTECTED | CVAR_ROM | CVAR_SERVERINFO );
