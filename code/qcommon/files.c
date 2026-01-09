@@ -300,7 +300,7 @@ static	cvar_t		*fs_locked;
 #endif
 static	cvar_t		*fs_excludeReference;
 
-#ifndef QUAKE3
+#ifdef DEFAULT_GAME
 static	cvar_t		*fs_mod_settings;
 #endif
 
@@ -1233,7 +1233,7 @@ fileHandle_t FS_FOpenFileWrite( const char *filename ) {
 		return FS_INVALID_HANDLE;
 	}
 
-#ifndef QUAKE3
+#ifdef DEFAULT_GAME
 	if ( !fs_mod_settings->integer && !Q_stricmp( fs_gamedirvar->string, DEFAULT_GAME ) && !Q_stricmp( filename, Q3CONFIG_CFG ) ) {
 		mod_dir = fs_basegame->string;
 	} else
@@ -1632,7 +1632,7 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 	if ( file == NULL ) {
 		// just wants to see if file is there
 		for ( search = fs_searchpaths ; search ; search = search->next ) {
-#ifndef QUAKE3
+#ifdef DEFAULT_GAME
 			if ( !fs_mod_settings->integer && !Q_stricmp( fs_gamedirvar->string, DEFAULT_GAME ) && !Q_stricmp( filename, Q3CONFIG_CFG ) ) {
 				if ( search->pack && !FS_IsBaseGame( search->pack->pakGamename ) ) {
 					continue;
@@ -1682,7 +1682,20 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 	// search through the path, one element at a time
 	//
 	for ( search = fs_searchpaths ; search ; search = search->next ) {
-#ifndef QUAKE3
+		if ( !strcmp( filename, Q3CONFIG_CFG ) && !FS_IsBaseGame( fs_gamedirvar->string ) ) {
+#ifdef DEFAULT_GAME
+			if ( !Q_stricmp( fs_gamedirvar->string, DEFAULT_GAME ) && !fs_mod_settings->integer ) {
+			} else
+#endif
+			{
+				if ( search->pack && FS_IsBaseGame( search->pack->pakGamename ) ) {
+					continue;
+				} else if ( search->dir && FS_IsBaseGame( search->dir->gamedir ) ) {
+					continue;
+				}
+			}
+		}
+#ifdef DEFAULT_GAME
 		if ( !fs_mod_settings->integer && !strcmp( filename, Q3CONFIG_CFG ) ) {
 			if ( search->pack && !FS_IsBaseGame( search->pack->pakGamename ) ) {
 				continue;
@@ -4769,7 +4782,7 @@ static void FS_Startup( void ) {
 		"Exclude specified pak files from download list on client side.\n"
 		"Format is <moddir>/<pakname> (without .pk3 suffix), you may list multiple entries separated by space." );
 	
-#ifndef QUAKE3
+#ifdef DEFAULT_GAME
 	fs_mod_settings = Cvar_Get( "fs_mod_settings", "0", CVAR_INIT );
 	Cvar_CheckRange( fs_mod_settings, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( fs_mod_settings, "Set file handle policy for q3config.cfg files:\n"
@@ -4807,7 +4820,7 @@ static void FS_Startup( void ) {
 		// handle multiple basegames:
 		for ( i = 0; i < basegame_cnt; i++ ) {
 			FS_AddGameDirectory( fs_apppath->string, basegames[i] );
-#ifndef QUAKE3
+#ifdef DEFAULT_GAME
 			FS_AddGameDirectory( fs_apppath->string, DEFAULT_GAME );
 #endif
 		}
@@ -4877,7 +4890,7 @@ static void FS_Startup( void ) {
 	Com_Printf( "%d files in %d pk3 files\n", fs_packFiles, fs_packCount );
 
 	fs_gamedirvar->modified = qfalse; // We just loaded, it's not modified
-#ifndef QUAKE3
+#ifdef DEFAULT_GAME
 	fs_mod_settings->modified = qfalse;
 #endif
 
@@ -5419,7 +5432,7 @@ qboolean FS_ConditionalRestart( int checksumFeed, qboolean clientRestart )
 		Com_GameRestart( checksumFeed, clientRestart );
 		return qtrue;
 	}
-#ifndef QUAKE3
+#ifdef DEFAULT_GAME
 	else if ( fs_mod_settings->modified )
 	{
 		Com_GameRestart( checksumFeed, clientRestart );
