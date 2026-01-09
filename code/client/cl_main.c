@@ -4001,7 +4001,7 @@ void CL_Init( void ) {
 
 	// init cg_autoswitch so the ui will have it correctly even
 	// if the cgame hasn't been started
-	Cvar_Get ("cg_autoswitch", "1", CVAR_ARCHIVE);
+	Cvar_Get ("cg_autoswitch", "0", CVAR_ARCHIVE);
 
 	cl_motdString = Cvar_Get( "cl_motdString", "", CVAR_ROM );
 	Cvar_SetDescription( cl_motdString, "Message of the day string from id's master server, it is a read only variable." );
