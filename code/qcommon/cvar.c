@@ -743,6 +743,11 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 	var->modified = qtrue;
 	var->modificationCount++;
 	cvar_group[ var->group ] = 1;
+
+	// copy latest snapshot of q3config.cfg before mod switch
+	if ( !Q_stricmp( var->name, "fs_game" ) ) {
+		Com_WriteConfigSnapshot();
+	}
 	
 	Z_Free( var->string ); // free the old value string
 	
