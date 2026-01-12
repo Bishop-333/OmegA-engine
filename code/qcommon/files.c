@@ -300,10 +300,6 @@ static	cvar_t		*fs_locked;
 #endif
 static	cvar_t		*fs_excludeReference;
 
-#ifndef QUAKE3
-static	cvar_t		*fs_mod_settings;
-#endif
-
 static	searchpath_t	*fs_searchpaths;
 static	int			fs_readCount;			// total bytes read
 static	int			fs_loadCount;			// total files read
@@ -1223,7 +1219,6 @@ fileHandle_t FS_FOpenFileWrite( const char *filename ) {
 	char			*ospath;
 	fileHandle_t	f;
 	fileHandleData_t *fd;
-	const char		*mod_dir;
 
 	if ( !fs_searchpaths ) {
 		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
@@ -1233,14 +1228,7 @@ fileHandle_t FS_FOpenFileWrite( const char *filename ) {
 		return FS_INVALID_HANDLE;
 	}
 
-#ifndef QUAKE3
-	if ( !fs_mod_settings->integer && !Q_stricmp( fs_gamedirvar->string, DEFAULT_GAME ) && !Q_stricmp( filename, Q3CONFIG_CFG ) ) {
-		mod_dir = fs_basegame->string;
-	} else
-#endif
-		mod_dir = FS_GetCurrentGameDir();
-
-	ospath = FS_BuildOSPath( fs_homepath->string, mod_dir, filename );
+	ospath = FS_BuildOSPath( fs_homepath->string, fs_gamedir, filename );
 
 	if ( fs_debug->integer ) {
 		Com_Printf( "FS_FOpenFileWrite: %s\n", ospath );
@@ -1556,29 +1544,6 @@ static int FS_OpenFileInPak( fileHandle_t *file, pack_t *pak, fileInPack_t *pakF
 
 
 /*
-================
-FS_IsBaseGame
-================
-*/
-static qboolean FS_IsBaseGame( const char *game )
-{
-	int i;
-
-	if ( game == NULL || *game == '\0' ) {
-		return qtrue;
-	}
-
-	for ( i = 0; i < basegame_cnt; i++ ) {
-		if ( Q_stricmp( basegames[i], game ) == 0 ) {
-			return qtrue;
-		}
-	}
-
-	return qfalse;
-}
-
-
-/*
 ===========
 FS_FOpenFileRead
 
@@ -1632,15 +1597,6 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 	if ( file == NULL ) {
 		// just wants to see if file is there
 		for ( search = fs_searchpaths ; search ; search = search->next ) {
-#ifndef QUAKE3
-			if ( !fs_mod_settings->integer && !Q_stricmp( fs_gamedirvar->string, DEFAULT_GAME ) && !Q_stricmp( filename, Q3CONFIG_CFG ) ) {
-				if ( search->pack && !FS_IsBaseGame( search->pack->pakGamename ) ) {
-					continue;
-				} else if ( search->dir && !FS_IsBaseGame( search->dir->gamedir ) ) {
-					continue;
-				}
-			}
-#endif
 			// is the element a pak file?
 			if ( search->pack && search->pack->hashTable[ (hash = fullHash & (search->pack->hashSize-1)) ] ) {
 				// skip non-pure files
@@ -1682,15 +1638,6 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 	// search through the path, one element at a time
 	//
 	for ( search = fs_searchpaths ; search ; search = search->next ) {
-#ifndef QUAKE3
-		if ( !fs_mod_settings->integer && !strcmp( filename, Q3CONFIG_CFG ) ) {
-			if ( search->pack && !FS_IsBaseGame( search->pack->pakGamename ) ) {
-				continue;
-			} else if ( search->dir && !FS_IsBaseGame( search->dir->gamedir ) ) {
-				continue;
-			}
-		}
-#endif
 		// is the element a pak file?
 		if ( search->pack && search->pack->hashTable[ (hash = fullHash & (search->pack->hashSize-1)) ] ) {
 			// disregard if it doesn't match one of the allowed pure pak files
@@ -3703,6 +3650,29 @@ static void FS_GetModDescription( const char *modDir, char *description, int des
 
 
 /*
+================
+FS_IsBaseGame
+================
+*/
+static qboolean FS_IsBaseGame( const char *game )
+{
+	int i;
+
+	if ( game == NULL || *game == '\0' ) {
+		return qtrue;
+	}
+
+	for ( i = 0; i < basegame_cnt; i++ ) {
+		if ( Q_stricmp( basegames[i], game ) == 0 ) {
+			return qtrue;
+		}
+	}
+
+	return qfalse;
+}
+
+
+/*
 ===========
 FS_PathCmp
 
@@ -4768,14 +4738,6 @@ static void FS_Startup( void ) {
 	Cvar_SetDescription( fs_excludeReference,
 		"Exclude specified pak files from download list on client side.\n"
 		"Format is <moddir>/<pakname> (without .pk3 suffix), you may list multiple entries separated by space." );
-	
-#ifndef QUAKE3
-	fs_mod_settings = Cvar_Get( "fs_mod_settings", "0", CVAR_INIT );
-	Cvar_CheckRange( fs_mod_settings, "0", "1", CV_INTEGER );
-	Cvar_SetDescription( fs_mod_settings, "Set file handle policy for q3config.cfg files:\n"
-		" 0 - All settings are loaded and saved in the q3config.cfg in "BASEGAME", only for "DEFAULT_GAME".\n"
-		" 1 - Existing behavior, with separately stored settings for each mod." );
-#endif
 
 	start = Sys_Milliseconds();
 
@@ -4807,7 +4769,7 @@ static void FS_Startup( void ) {
 		// handle multiple basegames:
 		for ( i = 0; i < basegame_cnt; i++ ) {
 			FS_AddGameDirectory( fs_apppath->string, basegames[i] );
-#ifndef QUAKE3
+#ifdef DEFAULT_GAME
 			FS_AddGameDirectory( fs_apppath->string, DEFAULT_GAME );
 #endif
 		}
@@ -4877,9 +4839,6 @@ static void FS_Startup( void ) {
 	Com_Printf( "%d files in %d pk3 files\n", fs_packFiles, fs_packCount );
 
 	fs_gamedirvar->modified = qfalse; // We just loaded, it's not modified
-#ifndef QUAKE3
-	fs_mod_settings->modified = qfalse;
-#endif
 
 #ifdef FS_MISSING
 	if (missingFiles == NULL) {
@@ -5419,13 +5378,6 @@ qboolean FS_ConditionalRestart( int checksumFeed, qboolean clientRestart )
 		Com_GameRestart( checksumFeed, clientRestart );
 		return qtrue;
 	}
-#ifndef QUAKE3
-	else if ( fs_mod_settings->modified )
-	{
-		Com_GameRestart( checksumFeed, clientRestart );
-		return qtrue;
-	}
-#endif
 	else if ( checksumFeed != fs_checksumFeed )
 	{
 		FS_Restart( checksumFeed );

@@ -1188,8 +1188,13 @@ static void Con_DrawHelp( int y, float conColorValue[4] ) {
 	int w = maxLen * smallchar_width + 16;
 	int h = lines * smallchar_height + 8;
 
-	re.SetColor( conColorValue );
-	re.DrawStretchPic( x, y, w, h, 0, 0, 0, 0, cls.whiteShader );
+	if ( cl_conColor->string[0] ) {
+		re.SetColor( conColorValue );
+		re.DrawStretchPic( x, y, w, h, 0, 0, 1, 1, cls.whiteShader );
+	} else {
+		re.SetColor( g_color_table[ ColorIndex( COLOR_WHITE ) ] );
+		re.DrawStretchPic( x, y, w, h, 0, 0, 1, 1, cls.consoleShader );
+	}
 	re.SetColor( NULL );
 
 	re.SetColor( g_color_table[ conColors[ activeConsoleNum ] ] );

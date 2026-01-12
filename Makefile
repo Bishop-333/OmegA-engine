@@ -45,12 +45,15 @@ USE_OPENGL_API   = 1
 USE_VULKAN_API   = 1
 USE_RENDERER_DLOPEN = 1
 
-# valid options: omega, ratmod, aftershock, etc... or null (no mod)
-MOD_DEFAULT      = omega
-QUAKE3           = 0
-
 # valid options: opengl, vulkan
 RENDERER_DEFAULT = opengl
+
+QUAKE3           = 0
+
+# valid options: omega, ratmod, aftershock, etc... or 0 (no mod)
+ifneq ($(QUAKE3),1)
+  MOD_DEFAULT    = omega
+endif
 
 ifeq ($(QUAKE3),1)
   ifeq ($(RENDERER_DEFAULT),vulkan)
@@ -373,12 +376,12 @@ ifeq ($(GENERATE_DEPENDENCIES),1)
   BASE_CFLAGS += -MMD
 endif
 
-ifneq ($(QUAKE3),1)
-  ifdef MOD_DEFAULT
-    BASE_CFLAGS += -DMOD_DEFAULT=\\\"$(MOD_DEFAULT)\\\"
-  endif
-else
+ifeq ($(QUAKE3),1)
   BASE_CFLAGS += -DQUAKE3
+endif
+
+ifdef MOD_DEFAULT
+  BASE_CFLAGS += -DDEFAULT_GAME=\\\"$(MOD_DEFAULT)\\\"
 endif
 
 ARCHEXT=
