@@ -401,7 +401,7 @@ void Con_CheckResize( console_t *con )
 	{
 		scale = con_scale->value;
 	}
-	else if ( Cvar_VariableIntegerValue( "r_ext_supersample" ) )
+	else if ( Cvar_VariableIntegerValue( "r_ext_supersample" ) && Cvar_VariableIntegerValue( "r_fbo" ) )
 	{
 		scale = con_scale->value * ((cls.glconfig.vidWidth / 1920.0f) + (cls.glconfig.vidHeight / 1080.0f)) / 2.0f;
 	}
@@ -965,7 +965,7 @@ static void Con_DrawNotify( void )
 	int		skip;
 	int		currentColorIndex;
 	int		colorIndex;
-	int notifytime = con_notifytime->value * 1000 + 2 * (int)NOTIFY_FADE_TIME;
+	int		notifytime = con_notifytime->value * 1000 + 2 * (int)NOTIFY_FADE_TIME;
 
 	currentColorIndex = ColorIndex( COLOR_WHITE );
 	re.SetColor( g_color_table[ currentColorIndex ] );
@@ -1055,6 +1055,7 @@ static void Con_DrawNotify( void )
 	}
 }
 
+
 /*
 ================
 Con_DrawFPS
@@ -1062,14 +1063,16 @@ Con_DrawFPS
 */
 #define FPS_FRAMES 4
 static float Con_DrawFPS( float y ) {
-	const char		*s;
-	int			w;
+	const char	*s;
+	int		w;
 	static int	previousTimes[FPS_FRAMES];
 	static int	index;
 	int		i, total;
 	int		fps;
 	static	int	previous;
 	int		t, frameTime;
+	static int	lowFpsStartTime;
+	static qboolean	warned;
 
 	// don't use serverTime, because that will be drifting to
 	// correct for internet lag changes, timescales, timedemos, etc
@@ -1089,6 +1092,19 @@ static float Con_DrawFPS( float y ) {
 			total = 1;
 		}
 		fps = 1000 * FPS_FRAMES / total;
+
+		if ( fps < cl_fpsWarning->integer && !warned ) {
+			if ( lowFpsStartTime == 0 ) {
+				lowFpsStartTime = t;
+			} else if ( ( t - lowFpsStartTime ) > 2000 ) {
+				Com_Printf( "^3WARNING: Low fps detected (%ifps)\n", fps );
+				Com_Printf( "^3You may want to execute \\performancepanic to optimize your game\n" );
+				Com_Printf( "^3Type \\cl_fpsWarning 0 to disable this warning\n" );
+				warned = qtrue;
+			}
+		} else {
+			lowFpsStartTime = 0;
+		}
 
 		s = va( "%ifps", fps );
 		w = strlen( s ) * smallchar_width;

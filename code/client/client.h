@@ -450,6 +450,7 @@ extern	cvar_t	*cl_drawBuffer;
 
 //Omega
 extern	cvar_t	*cl_consoleHeight;
+extern	cvar_t	*cl_fpsWarning;
 extern	cvar_t	*com_warnings;
 
 //=================================================

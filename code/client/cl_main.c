@@ -97,6 +97,7 @@ cvar_t *cl_drawBuffer;
 
 //OmegA
 cvar_t *cl_consoleHeight;
+cvar_t *cl_fpsWarning;
 static cvar_t *cl_omegaEngine;
 cvar_t *fwd_use;
 cvar_t *fwd_addr;
@@ -1550,6 +1551,27 @@ void CL_FWDInfo( void ) {
 	Com_Printf( "cls.servername = %s\n", cls.servername );
 	Com_Printf( "cls.fwd_to = %s\n", cls.fwd_to );
 	Com_Printf( "---- End FWD Info ---\n" );
+}
+
+
+/*
+================
+CL_Performance_f
+================
+*/
+void CL_Performance_f( void ) {
+#if defined (USE_RENDERER_DLOPEN) && defined(USE_VULKAN_API)
+	Cvar_Set( "cl_renderer", "vulkan" );
+#endif
+	Cvar_Set( "r_fbo", "0" );
+	Cvar_Set( "r_flares", "0" );
+	Cvar_Set( "r_bloom", "0" );
+	Cvar_Set( "r_dynamiclight", "0" );
+	Cvar_Set( "r_ext_multisample", "0" );
+	Cvar_Set( "r_ext_supersample", "0" );
+	Cvar_Set( "r_hdr", "0" );
+	Cvar_Set( "r_vbo", "1" );
+	Cbuf_ExecuteText( EXEC_APPEND, "vid_restart\n" );
 }
 
 
@@ -4033,6 +4055,8 @@ void CL_Init( void ) {
 	cl_consoleHeight = Cvar_Get( "cl_consoleHeight", "0.5", CVAR_ARCHIVE );
 	Cvar_CheckRange( cl_consoleHeight, "0", "1", CV_FLOAT );
 	Cvar_SetDescription( cl_consoleHeight, "Console height, set as value from 0.0-1.0, use with \\seta to save in config." );
+	cl_fpsWarning = Cvar_Get( "cl_fpsWarning", "30", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_fpsWarning, va( "Displays a warning message if your game is under %ifps. Set to 0 to disable.", cl_fpsWarning->integer ) );
 	cl_omegaEngine = Cvar_Get( "cl_omegaEngine", "1", CVAR_ROM | CVAR_PROTECTED );
 	Cvar_SetDescription( cl_omegaEngine, "Informs the game that we are using OmegA engine." );
 	r_displaywidth = Cvar_Get( "r_displaywidth", "0", CVAR_PROTECTED );
@@ -4132,6 +4156,8 @@ void CL_Init( void ) {
 	Cmd_SetDescription( "systeminfo", "Prints all system info cvars.");
 	Cmd_AddCommand ("fwdinfo", CL_FWDInfo );
 	Cmd_SetDescription( "fwdinfo", "Prints all forwarder info.");
+	Cmd_AddCommand ("performancepanic", CL_Performance_f );
+	Cmd_SetDescription( "performancepanic", "Disables resource-heavy effects and enables GPU optimizations.");
 
 #ifdef USE_CURL
 	Cmd_AddCommand( "download", CL_Download_f );
