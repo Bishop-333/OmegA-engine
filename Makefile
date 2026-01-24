@@ -378,6 +378,8 @@ endif
 
 ifeq ($(QUAKE3),1)
   BASE_CFLAGS += -DQUAKE3
+else
+  BASE_CFLAGS += -DUSE_Q3KEY -DUSE_MD5
 endif
 
 ifdef MOD_DEFAULT
