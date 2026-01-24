@@ -50,7 +50,7 @@ RENDERER_DEFAULT = opengl
 
 QUAKE3           = 0
 
-# valid options: omega, ratmod, aftershock, etc... or 0 (no mod)
+# valid options: omega, rat, aftershock, etc... or 0 (no mod)
 ifneq ($(QUAKE3),1)
   MOD_DEFAULT    = omega
 endif
