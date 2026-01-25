@@ -140,8 +140,8 @@ jobs:
 
     - name: Build
       run: |
-        make install -j$(sysctl -n hw.logicalcpu) ARCH=x86_64 DESTDIR=bin INSTALL=ginstall STRIP=echo
-        make install -j$(sysctl -n hw.logicalcpu) ARCH=arm64 DESTDIR=bin INSTALL=ginstall STRIP=echo
+        make install -j$(sysctl -n hw.logicalcpu) ARCH=x86_64 DESTDIR=bin INSTALL=ginstall
+        make install -j$(sysctl -n hw.logicalcpu) ARCH=arm64 DESTDIR=bin INSTALL=ginstall
         ./make-macosx-app.sh release
         hdiutil create -format UDZO -srcfolder build/release-darwin-universal2/OmegA.app build/omega-engine-macos-universal2.dmg
 

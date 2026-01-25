@@ -248,6 +248,12 @@ VULKANDIR=$(MOUNT_DIR)/libvulkan
 
 bin_path=$(shell which $(1) 2> /dev/null)
 
+ifeq ($(NO_STRIP),1)
+  STRIP_FLAG =
+else
+  STRIP_FLAG = -s
+endif
+
 STRIP ?= strip
 PKG_CONFIG ?= pkg-config
 INSTALL=install
@@ -480,6 +486,7 @@ ifdef MINGW
   LDFLAGS += -Wl,--gc-sections -fvisibility=hidden
   LDFLAGS += -lwsock32 -lgdi32 -lwinmm -lole32 -lws2_32 -lpsapi -lcomctl32
   LDFLAGS += -flto
+  LDFLAGS += $(STRIP_FLAG)
 
   CLIENT_LDFLAGS=$(LDFLAGS)
 
@@ -643,6 +650,7 @@ else
 
   LDFLAGS += -lm
   LDFLAGS += -Wl,--gc-sections -fvisibility=hidden
+  LDFLAGS += $(STRIP_FLAG)
 
   ifeq ($(USE_SDL),1)
     BASE_CFLAGS += $(SDL_INCLUDE)
@@ -810,7 +818,7 @@ default: release
 all: debug release
 
 debug:
-	@$(MAKE) targets B=$(BD) CFLAGS="$(CFLAGS) $(DEBUG_CFLAGS)" LDFLAGS="$(LDFLAGS) $(DEBUG_LDFLAGS)" V=$(V)
+	@$(MAKE) targets B=$(BD) CFLAGS="$(CFLAGS) $(DEBUG_CFLAGS)" LDFLAGS="$(LDFLAGS) $(DEBUG_LDFLAGS)" V=$(V) NO_STRIP=1
 
 release:
 	@$(MAKE) targets B=$(BR) CFLAGS="$(CFLAGS) $(RELEASE_CFLAGS)" V=$(V)
@@ -870,7 +878,6 @@ ifneq ($(TARGETS),)
 endif
 	@echo "  Cleanup:"
 	rm -rf $(B)/*/
-	@if [ $(PLATFORM) = "linux" ];then strip $(TARGETS);fi
 
 makedirs:
 	@if [ ! -d $(BUILD_DIR) ];then $(MKDIR) $(BUILD_DIR);fi
@@ -1481,7 +1488,6 @@ install: release
 	@for i in $(TARGETS); do \
 		if [ -f $(BR)$$i ]; then \
 			$(INSTALL) -D -m 0755 "$(BR)/$$i" "$(DESTDIR)$$i"; \
-			$(STRIP) "$(DESTDIR)$$i"; \
 		fi \
 	done
 
