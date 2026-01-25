@@ -537,13 +537,18 @@ ifeq ($(COMPILE_PLATFORM),darwin)
 
   BASE_CFLAGS += -Wno-unused-result
 
-  OPTIMIZE = -O2 -fvisibility=hidden
+  BASE_CFLAGS += -ffunction-sections -flto
+
+  OPTIMIZE = -O2 -fvisibility=hidden -ffast-math
 
   SHLIBEXT = dylib
   SHLIBCFLAGS = -fPIC -fvisibility=hidden
   SHLIBLDFLAGS = -dynamiclib $(LDFLAGS)
 
   ARCHEXT = -osx-$(ARCH)
+
+  LDFLAGS += -Wl,-dead_strip
+  LDFLAGS += -flto
 
   # Default minimum Mac OS X version
   ifeq ($(MACOSX_VERSION_MIN),)
@@ -625,7 +630,9 @@ else
 
   BASE_CFLAGS += -I/usr/include -I/usr/local/include
 
-  OPTIMIZE = -O2 -fvisibility=hidden
+  BASE_CFLAGS += -ffunction-sections -flto
+
+  OPTIMIZE = -O2 -fvisibility=hidden -ffast-math
 
   ifeq ($(ARCH),x86_64)
     ARCHEXT = -x64
@@ -650,6 +657,7 @@ else
 
   LDFLAGS += -lm
   LDFLAGS += -Wl,--gc-sections -fvisibility=hidden
+  LDFLAGS += -flto
   LDFLAGS += $(STRIP_FLAG)
 
   ifeq ($(USE_SDL),1)
