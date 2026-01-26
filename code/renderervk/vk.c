@@ -23,6 +23,7 @@ VkDebugReportCallbackEXT vk_debug_callback = VK_NULL_HANDLE;
 //
 static PFN_vkCreateInstance								qvkCreateInstance;
 static PFN_vkEnumerateInstanceExtensionProperties		qvkEnumerateInstanceExtensionProperties;
+static PFN_vkEnumerateInstanceVersion					qvkEnumerateInstanceVersion;
 
 static PFN_vkCreateDevice								qvkCreateDevice;
 static PFN_vkDestroyInstance							qvkDestroyInstance;
@@ -1336,6 +1337,15 @@ static void create_instance( void )
 #else
 	appInfo.apiVersion = VK_API_VERSION_1_0;
 #endif
+
+	qvkEnumerateInstanceVersion = (PFN_vkEnumerateInstanceVersion)ri.VK_GetInstanceProcAddr(NULL, "vkEnumerateInstanceVersion");
+	if ( qvkEnumerateInstanceVersion ) {
+		qvkEnumerateInstanceVersion( &appInfo.apiVersion );
+	}
+
+	if ( appInfo.apiVersion > VK_API_VERSION_1_4 ) {
+		appInfo.apiVersion = VK_API_VERSION_1_4;
+	}
 
 	// create instance
 	desc.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
