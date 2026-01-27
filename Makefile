@@ -34,6 +34,7 @@ USE_SDL          = 1
 USE_CURL         = 1
 USE_LOCAL_HEADERS= 0
 USE_SYSTEM_JPEG  = 0
+USE_JPEG_TURBO   = 1
 
 USE_OGG_VORBIS    = 1
 USE_SYSTEM_OGG    = 0
@@ -257,6 +258,7 @@ UDIR=$(MOUNT_DIR)/unix
 W32DIR=$(MOUNT_DIR)/win32
 BLIBDIR=$(MOUNT_DIR)/botlib
 JPDIR=$(MOUNT_DIR)/libjpeg
+JPTURBODIR=$(MOUNT_DIR)/libjpeg-turbo
 OGGDIR=$(MOUNT_DIR)/libogg
 VORBISDIR=$(MOUNT_DIR)/libvorbis
 OPENALDIR=$(MOUNT_DIR)/libopenal
@@ -355,6 +357,10 @@ BASE_CFLAGS =
 
 ifeq ($(USE_SYSTEM_JPEG),1)
   BASE_CFLAGS += -DUSE_SYSTEM_JPEG
+else
+ifeq ($(USE_JPEG_TURBO),1)
+  BASE_CFLAGS += -DUSE_JPEG_TURBO
+endif
 endif
 
 ifneq ($(HAVE_VM_COMPILED),true)
@@ -531,6 +537,17 @@ ifdef MINGW
     CLIENT_LDFLAGS += -lcurl -lz -lcrypt32
   endif
 
+  ifeq ($(USE_JPEG_TURBO),1)
+    BASE_CFLAGS += -I$(JPTURBODIR)/include
+    ifeq ($(ARCH),x86)
+      CLIENT_LDFLAGS += $(JPTURBODIR)/windows/mingw/lib32/libjpeg.a
+    else
+      CLIENT_LDFLAGS += $(JPTURBODIR)/windows/mingw/lib64/libjpeg.a
+    endif
+  else
+    BASE_CFLAGS += -I$(JPDIR)
+  endif
+
   ifeq ($(USE_OGG_VORBIS),1)
     BASE_CFLAGS += -DUSE_OGG_VORBIS $(OGG_FLAGS) $(VORBIS_FLAGS)
     CLIENT_LDFLAGS += $(OGG_LIBS) $(VORBIS_LIBS)
@@ -622,6 +639,13 @@ ifeq ($(COMPILE_PLATFORM),darwin)
 
   ifeq ($(USE_SYSTEM_JPEG),1)
     CLIENT_LDFLAGS += -ljpeg
+  else
+  ifeq ($(USE_JPEG_TURBO),1)
+    BASE_CFLAGS += -I$(JPTURBODIR)/include
+    CLIENT_LDFLAGS += $(JPTURBODIR)/macosx/libjpeg.a
+  else
+    BASE_CFLAGS += -I$(JPDIR)
+  endif
   endif
 
   ifeq ($(USE_OGG_VORBIS),1)
@@ -701,6 +725,13 @@ else
 
   ifeq ($(USE_SYSTEM_JPEG),1)
     CLIENT_LDFLAGS += -ljpeg
+  else
+  ifeq ($(USE_JPEG_TURBO),1)
+    BASE_CFLAGS += -I$(JPTURBODIR)/include
+    CLIENT_LDFLAGS += $(JPTURBODIR)/linux/$(ARCH)/libjpeg.a
+  else
+    BASE_CFLAGS += -I$(JPDIR)
+  endif
   endif
 
   ifeq ($(USE_CURL),1)
@@ -1170,8 +1201,10 @@ Q3OBJ = \
   $(B)/client/l_script.o \
   $(B)/client/l_struct.o
 
-ifneq ($(USE_SYSTEM_JPEG),1)
-  Q3OBJ += $(JPGOBJ)
+ifneq ($(USE_JPEG_TURBO),1)
+  ifneq ($(USE_SYSTEM_JPEG),1)
+    Q3OBJ += $(JPGOBJ)
+  endif
 endif
 
 ifeq ($(USE_OGG_VORBIS),1)
