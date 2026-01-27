@@ -519,7 +519,7 @@ ifdef MINGW
     else
       CLIENT_LDFLAGS += -L$(MOUNT_DIR)/libcurl/windows/mingw/lib64
     endif
-    CLIENT_LDFLAGS += -lcurl -lwldap32 -lcrypt32
+    CLIENT_LDFLAGS += -lcurl -lz -lcrypt32
   endif
 
   DEBUG_CFLAGS = $(BASE_CFLAGS) -DDEBUG -D_DEBUG -g -O0
