@@ -52,7 +52,7 @@ jobs:
     - name: Build
       shell: cmd
       run: |
-        make install ARCH=${{ matrix.arch }} DESTDIR=bin BUILD_SERVER=1
+        make install -j%NUMBER_OF_PROCESSORS% ARCH=${{ matrix.arch }} DESTDIR=bin BUILD_SERVER=1
 
     - uses: actions/upload-artifact@v4
       with:
