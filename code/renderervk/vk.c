@@ -128,6 +128,7 @@ static PFN_vkQueuePresentKHR							qvkQueuePresentKHR;
 
 static PFN_vkGetBufferMemoryRequirements2KHR			qvkGetBufferMemoryRequirements2KHR;
 static PFN_vkGetImageMemoryRequirements2KHR				qvkGetImageMemoryRequirements2KHR;
+static PFN_vkCmdPipelineBarrier2KHR						qvkCmdPipelineBarrier2KHR;
 
 static PFN_vkDebugMarkerSetObjectNameEXT				qvkDebugMarkerSetObjectNameEXT;
 
@@ -1338,13 +1339,15 @@ static void create_instance( void )
 	appInfo.apiVersion = VK_API_VERSION_1_0;
 #endif
 
+	uint32_t instanceVersion = appInfo.apiVersion;
+
 	qvkEnumerateInstanceVersion = (PFN_vkEnumerateInstanceVersion)ri.VK_GetInstanceProcAddr(NULL, "vkEnumerateInstanceVersion");
 	if ( qvkEnumerateInstanceVersion ) {
-		qvkEnumerateInstanceVersion( &appInfo.apiVersion );
-	}
+		qvkEnumerateInstanceVersion( &instanceVersion );
 
-	if ( appInfo.apiVersion > VK_API_VERSION_1_4 ) {
-		appInfo.apiVersion = VK_API_VERSION_1_4;
+		if ( instanceVersion < appInfo.apiVersion ) {
+			appInfo.apiVersion = instanceVersion;
+		}
 	}
 
 	// create instance
@@ -1648,7 +1651,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 
 	// create VkDevice
 	{
-		const char *device_extension_list[8];
+		const char *device_extension_list[9];
 		uint32_t device_extension_count;
 		const char *ext, *end;
 		char *str;
@@ -1659,6 +1662,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		VkPhysicalDeviceFeatures features;
 		VkDeviceCreateInfo device_desc;
 		VkResult res;
+		VkPhysicalDeviceSynchronization2FeaturesKHR sync2;
 		qboolean swapchainSupported = qfalse;
 		qboolean dedicatedAllocation = qfalse;
 		qboolean memoryRequirements2 = qfalse;
@@ -1733,6 +1737,8 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 
 		device_extension_list[ device_extension_count++ ] = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
 
+		device_extension_list[ device_extension_count++ ] = VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME;
+
 		if ( vk.dedicatedAllocation ) {
 			device_extension_list[ device_extension_count++ ] = VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME;
 			device_extension_list[ device_extension_count++ ] = VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME;
@@ -1797,8 +1803,12 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			vk.samplerAnisotropy = qtrue;
 		}
 
+		sync2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR;
+		sync2.synchronization2 = VK_TRUE;
+		sync2.pNext = NULL;
+
 		device_desc.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-		device_desc.pNext = NULL;
+		device_desc.pNext = &sync2;
 		device_desc.flags = 0;
 		device_desc.queueCreateInfoCount = 1;
 		device_desc.pQueueCreateInfos = &queue_desc;
@@ -1809,7 +1819,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		device_desc.pEnabledFeatures = &features;
 
 #ifdef _DEBUG
-		pNextPtr = (const void **)&device_desc.pNext;
+		pNextPtr = (const void **)&sync2.pNext;
 
 		if ( timelineSemaphore ) {
 			*pNextPtr = &timeline_semaphore;
@@ -2109,6 +2119,8 @@ static void init_vulkan_library( void )
 		}
 	}
 
+	INIT_DEVICE_FUNCTION(vkCmdPipelineBarrier2KHR)
+
 	if ( vk.debugMarkers ) {
 		INIT_DEVICE_FUNCTION_EXT(vkDebugMarkerSetObjectNameEXT)
 	}
@@ -2233,6 +2245,7 @@ static void deinit_device_functions( void )
 
 	qvkGetBufferMemoryRequirements2KHR			= NULL;
 	qvkGetImageMemoryRequirements2KHR			= NULL;
+	qvkCmdPipelineBarrier2KHR					= NULL;
 
 	qvkDebugMarkerSetObjectNameEXT				= NULL;
 }
