@@ -23,37 +23,36 @@ on:
 jobs:
   windows:
     name: Release Windows ${{ matrix.arch }}
-    runs-on: windows-2022
+    runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
         arch: [x86_64]
-        include:
-          - arch: x86_64
-            msystem: mingw64
-            prefix: mingw-w64-x86_64
-
-    defaults:
-      run:
-        shell: msys2 {0}
 
     steps:
+    - name: Checkout current repo
+      uses: actions/checkout@v4
 
-    - uses: msys2/setup-msys2@v2
+    - name: Checkout msys32 tools from sibling repo
+      uses: actions/checkout@v4
       with:
-        install: base-devel ${{ matrix.prefix }}-binutils ${{ matrix.prefix }}-make ${{ matrix.prefix }}-gcc
-        msystem: ${{ matrix.msystem }}
-        path-type: minimal
-        release: false
-        update: false
+        repository: ec-/msys32
+        path: msys
 
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
+    - name: Extract msys32.7z
+      run: |
+        7z x %GITHUB_WORKSPACE%/msys/msys32.7z -o%GITHUB_WORKSPACE%/msys
+      shell: cmd
+
+    - name: Prepend msys/bin to PATH
+      run: |
+           echo "PATH=$GITHUB_WORKSPACE/msys/mingw/bin;$GITHUB_WORKSPACE/msys/bin;$GITHUB_WORKSPACE/msys" >> $GITHUB_ENV
+      shell: bash
 
     - name: Build
+      shell: cmd
       run: |
-        make install -j$(nproc) ARCH=${{ matrix.arch }} DESTDIR=bin BUILD_SERVER=1
+        make install ARCH=${{ matrix.arch }} DESTDIR=bin BUILD_SERVER=1
 
     - uses: actions/upload-artifact@v4
       with:
