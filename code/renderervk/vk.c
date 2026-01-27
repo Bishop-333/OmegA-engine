@@ -373,90 +373,131 @@ static void end_command_buffer( VkCommandBuffer command_buffer, const char *loca
 
 
 static void record_image_layout_transition( VkCommandBuffer command_buffer, VkImage image, VkImageAspectFlags image_aspect_flags, 
-	VkImageLayout old_layout, VkImageLayout new_layout, uint32_t src_stage_override, uint32_t dst_stage_override ) {
-	VkImageMemoryBarrier barrier;
-	uint32_t src_stage, dst_stage;
+    VkImageLayout old_layout, VkImageLayout new_layout, uint32_t src_stage_override, uint32_t dst_stage_override ) {
+    
+    VkPipelineStageFlags src_stage_mask = 0;
+    VkPipelineStageFlags dst_stage_mask = 0;
+    VkAccessFlags src_access_mask = 0;
+    VkAccessFlags dst_access_mask = 0;
 
-	switch ( old_layout ) {
-		case VK_IMAGE_LAYOUT_UNDEFINED:
-			if ( src_stage_override != 0 )
-				src_stage = src_stage_override;
-			else
-				src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-			barrier.srcAccessMask = VK_ACCESS_NONE;
-			break;
-		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
-			src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-			barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
-			src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-			barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
-			src_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-			barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
-			src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-			barrier.srcAccessMask = VK_ACCESS_NONE;
-			break;
-		default:
-			ri.Error( ERR_DROP, "unsupported old layout %i", old_layout );
-			src_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-			barrier.srcAccessMask = VK_ACCESS_NONE;
-			break;
-	}
+    // --- 1. Détermination des masques (Logique commune) ---
 
-	switch ( new_layout ) {
-		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
-			dst_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-			barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
-			dst_stage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-			barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
-			dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-			barrier.dstAccessMask = VK_ACCESS_NONE;
-			break;
-		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
-			dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-			barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
-			dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-			barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
-			dst_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-			break;
-		default:
-			ri.Error( ERR_DROP, "unsupported new layout %i", new_layout);
-			dst_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-			barrier.dstAccessMask = VK_ACCESS_NONE;
-			break;
-	}
+    switch ( old_layout ) {
+        case VK_IMAGE_LAYOUT_UNDEFINED:
+            if ( src_stage_override != 0 )
+                src_stage_mask = src_stage_override;
+            else
+                src_stage_mask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            src_access_mask = 0; // VK_ACCESS_NONE n'existe pas en 1.0 pur, c'est 0
+            break;
+        case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+            src_stage_mask = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            src_access_mask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            break;
+        case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+            src_stage_mask = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            src_access_mask = VK_ACCESS_TRANSFER_READ_BIT;
+            break;
+        case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+            src_stage_mask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            src_access_mask = VK_ACCESS_SHADER_READ_BIT;
+            break;
+        case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
+            src_stage_mask = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            src_access_mask = 0;
+            break;
+        default:
+            ri.Error( ERR_DROP, "unsupported old layout %i", old_layout );
+            src_stage_mask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+            src_access_mask = 0;
+            break;
+    }
 
+    switch ( new_layout ) {
+        case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+            dst_stage_mask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            dst_access_mask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            break;
+        case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+            dst_stage_mask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+            dst_access_mask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            break;
+        case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
+            dst_stage_mask = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            dst_access_mask = 0;
+            break;
+        case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+            dst_stage_mask = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            dst_access_mask = VK_ACCESS_TRANSFER_READ_BIT;
+            break;
+        case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+            dst_stage_mask = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            dst_access_mask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            break;
+        case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+            dst_stage_mask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            dst_access_mask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+            break;
+        default:
+            ri.Error( ERR_DROP, "unsupported new layout %i", new_layout);
+            dst_stage_mask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+            dst_access_mask = 0;
+            break;
+    }
 
-	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-	barrier.pNext = NULL;
-	//barrier.srcAccessMask = src_access_flags;
-	//barrier.dstAccessMask = dst_access_flags;
-	barrier.oldLayout = old_layout;
-	barrier.newLayout = new_layout;
-	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.image = image;
-	barrier.subresourceRange.aspectMask = image_aspect_flags;
-	barrier.subresourceRange.baseMipLevel = 0;
-	barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
-	barrier.subresourceRange.baseArrayLayer = 0;
-	barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+    // --- 2. Branchement selon la disponibilité de l'extension ---
 
-	qvkCmdPipelineBarrier( command_buffer, src_stage, dst_stage, 0, 0, NULL, 0, NULL, 1, &barrier );
+    // Si le pointeur de fonction Synchronization2 est chargé (donc extension présente)
+    if ( qvkCmdPipelineBarrier2KHR != NULL ) {
+        
+        VkImageMemoryBarrier2KHR barrier = {0};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2_KHR;
+        barrier.pNext = NULL;
+        
+        // Cast explicite car les types '2KHR' sont en 64 bits
+        barrier.srcStageMask = (VkPipelineStageFlags2KHR)src_stage_mask;
+        barrier.srcAccessMask = (VkAccessFlags2KHR)src_access_mask;
+        barrier.dstStageMask = (VkPipelineStageFlags2KHR)dst_stage_mask;
+        barrier.dstAccessMask = (VkAccessFlags2KHR)dst_access_mask;
+        
+        barrier.oldLayout = old_layout;
+        barrier.newLayout = new_layout;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = image;
+        barrier.subresourceRange.aspectMask = image_aspect_flags;
+        barrier.subresourceRange.baseMipLevel = 0;
+        barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
+        barrier.subresourceRange.baseArrayLayer = 0;
+        barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+
+        VkDependencyInfoKHR depInfo = {0};
+        depInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO_KHR;
+        depInfo.imageMemoryBarrierCount = 1;
+        depInfo.pImageMemoryBarriers = &barrier;
+
+        qvkCmdPipelineBarrier2KHR( command_buffer, &depInfo );
+
+    } else {
+        // Fallback: Vulkan 1.0 Standard
+        VkImageMemoryBarrier barrier = {0};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.pNext = NULL;
+        barrier.srcAccessMask = src_access_mask;
+        barrier.dstAccessMask = dst_access_mask;
+        barrier.oldLayout = old_layout;
+        barrier.newLayout = new_layout;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = image;
+        barrier.subresourceRange.aspectMask = image_aspect_flags;
+        barrier.subresourceRange.baseMipLevel = 0;
+        barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
+        barrier.subresourceRange.baseArrayLayer = 0;
+        barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+
+        qvkCmdPipelineBarrier( command_buffer, src_stage_mask, dst_stage_mask, 0, 0, NULL, 0, NULL, 1, &barrier );
+    }
 }
 
 
