@@ -75,7 +75,7 @@ jobs:
     - name: Install tools
       run: |
         sudo apt-get -qq update
-        sudo apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libjpeg-dev
+        sudo apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev
 
     - uses: actions/checkout@v4
       with:
@@ -106,7 +106,7 @@ jobs:
       run: |
         sudo apt-get -qq update
         sudo apt-get install -y make gcc g++
-        sudo apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev
+        sudo apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev
 
     - uses: actions/checkout@v4
       with:
