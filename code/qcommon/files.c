@@ -1638,10 +1638,6 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 	// search through the path, one element at a time
 	//
 	for ( search = fs_searchpaths ; search ; search = search->next ) {
-		// skip q3config.cfg lookup in pak files
-		if ( search->pack && !strcmp( filename, Q3CONFIG_CFG ) ) {
-			continue;
-		}
 		// is the element a pak file?
 		if ( search->pack && search->pack->hashTable[ (hash = fullHash & (search->pack->hashSize-1)) ] ) {
 			// disregard if it doesn't match one of the allowed pure pak files
