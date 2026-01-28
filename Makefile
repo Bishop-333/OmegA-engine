@@ -35,6 +35,7 @@ USE_CURL         = 1
 USE_LOCAL_HEADERS= 0
 USE_SYSTEM_JPEG  = 0
 USE_JPEG_TURBO   = 1
+USE_MIMALLOC     = 0
 
 USE_OGG_VORBIS    = 1
 USE_SYSTEM_OGG    = 0
@@ -263,6 +264,7 @@ OGGDIR=$(MOUNT_DIR)/libogg
 VORBISDIR=$(MOUNT_DIR)/libvorbis
 OPENALDIR=$(MOUNT_DIR)/libopenal
 VULKANDIR=$(MOUNT_DIR)/libvulkan
+MIMALLOCDIR=$(MOUNT_DIR)/libmimalloc
 
 bin_path=$(shell which $(1) 2> /dev/null)
 
@@ -361,6 +363,10 @@ else
 ifeq ($(USE_JPEG_TURBO),1)
   BASE_CFLAGS += -DUSE_JPEG_TURBO
 endif
+endif
+
+ifeq ($(USE_MIMALLOC),1)
+  BASE_CFLAGS += -DUSE_MIMALLOC
 endif
 
 ifneq ($(HAVE_VM_COMPILED),true)
@@ -646,6 +652,11 @@ ifeq ($(COMPILE_PLATFORM),darwin)
   else
     BASE_CFLAGS += -I$(JPDIR)
   endif
+  endif
+
+  ifeq ($(USE_MIMALLOC),1)
+    BASE_CFLAGS += -I$(MIMALLOCDIR)/include
+    CLIENT_LDFLAGS += $(MIMALLOCDIR)/macosx/libmimalloc.a
   endif
 
   ifeq ($(USE_OGG_VORBIS),1)

@@ -34,6 +34,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../win32/win_local.h"
 #endif
 #endif
+#ifdef USE_MIMALLOC
+#include "mimalloc.h"
+#include "mimalloc-override.h"
+#endif
 
 #include "../client/keys.h"
 
