@@ -20,6 +20,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 
+#ifdef USE_SYSTEM_ZLIB
+#include <zlib.h>
+#else
+#ifdef USE_ZLIB_NG
+#include "zlib.h"
+#endif
+#endif
+
 #if defined(STRICTUNZIP) || defined(STRICTZIPUNZIP)
 /* like the STRICT of WIN32, we define a pointer that cannot be converted
     from (void*) without cast */
@@ -82,6 +90,7 @@ typedef void   (*free_func) (void* opaque, void* address);
 
 struct internal_state;
 
+#if !defined(USE_ZLIB_NG) && !defined(USE_SYSTEM_ZLIB)
 typedef struct z_stream_s {
     unsigned char    *next_in;  /* next input unsigned char */
     unsigned int     avail_in;  /* number of unsigned chars available at next_in */
@@ -102,6 +111,7 @@ typedef struct z_stream_s {
     unsigned long   adler;      /* adler32 value of the uncompressed data */
     unsigned long   reserved;   /* reserved for future use */
 } z_stream;
+#endif
 
 typedef z_stream *z_streamp;
 

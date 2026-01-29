@@ -35,6 +35,8 @@ USE_CURL         = 1
 USE_LOCAL_HEADERS= 0
 USE_SYSTEM_JPEG  = 0
 USE_JPEG_TURBO   = 1
+USE_SYSTEM_ZLIB  = 0
+USE_ZLIB_NG      = 1
 
 USE_OGG_VORBIS    = 1
 USE_SYSTEM_OGG    = 0
@@ -100,6 +102,10 @@ endif
 ifeq ($(COMPILE_PLATFORM),darwin)
   USE_SDL=1
   USE_LOCAL_HEADERS=1
+  USE_SYSTEM_ZLIB=1
+  ifeq ($(ARCH),x86_64)
+    USE_JPEG_TURBO=0
+  endif
 endif
 
 ifeq ($(COMPILE_PLATFORM),linux)
@@ -260,6 +266,7 @@ BLIBDIR=$(MOUNT_DIR)/botlib
 JPDIR=$(MOUNT_DIR)/libjpeg
 JPTURBODIR=$(MOUNT_DIR)/libjpeg-turbo
 OGGDIR=$(MOUNT_DIR)/libogg
+ZLIBNGDIR=$(MOUNT_DIR)/libz-ng
 VORBISDIR=$(MOUNT_DIR)/libvorbis
 OPENALDIR=$(MOUNT_DIR)/libopenal
 VULKANDIR=$(MOUNT_DIR)/libvulkan
@@ -360,6 +367,14 @@ ifeq ($(USE_SYSTEM_JPEG),1)
 else
 ifeq ($(USE_JPEG_TURBO),1)
   BASE_CFLAGS += -DUSE_JPEG_TURBO
+endif
+endif
+
+ifeq ($(USE_SYSTEM_ZLIB),1)
+  BASE_CFLAGS += -DUSE_SYSTEM_ZLIB
+else
+ifeq ($(USE_ZLIB_NG),1)
+  CLIENT_CFLAGS += -DUSE_ZLIB_NG
 endif
 endif
 
@@ -534,7 +549,7 @@ ifdef MINGW
     else
       CLIENT_LDFLAGS += -L$(MOUNT_DIR)/libcurl/windows/mingw/lib64
     endif
-    CLIENT_LDFLAGS += -lcurl -lz -lcrypt32
+    CLIENT_LDFLAGS += -lcurl -lcrypt32
   endif
 
   ifeq ($(USE_JPEG_TURBO),1)
@@ -546,6 +561,17 @@ ifdef MINGW
     endif
   else
     BASE_CFLAGS += -I$(JPDIR)
+  endif
+
+  ifeq ($(USE_ZLIB_NG),1)
+    BASE_CFLAGS += -I$(ZLIBNGDIR)/include
+    ifeq ($(ARCH),x86)
+      CLIENT_LDFLAGS += $(ZLIBNGDIR)/windows/mingw/lib32/libz.a
+    else
+      CLIENT_LDFLAGS += $(ZLIBNGDIR)/windows/mingw/lib64/libz.a
+    endif
+  else
+    CLIENT_LDFLAGS += -lz
   endif
 
   ifeq ($(USE_OGG_VORBIS),1)
@@ -648,6 +674,15 @@ ifeq ($(COMPILE_PLATFORM),darwin)
   endif
   endif
 
+  ifeq ($(USE_SYSTEM_ZLIB),1)
+    CLIENT_LDFLAGS += -lz
+  else
+  ifeq ($(USE_ZLIB_NG),1)
+    BASE_CFLAGS += -I$(ZLIBNGDIR)/include
+    CLIENT_LDFLAGS += $(ZLIBNGDIR)/macosx/libz.a
+  endif
+  endif
+
   ifeq ($(USE_OGG_VORBIS),1)
     BASE_CFLAGS += -DUSE_OGG_VORBIS $(OGG_FLAGS) $(VORBIS_FLAGS)
     CLIENT_LDFLAGS += $(OGG_LIBS) $(VORBIS_LIBS)
@@ -712,7 +747,7 @@ else
 
   LDFLAGS += -lm
   LDFLAGS += -Wl,--gc-sections -fvisibility=hidden
-  LDFLAGS += -flto
+  LDFLAGS += -flto=auto
   LDFLAGS += $(STRIP_FLAG)
 
   ifeq ($(USE_SDL),1)
@@ -731,6 +766,15 @@ else
     CLIENT_LDFLAGS += $(JPTURBODIR)/linux/$(ARCH)/libjpeg.a
   else
     BASE_CFLAGS += -I$(JPDIR)
+  endif
+  endif
+
+  ifeq ($(USE_SYSTEM_ZLIB),1)
+    CLIENT_LDFLAGS += -lz
+  else
+  ifeq ($(USE_ZLIB_NG),1)
+    BASE_CFLAGS += -I$(ZLIBNGDIR)/include
+    CLIENT_LDFLAGS += $(ZLIBNGDIR)/linux/$(ARCH)/libz.a
   endif
   endif
 
@@ -810,17 +854,17 @@ endif
 
 define DO_CC
 $(echo_cmd) "CC $<"
-$(Q)$(CC) $(CFLAGS) -o $@ -c $<
+$(Q)$(CC) $(CFLAGS) $(CLIENT_CFLAGS) -o $@ -c $<
 endef
 
 define DO_CC_QVM
 $(echo_cmd) "CC_QVM $<"
-$(Q)$(CC) $(CFLAGS) -fno-fast-math -o $@ -c $<
+$(Q)$(CC) $(CFLAGS) $(CLIENT_CFLAGS) -fno-fast-math -o $@ -c $<
 endef
 
 define DO_REND_CC
 $(echo_cmd) "REND_CC $<"
-$(Q)$(CC) $(CFLAGS) $(RENDCFLAGS) -o $@ -c $<
+$(Q)$(CC) $(CFLAGS) $(CLIENT_CFLAGS) $(RENDCFLAGS) -o $@ -c $<
 endef
 
 define DO_REF_STR

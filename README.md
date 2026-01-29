@@ -32,7 +32,8 @@ Go to [Releases](../../releases) section to download latest binaries for your pl
 * non-intrusive support for SDL2 backend (video, audio, input), selectable at compile time
 * OpenAL sound API support (multiple speaker support and better sound quality)
 * Ogg Vorbis support
-* libjpeg-turbo support
+* libjpeg-turbo support (JPEG image codec that uses SIMD instructions to accelerate baseline JPEG compression and decompression)
+* zlib-ng support (zlib replacement with optimizations for "next generation" systems)
 * [QWFWD](https://www.quakeworld.nu/wiki/QWfwd) proxy support from [fX3](https://codeberg.org/ChannelZ/fX3), [list of servers](https://www.quakeservers.net//quakeworld/servers/t=proxy/)
 * console tabs from [fX3](https://codeberg.org/ChannelZ/fX3)
 * tons of bug fixes and other improvements
