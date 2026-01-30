@@ -62,7 +62,7 @@ jobs:
         retention-days: 5
         
   linux:
-    name: Release Unix ${{ matrix.arch }}
+    name: Release Linux ${{ matrix.arch }}
     runs-on: ubuntu-latest
     container:
       image: debian:trixie
@@ -75,8 +75,8 @@ jobs:
 
     - name: Install tools
       run: |
-        sudo apt-get -qq update
-        sudo apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev
+        apt-get -qq update
+        apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev
 
     - uses: actions/checkout@v4
       with:
@@ -94,7 +94,7 @@ jobs:
         retention-days: 5
 
   linux-arm:
-    name: Release Unix ${{ matrix.arch }}
+    name: Release Linux ${{ matrix.arch }}
     runs-on: ubuntu-22.04-arm
     strategy:
       fail-fast: false
