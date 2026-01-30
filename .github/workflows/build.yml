@@ -68,12 +68,15 @@ jobs:
       fail-fast: false
       matrix:
         arch: [x86_64]
+        cc: [gcc-13]
 
     steps:
 
     - name: Install tools
       run: |
+        sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
         sudo apt-get -qq update
+        sudo apt-get -y install ${{ matrix.cc }}
         sudo apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev
 
     - uses: actions/checkout@v4
@@ -82,7 +85,7 @@ jobs:
 
     - name: Build
       run: |
-        make install -j$(nproc) ARCH=${{ matrix.arch }} DESTDIR=bin BUILD_SERVER=1
+        make install -j$(nproc) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin BUILD_SERVER=1
 
     - uses: actions/upload-artifact@v4
       with:
