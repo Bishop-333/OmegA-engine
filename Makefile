@@ -603,7 +603,7 @@ ifeq ($(COMPILE_PLATFORM),darwin)
 
   BASE_CFLAGS += -Wno-unused-result
 
-  BASE_CFLAGS += -ffunction-sections -flto
+  BASE_CFLAGS += -ffunction-sections -flto=thin
 
   OPTIMIZE = -O2 -fvisibility=hidden -ffast-math
 
@@ -614,7 +614,7 @@ ifeq ($(COMPILE_PLATFORM),darwin)
   ARCHEXT = -osx-$(ARCH)
 
   LDFLAGS += -Wl,-dead_strip
-  LDFLAGS += -flto
+  LDFLAGS += -flto=thin
 
   # Default minimum Mac OS X version
   ifeq ($(MACOSX_VERSION_MIN),)
@@ -720,7 +720,7 @@ else
 
   BASE_CFLAGS += -I/usr/include -I/usr/local/include
 
-  BASE_CFLAGS += -ffunction-sections -flto
+  BASE_CFLAGS += -ffunction-sections -flto=auto
 
   OPTIMIZE = -O2 -fvisibility=hidden -ffast-math
 
