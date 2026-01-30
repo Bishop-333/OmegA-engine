@@ -63,9 +63,7 @@ jobs:
         
   linux:
     name: Release Linux ${{ matrix.arch }}
-    runs-on: ubuntu-latest
-    container:
-      image: debian:trixie
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -76,7 +74,6 @@ jobs:
     - name: Install tools
       run: |
         apt-get -qq update
-        apt-get -y install git build-essential
         apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev
 
     - uses: actions/checkout@v4
