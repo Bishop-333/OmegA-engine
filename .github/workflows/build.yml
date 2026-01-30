@@ -96,7 +96,9 @@ jobs:
 
   linux-arm:
     name: Release Linux ${{ matrix.arch }}
-    runs-on: ubuntu-22.04-arm
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: debian:bookworm
     strategy:
       fail-fast: false
       matrix:
@@ -106,9 +108,9 @@ jobs:
 
     - name: Install tools
       run: |
-        sudo apt-get -qq update
-        sudo apt-get install -y make gcc g++
-        sudo apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev
+        apt-get -qq update
+        apt-get -y install git build-essential
+        apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev
 
     - uses: actions/checkout@v4
       with:
