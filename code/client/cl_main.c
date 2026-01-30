@@ -4055,7 +4055,7 @@ void CL_Init( void ) {
 	cl_consoleHeight = Cvar_Get( "cl_consoleHeight", "0.5", CVAR_ARCHIVE );
 	Cvar_CheckRange( cl_consoleHeight, "0", "1", CV_FLOAT );
 	Cvar_SetDescription( cl_consoleHeight, "Console height, set as value from 0.0-1.0, use with \\seta to save in config." );
-	cl_fpsWarning = Cvar_Get( "cl_fpsWarning", "30", CVAR_ARCHIVE );
+	cl_fpsWarning = Cvar_Get( "cl_fpsWarning", "60", CVAR_ARCHIVE );
 	Cvar_SetDescription( cl_fpsWarning, va( "Displays a warning message if your game is under %ifps. Set to 0 to disable.", cl_fpsWarning->integer ) );
 	cl_omegaEngine = Cvar_Get( "cl_omegaEngine", "1", CVAR_ROM | CVAR_PROTECTED );
 	Cvar_SetDescription( cl_omegaEngine, "Informs the game that we are using OmegA engine." );
