@@ -4387,6 +4387,19 @@ static void CL_ServerInfoPacket( const netadr_t *from, msg_t *msg ) {
 		if ( NET_CompareAdr( from, &cls.localServers[i].adr ) ) {
 			return;
 		}
+
+		if ( !Q_stricmp( Info_ValueForKey( infoString, "hostname" ), cls.localServers[i].hostName ) ) {
+			if ( Cvar_VariableIntegerValue("net_enabled") & NET_PRIOV6 ) {
+				if ( from->type == NA_IP6 ) {
+					cls.localServers[i].adr = *from;
+				}
+			} else {
+				if ( from->type == NA_IP ) {
+					cls.localServers[i].adr = *from;
+				}
+			}
+			return;
+		}
 	}
 
 	if ( i == MAX_OTHER_SERVERS ) {
@@ -4397,6 +4410,7 @@ static void CL_ServerInfoPacket( const netadr_t *from, msg_t *msg ) {
 	// add this to the list
 	cls.numlocalservers = i+1;
 	CL_InitServerInfo( &cls.localServers[i], from );
+	Q_strncpyz(cls.localServers[i].hostName,Info_ValueForKey(infoString, "hostname"), MAX_NAME_LENGTH);
 
 	Q_strncpyz( info, MSG_ReadString( msg ), sizeof( info ) );
 	len = (int) strlen( info );
