@@ -3774,11 +3774,14 @@ Com_Init
 void Com_Init( char *commandLine ) {
 	const char *s;
 	int	qport;
+	int	startTime;
 
 	// get the initial time base
 	Sys_Milliseconds();
 
 	Com_Printf( "%s %s %s\n", SVN_VERSION, PLATFORM_STRING, __DATE__ );
+
+	startTime = Sys_Milliseconds();
 
 	if ( Q_setjmp( abortframe ) ) {
 		Sys_Error ("Error during initialization");
@@ -4066,7 +4069,7 @@ void Com_Init( char *commandLine ) {
 
 	com_fullyInitialized = qtrue;
 
-	Com_Printf( "--- Common Initialization Complete ---\n" );
+	Com_Printf( "--- Common Initialization Complete (%ims) ---\n", Sys_Milliseconds() - startTime );
 
 	NET_Init();
 

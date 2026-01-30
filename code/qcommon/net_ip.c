@@ -1444,7 +1444,7 @@ static void NET_GetLocalAddress( void )
 	
 		freeifaddrs( ifap );
 		
-		Sys_ShowIP();
+		//Sys_ShowIP();
 	}
 }
 #else // _WIN32
@@ -1497,7 +1497,7 @@ static void NET_GetLocalAddress( void ) {
 #endif
 		}
 	
-		Sys_ShowIP();
+		//Sys_ShowIP();
 	}
 	
 	if ( res )
