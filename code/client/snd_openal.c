@@ -2434,8 +2434,8 @@ static void S_AL_SoundInfo(void)
 	Com_Printf( "  Vendor:         %s\n", qalGetString( AL_VENDOR ) );
 	Com_Printf( "  Version:        %s\n", qalGetString( AL_VERSION ) );
 	Com_Printf( "  Renderer:       %s\n", qalGetString( AL_RENDERER ) );
-	Com_DPrintf( "  AL Extensions:  %s\n", qalGetString( AL_EXTENSIONS ) );
-	Com_DPrintf( "  ALC Extensions: %s\n", qalcGetString( alDevice, ALC_EXTENSIONS ) );
+	Com_Printf( "  AL Extensions:  %s\n", qalGetString( AL_EXTENSIONS ) );
+	Com_Printf( "  ALC Extensions: %s\n", qalcGetString( alDevice, ALC_EXTENSIONS ) );
 
 	if(enumeration_all_ext)
 		Com_Printf("  Device:         %s\n", qalcGetString(alDevice, ALC_ALL_DEVICES_SPECIFIER));

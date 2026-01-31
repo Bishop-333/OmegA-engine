@@ -294,12 +294,8 @@ PLIST="<?xml version=\"1.0\" encoding=\"UTF-8\"?>
     <string>public.app-category.games</string>
     <key>CFBundleShortVersionString</key>
     <string>${OMG_VERSION}</string>
-    <key>CFBundleSignature</key>
-    <string>????</string>
     <key>CFBundleVersion</key>
     <string>${OMG_VERSION}</string>
-    <key>CGDisableCoalescedUpdates</key>
-    <true/>
     <key>LSMinimumSystemVersion</key>
     <string>${MACOSX_DEPLOYMENT_TARGET}</string>"
 
