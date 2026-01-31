@@ -3882,8 +3882,9 @@ static void CL_InitGLimp_Cvars( void )
 	r_modeFullscreen = Cvar_Get( "r_modeFullscreen", "-2", CVAR_ARCHIVE | CVAR_LATCH );
 #endif
 	Cvar_SetDescription( r_modeFullscreen, "Dedicated fullscreen mode, set to \"\" to use \\r_mode in all cases." );
-	r_fullscreen = Cvar_Get( "r_fullscreen", "0", CVAR_ARCHIVE | CVAR_LATCH );
-	Cvar_SetDescription( r_fullscreen, "Fullscreen mode. Set to 0 for windowed mode." );
+	r_fullscreen = Cvar_Get( "r_fullscreen", "2", CVAR_ARCHIVE | CVAR_LATCH );
+	Cvar_CheckRange( r_fullscreen, "0", "2", CV_INTEGER );
+	Cvar_SetDescription( r_fullscreen, "Set fullscreen mode:\n 0 - windowed\n 1 - fullscreen\n 2 - borderless fullscreen" );
 	r_customPixelAspect = Cvar_Get( "r_customPixelAspect", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	Cvar_SetDescription( r_customPixelAspect, "Enables custom aspect of the screen, with \\r_mode -1." );
 	r_customwidth = Cvar_Get( "r_customWidth", "1024", CVAR_ARCHIVE | CVAR_LATCH );

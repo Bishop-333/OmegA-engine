@@ -442,25 +442,26 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 
 	if ( fullscreen )
 	{
-#ifdef __APPLE__
-		if ( r_mode->integer == -2 || r_modeFullscreen->integer == -2 )
+		if ( r_fullscreen->integer == 2 )
 		{
-			flags |= SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_ALLOW_HIGHDPI;
+			flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
 		}
 		else
 		{
 			flags |= SDL_WINDOW_FULLSCREEN;
 		}
-#else
-		flags |= SDL_WINDOW_FULLSCREEN;
-#endif
 	}
 	else if ( r_noborder->integer )
 	{
 		flags |= SDL_WINDOW_BORDERLESS;
 	}
 
-	//flags |= SDL_WINDOW_ALLOW_HIGHDPI;
+#ifdef __APPLE__
+		if ( r_fullscreen->integer == 2 || r_modeFullscreen->integer == -2 || ( !r_modeFullscreen->string[0] && r_mode->integer == -2 ) )
+		{
+			flags |= SDL_WINDOW_ALLOW_HIGHDPI;
+		}
+#endif
 
 	colorBits = r_colorbits->value;
 
