@@ -430,9 +430,7 @@ extern	cvar_t	*vid_ypos;
 extern	cvar_t	*r_noborder;
 
 extern	cvar_t	*r_allowSoftwareGL;
-#ifndef USE_VULKAN_API
 extern	cvar_t	*r_allowResize;
-#endif
 extern	cvar_t	*r_swapInterval;
 extern	cvar_t	*r_glDriver;
 
