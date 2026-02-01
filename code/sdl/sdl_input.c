@@ -65,6 +65,8 @@ static cvar_t *j_up_axis;
 static cvar_t *cl_consoleKeys;
 
 static int vidRestartTime = 0;
+static int vidResizeWidth = 0;
+static int vidResizeHeight = 0;
 
 static int in_eventTime = 0;
 static qboolean mouse_focus;
@@ -1312,10 +1314,7 @@ void HandleEvents( void )
 						Cvar_SetValue( "r_customheight", height );
 						Cvar_Set( "r_mode", "-1" );
 
-						// Wait until user stops dragging for 1 second, so
-						// we aren't constantly recreating the GL context while
-						// he tries to drag...
-						vidRestartTime = Sys_Milliseconds( ) + 1000;
+						re.ResizeWindow( e.window.data1, e.window.data2 );
 					}
 					break;
 					case SDL_WINDOWEVENT_MOVED:
@@ -1397,7 +1396,10 @@ void IN_Frame( void )
 	if( ( vidRestartTime != 0 ) && ( vidRestartTime < Sys_Milliseconds( ) ) )
 	{
 		vidRestartTime = 0;
-		Cbuf_AddText( "vid_restart\n" );
+		if ( !re.ResizeWindow( vidResizeWidth, vidResizeHeight ) )
+		{
+			Cbuf_AddText( "vid_restart\n" );
+		}
 	}
 }
 

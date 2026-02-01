@@ -1464,6 +1464,9 @@ const void *RB_TakeVideoFrameCmd( const void *data );
 
 float R_ClampDenorm( float v );
 
+qboolean	GLimp_ResizeWindow( int width, int height );
+
+
 //
 // tr_shader.c
 //

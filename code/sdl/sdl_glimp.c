@@ -764,6 +764,22 @@ static rserr_t GLimp_StartDriverAndSetMode( int mode, const char *modeFS, qboole
 
 /*
 ===============
+GLimp_ResizeWindow
+===============
+*/
+qboolean GLimp_ResizeWindow( int width, int height )
+{
+	glw_state.config->vidWidth = width;
+	glw_state.config->vidHeight = height;
+	glw_state.config->windowAspect = (float)glw_state.config->vidWidth / (float)glw_state.config->vidHeight;
+
+	ri.CL_GlconfigChanged( glw_state.config );
+	return qtrue;
+}
+
+
+/*
+===============
 GLimp_Init
 
 This routine is responsible for initializing the OS specific portions

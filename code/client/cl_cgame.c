@@ -937,6 +937,22 @@ void CL_CGameRendering( stereoFrame_t stereo ) {
 
 
 /*
+=====================
+CL_UpdateGlconfig
+
+cls.glconfig has been modified and doesn't require a full vid_restart
+=====================
+*/
+void CL_UpdateGlconfig( void ) {
+	if ( !cgvm ) {
+		return;
+	}
+
+	VM_Call( cgvm, 0, CG_UPDATE_GLCONFIG );
+}
+
+
+/*
 =================
 CL_AdjustTimeDelta
 

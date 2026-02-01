@@ -237,6 +237,9 @@ typedef enum {
 	CG_EVENT_HANDLING,
 //	void (*CG_EventHandling)(int type);
 
+	CG_UPDATE_GLCONFIG,
+//	void	CG_UpdateGLConfig( void );
+
 	CG_EXPORT_LAST,
 } cgameExport_t;
 

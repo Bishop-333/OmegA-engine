@@ -3287,6 +3287,17 @@ static void CL_InitRenderer( void ) {
 
 
 /*
+============
+CL_GlconfigChanged
+============
+*/
+void CL_GlconfigChanged( const glconfig_t *glconfig ) {
+	cls.glconfig = *glconfig;
+	CL_UpdateGlconfig();
+}
+
+
+/*
 ============================
 CL_StartHunkUsers
 
@@ -3541,6 +3552,8 @@ static void CL_InitRef( void ) {
 	rimp.GL_GetProcAddress = GL_GetProcAddress;
 	rimp.GLimp_EndFrame = GLimp_EndFrame;
 #endif
+
+	rimp.CL_GlconfigChanged = CL_GlconfigChanged;
 
 	// Vulkan API
 #ifdef USE_VULKAN_API

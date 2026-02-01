@@ -43,6 +43,9 @@ typedef struct {
 	// which will keep the screen from flashing to the desktop.
 	void	(*Shutdown)( refShutdownCode_t code );
 
+	//
+	qboolean	(*ResizeWindow)( int width, int height );
+
 	// All data that will be used in a level should be
 	// registered before rendering any frames to prevent disk hits,
 	// but they can still be registered at a later time
@@ -221,6 +224,8 @@ typedef struct {
 	void	(*GLimp_Shutdown)( qboolean unloadDLL );
 	void	(*GLimp_EndFrame)( void );
 	void*	(*GL_GetProcAddress)( const char *name );
+	qboolean (*GLimp_ResizeWindow)( int width, int height );
+	void	(*CL_GlconfigChanged)( const glconfig_t *glconfig );
 
 	// Vulkan
 	void	(*VKimp_Init)( glconfig_t *config );
