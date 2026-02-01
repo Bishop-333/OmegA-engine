@@ -1069,18 +1069,8 @@ static float Con_DrawFPS( float y ) {
 	static int	index;
 	int		i, total;
 	int		fps;
-	static	int	previous;
-	int		t, frameTime;
-	static int	lowFpsStartTime;
-	static qboolean	warned;
 
-	// don't use serverTime, because that will be drifting to
-	// correct for internet lag changes, timescales, timedemos, etc
-	t = Sys_Milliseconds();
-	frameTime = t - previous;
-	previous = t;
-
-	previousTimes[index % FPS_FRAMES] = frameTime;
+	previousTimes[index % FPS_FRAMES] = cls.realFrametime;
 	index++;
 	if ( index > FPS_FRAMES ) {
 		// average multiple frames together to smooth changes out a bit
@@ -1092,19 +1082,6 @@ static float Con_DrawFPS( float y ) {
 			total = 1;
 		}
 		fps = 1000 * FPS_FRAMES / total;
-
-		if ( fps < cl_fpsWarning->integer && !warned ) {
-			if ( lowFpsStartTime == 0 ) {
-				lowFpsStartTime = t;
-			} else if ( ( t - lowFpsStartTime ) > 2000 ) {
-				Com_Printf( "^3WARNING: Low fps detected (%ifps)\n", fps );
-				Com_Printf( "^3You may want to execute \\performancepanic to optimize your game\n" );
-				Com_Printf( "^3Type \\cl_fpsWarning 0 to disable this warning\n" );
-				warned = qtrue;
-			}
-		} else {
-			lowFpsStartTime = 0;
-		}
 
 		s = va( "%ifps", fps );
 		w = strlen( s ) * smallchar_width;
