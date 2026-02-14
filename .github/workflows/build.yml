@@ -22,12 +22,10 @@ on:
 
 jobs:
   windows:
-    name: Release Windows ${{ matrix.arch }}
+    name: Release Windows x86_64
     runs-on: windows-latest
     strategy:
       fail-fast: false
-      matrix:
-        arch: [x86_64]
 
     steps:
     - name: Checkout current repo
@@ -52,24 +50,22 @@ jobs:
     - name: Build
       shell: cmd
       run: |
-        make install -j%NUMBER_OF_PROCESSORS% ARCH=${{ matrix.arch }} DESTDIR=bin
+        make install -j %NUMBER_OF_PROCESSORS% ARCH=x86_64 DESTDIR=bin
 
     - uses: actions/upload-artifact@v4
       with:
-        name: release-mingw64-${{ matrix.arch }}
+        name: release-mingw64-x86_64
         path: bin
         if-no-files-found: error
         retention-days: 5
         
   linux:
-    name: Release Linux ${{ matrix.arch }}
+    name: Release Linux x86_64
     runs-on: ubuntu-latest
     container:
       image: debian:bookworm
     strategy:
       fail-fast: false
-      matrix:
-        arch: [x86_64]
 
     steps:
 
@@ -85,24 +81,22 @@ jobs:
 
     - name: Build
       run: |
-        make install -j$(nproc) ARCH=${{ matrix.arch }} DESTDIR=bin BUILD_SERVER=1
+        make install -j$(nproc) DESTDIR=bin BUILD_SERVER=1
 
     - uses: actions/upload-artifact@v4
       with:
-        name: release-linux-${{ matrix.arch }}
+        name: release-linux-x86_64
         path: bin
         if-no-files-found: error
         retention-days: 5
 
   linux-arm:
-    name: Release Linux ${{ matrix.arch }}
+    name: Release Linux arm64
     runs-on: ubuntu-24.04-arm
     container:
       image: debian:bookworm
     strategy:
       fail-fast: false
-      matrix:
-        arch: [arm64]
 
     steps:
 
@@ -118,18 +112,18 @@ jobs:
 
     - name: Build
       run: |
-        make install -j$(nproc) ARCH=${{ matrix.arch }} DESTDIR=bin BUILD_SERVER=1
+        make install -j$(nproc) DESTDIR=bin BUILD_SERVER=1
 
     - uses: actions/upload-artifact@v4
       with:
-        name: release-linux-${{ matrix.arch }}
+        name: release-linux-arm64
         path: bin
         if-no-files-found: error
         retention-days: 5
 
   macos:
     name: Release macOS universal2
-    runs-on: macos-15
+    runs-on: macos-latest
     strategy:
       fail-fast: false
 
