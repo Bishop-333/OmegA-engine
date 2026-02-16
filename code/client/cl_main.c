@@ -3199,7 +3199,7 @@ static void FORMAT_PRINTF(2, 3) QDECL CL_RefPrintf( printParm_t level, const cha
 		default: Com_Printf( "%s", msg ); break;
 		case PRINT_DEVELOPER: Com_DPrintf( "%s", msg ); break;
 		case PRINT_WARNING: Com_WPrintf( "%s", msg ); break;
-		case PRINT_ERROR: Com_Printf( S_COLOR_RED "%s", msg ); break;
+		case PRINT_ERROR: Com_Printf( S_COLOR_ERROR "%s", msg ); break;
 	}
 }
 
