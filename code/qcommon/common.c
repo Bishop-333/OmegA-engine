@@ -295,7 +295,7 @@ void QDECL Com_WPrintf( const char *fmt, ...) {
 	Q_vsnprintf( msg, sizeof( msg ), fmt, argptr );
 	va_end( argptr );
 
-	Com_Printf( S_COLOR_YELLOW "%s", msg );
+	Com_Printf( S_COLOR_WARNING "%s", msg );
 }
 
 
