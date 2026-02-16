@@ -23,36 +23,26 @@ on:
 jobs:
   windows:
     name: Release Windows x86_64
-    runs-on: windows-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
 
     steps:
-    - name: Checkout current repo
-      uses: actions/checkout@v4
 
-    - name: Checkout msys32 tools from sibling repo
-      uses: actions/checkout@v4
+    - name: Install tools
+      run: |
+        sudo apt-get -qq update
+        sudo apt-get -y install gcc-mingw-w64-x86-64
+
+    - uses: actions/checkout@v6
       with:
-        repository: ec-/msys32
-        path: msys
-
-    - name: Extract msys32.7z
-      run: |
-        7z x %GITHUB_WORKSPACE%/msys/msys32.7z -o%GITHUB_WORKSPACE%/msys
-      shell: cmd
-
-    - name: Prepend msys/bin to PATH
-      run: |
-           echo "PATH=$GITHUB_WORKSPACE/msys/mingw/bin;$GITHUB_WORKSPACE/msys/bin;$GITHUB_WORKSPACE/msys" >> $GITHUB_ENV
-      shell: bash
+        submodules: recursive
 
     - name: Build
-      shell: cmd
       run: |
-        make install -j %NUMBER_OF_PROCESSORS% ARCH=x86_64 DESTDIR=bin
+        make install -j$(nproc) PLATFORM=mingw64 DESTDIR=bin
 
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v6
       with:
         name: release-mingw64-x86_64
         path: bin
@@ -61,9 +51,7 @@ jobs:
         
   linux:
     name: Release Linux x86_64
-    runs-on: ubuntu-latest
-    container:
-      image: debian:bookworm
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
 
@@ -71,11 +59,10 @@ jobs:
 
     - name: Install tools
       run: |
-        apt-get -qq update
-        apt-get -y install git build-essential
-        apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev
+        sudo apt-get -qq update
+        sudo apt-get -y install libcurl4-openssl-dev libsdl2-dev libopenal-dev
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         submodules: recursive
 
@@ -83,7 +70,7 @@ jobs:
       run: |
         make install -j$(nproc) DESTDIR=bin BUILD_SERVER=1
 
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v6
       with:
         name: release-linux-x86_64
         path: bin
@@ -93,8 +80,6 @@ jobs:
   linux-arm:
     name: Release Linux arm64
     runs-on: ubuntu-24.04-arm
-    container:
-      image: debian:bookworm
     strategy:
       fail-fast: false
 
@@ -102,11 +87,10 @@ jobs:
 
     - name: Install tools
       run: |
-        apt-get -qq update
-        apt-get -y install git build-essential
-        apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libopenal-dev
+        sudo apt-get -qq update
+        sudo apt-get -y install libcurl4-openssl-dev libsdl2-dev libopenal-dev
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         submodules: recursive
 
@@ -114,7 +98,7 @@ jobs:
       run: |
         make install -j$(nproc) DESTDIR=bin BUILD_SERVER=1
 
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v6
       with:
         name: release-linux-arm64
         path: bin
@@ -123,16 +107,16 @@ jobs:
 
   macos:
     name: Release macOS universal2
-    runs-on: macos-latest
+    runs-on: macos-15
     strategy:
       fail-fast: false
 
     steps:
 
     - name: Install tools
-      run: brew install coreutils sdl2 # pkg-config
+      run: brew install coreutils sdl2
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         submodules: recursive
 
@@ -143,7 +127,7 @@ jobs:
         ./make-macosx-app.sh release
         hdiutil create -format UDZO -srcfolder build/release-darwin-universal2/OmegA.app build/omega-engine-macos-universal2.dmg
 
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v6
       with:
         name: release-darwin-universal2
         path: build/omega-engine-macos-universal2.dmg
@@ -151,16 +135,15 @@ jobs:
         retention-days: 5
 
   create-testing:
-    if: github.ref == 'refs/heads/master' && github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch'
     needs: [windows, linux, linux-arm, macos]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - name: Download Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
 
       - name: Create binary archives
         run: |
-          chmod -R +x *
           7z a -r omega-engine-linux-x86_64.zip      ./release-linux-x86_64
           7z a -r omega-engine-linux-arm64.zip       ./release-linux-arm64
           7z a -r omega-engine-windows-x86_64.zip    ./release-mingw64-x86_64
