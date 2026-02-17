@@ -1026,6 +1026,7 @@ ifdef MINGW
 	cd $(CURLDIR) && CFLAGS="" cmake $(CURDIR)/$(MOUNT_DIR)/libcurl $(CURL_CMAKE_ARGS)
 	@$(MAKE) -C $(CURLDIR)
 endif
+endif
 ifeq ($(USE_JPEG_TURBO),1)
 	@echo ""
 	@echo "Building libjpeg-turbo in $(JPTURBODIR):"
