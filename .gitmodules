@@ -1,0 +1,6 @@
+[submodule "code/libjpeg-turbo"]
+	path = code/libjpeg-turbo
+	url = https://github.com/libjpeg-turbo/libjpeg-turbo.git
+[submodule "code/zlib-ng"]
+	path = code/zlib-ng
+	url = https://github.com/zlib-ng/zlib-ng.git
