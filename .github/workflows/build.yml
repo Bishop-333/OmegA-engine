@@ -32,7 +32,7 @@ jobs:
     - name: Install tools
       run: |
         sudo apt-get -qq update
-        sudo apt-get -y install gcc-mingw-w64-x86-64
+        sudo apt-get -y install gcc-mingw-w64-x86-64 nasm
 
     - uses: actions/checkout@v6
       with:
@@ -60,7 +60,7 @@ jobs:
     - name: Install tools
       run: |
         sudo apt-get -qq update
-        sudo apt-get -y install libcurl4-openssl-dev libsdl2-dev libopenal-dev
+        sudo apt-get -y install libcurl4-openssl-dev libsdl2-dev libopenal-dev nasm
 
     - uses: actions/checkout@v6
       with:
