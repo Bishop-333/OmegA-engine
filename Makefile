@@ -264,6 +264,7 @@ BLIBDIR=$(MOUNT_DIR)/botlib
 JPDIR=$(MOUNT_DIR)/libjpeg
 JPTURBODIR=$(BUILD_DIR)/$(MODE)-$(PLATFORM)-$(ARCH)/libjpeg-turbo
 ZLIBNGDIR=$(BUILD_DIR)/$(MODE)-$(PLATFORM)-$(ARCH)/zlib-ng
+CURLDIR=$(BUILD_DIR)/$(MODE)-$(PLATFORM)-$(ARCH)/libcurl
 OGGDIR=$(MOUNT_DIR)/libogg
 VORBISDIR=$(MOUNT_DIR)/libvorbis
 OPENALDIR=$(MOUNT_DIR)/libopenal
@@ -547,12 +548,8 @@ ifdef MINGW
   endif
 
   ifeq ($(USE_CURL),1)
-    BASE_CFLAGS += -I$(MOUNT_DIR)/libcurl/windows/include
-    ifeq ($(ARCH),x86)
-      CLIENT_LDFLAGS += -L$(MOUNT_DIR)/libcurl/windows/mingw/lib32
-    else
-      CLIENT_LDFLAGS += -L$(MOUNT_DIR)/libcurl/windows/mingw/lib64
-    endif
+    BASE_CFLAGS += -I$(MOUNT_DIR)/libcurl//include
+    CLIENT_LDFLAGS += -L$(CURLDIR)
     CLIENT_LDFLAGS += -lcurl -lcrypt32
   endif
 
@@ -856,6 +853,10 @@ else
     RENDCFLAGS=$(NOTSHLIBCFLAGS)
 endif
 
+ifeq ($(USE_CURL),1)
+  CURL_CMAKE_ARGS += -G"Unix Makefiles" -DCMAKE_C_COMPILER=$(CC) -DCMAKE_SYSTEM_PROCESSOR=$(ARCH) -DCMAKE_INSTALL_PREFIX=$(CURDIR)/$(CURLDIR) -DCMAKE_SYSTEM_NAME=Windows
+endif
+
 ifeq ($(USE_JPEG_TURBO),1)
   JPTURBO_CMAKE_ARGS += -G"Unix Makefiles" -DCMAKE_C_COMPILER=$(CC) -DCMAKE_SYSTEM_PROCESSOR=$(ARCH) -DENABLE_SHARED=OFF -DCMAKE_INSTALL_PREFIX=$(CURDIR)/$(JPTURBODIR)
   ifdef MINGW
@@ -1016,6 +1017,15 @@ ifneq ($(BUILD_SERVER),0)
 endif
 
 thirdparty:
+ifeq ($(USE_CURL),1)
+ifdef MINGW
+	@echo ""
+	@echo "Building curl in $(CURLDIR):"
+	@echo ""
+	$(MKDIR) $(CURLDIR)
+	cd $(CURLDIR) && CFLAGS="" cmake $(CURDIR)/$(MOUNT_DIR)/libcurl $(CURL_CMAKE_ARGS)
+	@$(MAKE) -C $(CURLDIR)
+endif
 ifeq ($(USE_JPEG_TURBO),1)
 	@echo ""
 	@echo "Building libjpeg-turbo in $(JPTURBODIR):"
