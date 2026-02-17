@@ -548,8 +548,8 @@ ifdef MINGW
   endif
 
   ifeq ($(USE_CURL),1)
-    BASE_CFLAGS += -I$(MOUNT_DIR)/libcurl//include
-    CLIENT_LDFLAGS += -L$(CURLDIR)
+    BASE_CFLAGS += -I$(MOUNT_DIR)/libcurl/include
+    CLIENT_LDFLAGS += -L$(CURLDIR)/lib
     CLIENT_LDFLAGS += -lcurl -lcrypt32
   endif
 
