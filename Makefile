@@ -247,6 +247,7 @@ endif
 BD=$(BUILD_DIR)/debug-$(PLATFORM)-$(ARCH)
 BR=$(BUILD_DIR)/release-$(PLATFORM)-$(ARCH)
 MODE=$(if $(filter debug,$(MAKECMDGOALS)),debug,release)
+TARGETDIR=$(BUILD_DIR)/$(MODE)-$(PLATFORM)-$(ARCH)
 ADIR=$(MOUNT_DIR)/asm
 CDIR=$(MOUNT_DIR)/client
 SDIR=$(MOUNT_DIR)/server
@@ -262,12 +263,12 @@ UDIR=$(MOUNT_DIR)/unix
 W32DIR=$(MOUNT_DIR)/win32
 BLIBDIR=$(MOUNT_DIR)/botlib
 JPDIR=$(MOUNT_DIR)/thirdparty/libjpeg
-JPTURBODIR=$(BUILD_DIR)/$(MODE)-$(PLATFORM)-$(ARCH)/libjpeg-turbo
-ZLIBNGDIR=$(BUILD_DIR)/$(MODE)-$(PLATFORM)-$(ARCH)/zlib-ng
-CURLDIR=$(BUILD_DIR)/$(MODE)-$(PLATFORM)-$(ARCH)/libcurl
+JPTURBODIR=$(MOUNT_DIR)/thirdparty/libjpeg-turbo
+CURLDIR=$(MOUNT_DIR)/thirdparty/libcurl
 OGGDIR=$(MOUNT_DIR)/thirdparty/libogg
 VORBISDIR=$(MOUNT_DIR)/thirdparty/libvorbis
 OPENALDIR=$(MOUNT_DIR)/thirdparty/libopenal
+ZLIBNGDIR=$(MOUNT_DIR)/thirdparty/libz-ng
 VULKANDIR=$(MOUNT_DIR)/thirdparty/libvulkan
 
 bin_path=$(shell which $(1) 2> /dev/null)
@@ -372,7 +373,7 @@ ifeq ($(USE_SYSTEM_JPEG),1)
 else
 ifeq ($(USE_JPEG_TURBO),1)
   BASE_CFLAGS += -DUSE_JPEG_TURBO
-  JPTURBO_CMAKE_ARGS += -G"Unix Makefiles" -DCMAKE_C_COMPILER=$(CC) -DCMAKE_SYSTEM_PROCESSOR=$(ARCH) -DENABLE_SHARED=OFF -DCMAKE_INSTALL_PREFIX=$(CURDIR)/$(JPTURBODIR)
+  JPTURBO_CMAKE_ARGS += -G"Unix Makefiles" -DCMAKE_C_COMPILER=$(CC) -DCMAKE_SYSTEM_PROCESSOR=$(ARCH) -DENABLE_SHARED=OFF -DCMAKE_INSTALL_PREFIX=$(CURDIR)/$(TARGETDIR)/libjpeg-turbo
   ifdef MINGW
     JPTURBO_CMAKE_ARGS += -DCMAKE_SYSTEM_NAME=Windows
   endif
@@ -390,7 +391,7 @@ ifeq ($(USE_SYSTEM_ZLIB),1)
 else
 ifeq ($(USE_ZLIB_NG),1)
   BASE_CFLAGS += -DUSE_ZLIB_NG
-  ZLIBNG_CMAKE_ARGS += -G"Unix Makefiles" -DCMAKE_C_COMPILER=$(CC) -DCMAKE_SYSTEM_PROCESSOR=$(ARCH) -DBUILD_TESTING=OFF -DZLIB_COMPAT=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=$(CURDIR)/$(ZLIBNGDIR)
+  ZLIBNG_CMAKE_ARGS += -G"Unix Makefiles" -DCMAKE_C_COMPILER=$(CC) -DCMAKE_SYSTEM_PROCESSOR=$(ARCH) -DBUILD_TESTING=OFF -DZLIB_COMPAT=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=$(CURDIR)/$(TARGETDIR)/libz-ng
   ifdef MINGW
     ZLIBNG_CMAKE_ARGS += -DCMAKE_SYSTEM_NAME=Windows
   endif
@@ -425,7 +426,7 @@ ifeq ($(USE_CURL),1)
   else
     ifeq ($(MINGW),1)
       BASE_CFLAGS += -DCURL_STATICLIB
-      CURL_CMAKE_ARGS += -G"Unix Makefiles" -DCMAKE_C_COMPILER=$(CC) -DCMAKE_SYSTEM_PROCESSOR=$(ARCH) -DBUILD_CURL_EXE=OFF -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DCURL_DISABLE_LDAP=ON -DCURL_USE_LIBPSL=OFF -DCMAKE_INSTALL_PREFIX=$(CURDIR)/$(CURLDIR) -DCMAKE_SYSTEM_NAME=Windows
+      CURL_CMAKE_ARGS += -G"Unix Makefiles" -DCMAKE_C_COMPILER=$(CC) -DCMAKE_SYSTEM_PROCESSOR=$(ARCH) -DBUILD_CURL_EXE=OFF -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DCURL_DISABLE_LDAP=ON -DCURL_USE_LIBPSL=OFF -DCMAKE_INSTALL_PREFIX=$(CURDIR)/$(TARGETDIR)/libcurl -DCMAKE_SYSTEM_NAME=Windows
       ifeq ($(ARCH),x86)
         CURL_CMAKE_ARGS += -DENABLE_IPV6=OFF -DCURL_ENABLE_SSL=OFF
       endif
@@ -569,8 +570,8 @@ ifdef MINGW
   endif
 
   ifeq ($(USE_CURL),1)
-    BASE_CFLAGS += -I$(MOUNT_DIR)/thirdparty/libcurl/include
-    CLIENT_LDFLAGS += -L$(CURLDIR)/lib
+    BASE_CFLAGS += -I$(CURLDIR)/include
+    CLIENT_LDFLAGS += -L$(TARGETDIR)/libcurl/lib
     CLIENT_LDFLAGS += -lcurl -lcrypt32
     ifeq ($(ARCH),x86_64)
         CLIENT_LDFLAGS += -liphlpapi -lbcrypt
@@ -578,15 +579,15 @@ ifdef MINGW
   endif
 
   ifeq ($(USE_JPEG_TURBO),1)
-    BASE_CFLAGS += -I$(JPTURBODIR) -I$(MOUNT_DIR)/thirdparty/libjpeg-turbo/src
-    CLIENT_LDFLAGS += $(JPTURBODIR)/libjpeg.a
+    BASE_CFLAGS += -I$(TARGETDIR)/libjpeg-turbo -I$(JPTURBODIR)/src
+    CLIENT_LDFLAGS += $(TARGETDIR)/libjpeg-turbo/libjpeg.a
   else
     BASE_CFLAGS += -I$(JPDIR)
   endif
 
   ifeq ($(USE_ZLIB_NG),1)
-    BASE_CFLAGS += -I$(ZLIBNGDIR)
-    LDFLAGS += $(ZLIBNGDIR)/libz.a
+    BASE_CFLAGS += -I$(TARGETDIR)/libz-ng
+    LDFLAGS += $(TARGETDIR)/libz-ng/libz.a
   else
     LDFLAGS += -lz
   endif
@@ -684,8 +685,8 @@ ifeq ($(COMPILE_PLATFORM),darwin)
     CLIENT_LDFLAGS += -ljpeg
   else
   ifeq ($(USE_JPEG_TURBO),1)
-    BASE_CFLAGS += -I$(JPTURBODIR) -I$(MOUNT_DIR)/thirdparty/libjpeg-turbo/src
-    CLIENT_LDFLAGS += $(JPTURBODIR)/libjpeg.a
+    BASE_CFLAGS += -I$(TARGETDIR)/libjpeg-turbo -I$(JPTURBODIR)/src
+    CLIENT_LDFLAGS += $(TARGETDIR)/libjpeg-turbo/libjpeg.a
   else
     BASE_CFLAGS += -I$(JPDIR)
   endif
@@ -695,8 +696,8 @@ ifeq ($(COMPILE_PLATFORM),darwin)
     LDFLAGS += -lz
   else
   ifeq ($(USE_ZLIB_NG),1)
-    BASE_CFLAGS += -I$(ZLIBNGDIR)
-    LDFLAGS += $(ZLIBNGDIR)/libz.a
+    BASE_CFLAGS += -I$(TARGETDIR)/libz-ng
+    LDFLAGS += $(TARGETDIR)/libz-ng/libz.a
   endif
   endif
 
@@ -787,8 +788,8 @@ else
     CLIENT_LDFLAGS += -ljpeg
   else
   ifeq ($(USE_JPEG_TURBO),1)
-    BASE_CFLAGS += -I$(JPTURBODIR) -I$(MOUNT_DIR)/thirdparty/libjpeg-turbo/src
-    CLIENT_LDFLAGS += $(JPTURBODIR)/libjpeg.a
+    BASE_CFLAGS += -I$(TARGETDIR)/libjpeg-turbo -I$(JPTURBODIR)/src
+    CLIENT_LDFLAGS += $(TARGETDIR)/libjpeg-turbo/libjpeg.a
   else
     BASE_CFLAGS += -I$(JPDIR)
   endif
@@ -798,8 +799,8 @@ else
     LDFLAGS += -lz
   else
   ifeq ($(USE_ZLIB_NG),1)
-    BASE_CFLAGS += -I$(ZLIBNGDIR)
-    LDFLAGS += $(ZLIBNGDIR)/libz.a
+    BASE_CFLAGS += -I$(TARGETDIR)/libz-ng
+    LDFLAGS += $(TARGETDIR)/libz-ng/libz.a
   endif
   endif
 
@@ -1017,29 +1018,29 @@ thirdparty:
 ifeq ($(USE_CURL),1)
 ifdef MINGW
 	@echo ""
-	@echo "Building curl in $(CURLDIR):"
+	@echo "Building curl in $(TARGETDIR)/libcurl:"
 	@echo ""
-	$(MKDIR) $(CURLDIR)
-	cd $(CURLDIR) && CFLAGS="" cmake $(CURDIR)/$(MOUNT_DIR)/libcurl $(CURL_CMAKE_ARGS)
-	@$(MAKE) -C $(CURLDIR)
+	$(MKDIR) $(TARGETDIR)/libcurl
+	cd $(TARGETDIR)/libcurl && CFLAGS="" cmake $(CURDIR)/$(MOUNT_DIR)/libcurl $(CURL_CMAKE_ARGS)
+	@$(MAKE) -C $(TARGETDIR)/libcurl
 endif
 endif
 ifeq ($(USE_JPEG_TURBO),1)
 	@echo ""
-	@echo "Building libjpeg-turbo in $(JPTURBODIR):"
+	@echo "Building libjpeg-turbo in $(TARGETDIR)/libjpeg-turbo:"
 	@echo ""
-	$(MKDIR) $(JPTURBODIR)
-	cd $(JPTURBODIR) && CFLAGS="" cmake $(CURDIR)/$(MOUNT_DIR)/thirdparty/libjpeg-turbo $(JPTURBO_CMAKE_ARGS)
-	@$(MAKE) -C $(JPTURBODIR)
+	$(MKDIR) $(TARGETDIR)/libjpeg-turbo
+	cd $(TARGETDIR)/libjpeg-turbo && CFLAGS="" cmake $(CURDIR)/$(JPTURBODIR) $(JPTURBO_CMAKE_ARGS)
+	@$(MAKE) -C $(TARGETDIR)/libjpeg-turbo
 endif
 ifneq ($(USE_SYSTEM_ZLIB),1)
 ifeq ($(USE_ZLIB_NG),1)
 	@echo ""
-	@echo "Building zlib-ng in $(ZLIBNGDIR):"
+	@echo "Building zlib-ng in $(TARGETDIR)/libz-ng:"
 	@echo ""
-	@$(MKDIR) $(ZLIBNGDIR)
-	@cd $(ZLIBNGDIR) && CFLAGS="" cmake $(CURDIR)/$(MOUNT_DIR)/thirdparty/zlib-ng $(ZLIBNG_CMAKE_ARGS)
-	@$(MAKE) -C $(ZLIBNGDIR)
+	@$(MKDIR) $(TARGETDIR)/libz-ng
+	@cd $(TARGETDIR)/libz-ng && CFLAGS="" cmake $(CURDIR)/$(ZLIBNGDIR) $(ZLIBNG_CMAKE_ARGS)
+	@$(MAKE) -C $(TARGETDIR)/libz-ng
 endif
 endif
 
