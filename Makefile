@@ -254,21 +254,21 @@ RCDIR=$(MOUNT_DIR)/renderercommon
 R1DIR=$(MOUNT_DIR)/renderer
 RVDIR=$(MOUNT_DIR)/renderervk
 SDLDIR=$(MOUNT_DIR)/sdl
-SDLHDIR=$(MOUNT_DIR)/libsdl/include/SDL2
-LIBSDIR=$(MOUNT_DIR)/libsdl
+SDLHDIR=$(MOUNT_DIR)/thirdparty/libsdl/include/SDL2
+LIBSDIR=$(MOUNT_DIR)/thirdparty/libsdl
 
 CMDIR=$(MOUNT_DIR)/qcommon
 UDIR=$(MOUNT_DIR)/unix
 W32DIR=$(MOUNT_DIR)/win32
 BLIBDIR=$(MOUNT_DIR)/botlib
-JPDIR=$(MOUNT_DIR)/libjpeg
+JPDIR=$(MOUNT_DIR)/thirdparty/libjpeg
 JPTURBODIR=$(BUILD_DIR)/$(MODE)-$(PLATFORM)-$(ARCH)/libjpeg-turbo
 ZLIBNGDIR=$(BUILD_DIR)/$(MODE)-$(PLATFORM)-$(ARCH)/zlib-ng
 CURLDIR=$(BUILD_DIR)/$(MODE)-$(PLATFORM)-$(ARCH)/libcurl
-OGGDIR=$(MOUNT_DIR)/libogg
-VORBISDIR=$(MOUNT_DIR)/libvorbis
-OPENALDIR=$(MOUNT_DIR)/libopenal
-VULKANDIR=$(MOUNT_DIR)/libvulkan
+OGGDIR=$(MOUNT_DIR)/thirdparty/libogg
+VORBISDIR=$(MOUNT_DIR)/thirdparty/libvorbis
+OPENALDIR=$(MOUNT_DIR)/thirdparty/libopenal
+VULKANDIR=$(MOUNT_DIR)/thirdparty/libvulkan
 
 bin_path=$(shell which $(1) 2> /dev/null)
 
@@ -569,7 +569,7 @@ ifdef MINGW
   endif
 
   ifeq ($(USE_CURL),1)
-    BASE_CFLAGS += -I$(MOUNT_DIR)/libcurl/include
+    BASE_CFLAGS += -I$(MOUNT_DIR)/thirdparty/libcurl/include
     CLIENT_LDFLAGS += -L$(CURLDIR)/lib
     CLIENT_LDFLAGS += -lcurl -lcrypt32
     ifeq ($(ARCH),x86_64)
@@ -578,7 +578,7 @@ ifdef MINGW
   endif
 
   ifeq ($(USE_JPEG_TURBO),1)
-    BASE_CFLAGS += -I$(JPTURBODIR) -I$(MOUNT_DIR)/libjpeg-turbo/src
+    BASE_CFLAGS += -I$(JPTURBODIR) -I$(MOUNT_DIR)/thirdparty/libjpeg-turbo/src
     CLIENT_LDFLAGS += $(JPTURBODIR)/libjpeg.a
   else
     BASE_CFLAGS += -I$(JPDIR)
@@ -684,7 +684,7 @@ ifeq ($(COMPILE_PLATFORM),darwin)
     CLIENT_LDFLAGS += -ljpeg
   else
   ifeq ($(USE_JPEG_TURBO),1)
-    BASE_CFLAGS += -I$(JPTURBODIR) -I$(MOUNT_DIR)/libjpeg-turbo/src
+    BASE_CFLAGS += -I$(JPTURBODIR) -I$(MOUNT_DIR)/thirdparty/libjpeg-turbo/src
     CLIENT_LDFLAGS += $(JPTURBODIR)/libjpeg.a
   else
     BASE_CFLAGS += -I$(JPDIR)
@@ -787,7 +787,7 @@ else
     CLIENT_LDFLAGS += -ljpeg
   else
   ifeq ($(USE_JPEG_TURBO),1)
-    BASE_CFLAGS += -I$(JPTURBODIR) -I$(MOUNT_DIR)/libjpeg-turbo/src
+    BASE_CFLAGS += -I$(JPTURBODIR) -I$(MOUNT_DIR)/thirdparty/libjpeg-turbo/src
     CLIENT_LDFLAGS += $(JPTURBODIR)/libjpeg.a
   else
     BASE_CFLAGS += -I$(JPDIR)
@@ -1029,7 +1029,7 @@ ifeq ($(USE_JPEG_TURBO),1)
 	@echo "Building libjpeg-turbo in $(JPTURBODIR):"
 	@echo ""
 	$(MKDIR) $(JPTURBODIR)
-	cd $(JPTURBODIR) && CFLAGS="" cmake $(CURDIR)/$(MOUNT_DIR)/libjpeg-turbo $(JPTURBO_CMAKE_ARGS)
+	cd $(JPTURBODIR) && CFLAGS="" cmake $(CURDIR)/$(MOUNT_DIR)/thirdparty/libjpeg-turbo $(JPTURBO_CMAKE_ARGS)
 	@$(MAKE) -C $(JPTURBODIR)
 endif
 ifneq ($(USE_SYSTEM_ZLIB),1)
@@ -1038,7 +1038,7 @@ ifeq ($(USE_ZLIB_NG),1)
 	@echo "Building zlib-ng in $(ZLIBNGDIR):"
 	@echo ""
 	@$(MKDIR) $(ZLIBNGDIR)
-	@cd $(ZLIBNGDIR) && CFLAGS="" cmake $(CURDIR)/$(MOUNT_DIR)/zlib-ng $(ZLIBNG_CMAKE_ARGS)
+	@cd $(ZLIBNGDIR) && CFLAGS="" cmake $(CURDIR)/$(MOUNT_DIR)/thirdparty/zlib-ng $(ZLIBNG_CMAKE_ARGS)
 	@$(MAKE) -C $(ZLIBNGDIR)
 endif
 endif
