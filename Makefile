@@ -268,7 +268,7 @@ CURLDIR=$(MOUNT_DIR)/thirdparty/libcurl
 OGGDIR=$(MOUNT_DIR)/thirdparty/libogg
 VORBISDIR=$(MOUNT_DIR)/thirdparty/libvorbis
 OPENALDIR=$(MOUNT_DIR)/thirdparty/libopenal
-ZLIBNGDIR=$(MOUNT_DIR)/thirdparty/libz-ng
+ZNGDIR=$(MOUNT_DIR)/thirdparty/libz-ng
 VULKANDIR=$(MOUNT_DIR)/thirdparty/libvulkan
 
 bin_path=$(shell which $(1) 2> /dev/null)
@@ -561,14 +561,6 @@ ifdef MINGW
     endif
   endif
 
-  ifeq ($(USE_OPENAL),1)
-    ifeq ($(ARCH),x86)
-      CLIENT_EXTRA_FILES += $(OPENALDIR)/windows/mingw/lib32/OpenAL32.dll
-    else
-      CLIENT_EXTRA_FILES += $(OPENALDIR)/windows/mingw/lib64/OpenAL64.dll
-    endif
-  endif
-
   ifeq ($(USE_JPEG_TURBO),1)
     BASE_CFLAGS += -I$(TARGETDIR)/libjpeg-turbo -I$(JPTURBODIR)/src
     CLIENT_LDFLAGS += $(TARGETDIR)/libjpeg-turbo/libjpeg.a
@@ -594,6 +586,11 @@ ifdef MINGW
     BASE_CFLAGS += -DUSE_OPENAL
     ifeq ($(USE_OPENAL_DLOPEN),1)
       BASE_CFLAGS += -DUSE_OPENAL_DLOPEN
+      ifeq ($(ARCH),x86)
+        CLIENT_EXTRA_FILES += $(OPENALDIR)/windows/mingw/lib32/OpenAL32.dll
+      else
+        CLIENT_EXTRA_FILES += $(OPENALDIR)/windows/mingw/lib64/OpenAL64.dll
+      endif
     else
       CLIENT_LDFLAGS += $(OPENAL_LIBS)
     endif
@@ -699,16 +696,13 @@ ifeq ($(COMPILE_PLATFORM),darwin)
 
   ifeq ($(USE_OPENAL),1)
     BASE_CFLAGS += -DUSE_OPENAL
-    ifneq ($(USE_LOCAL_HEADERS),1)
-      BASE_CFLAGS += -I/System/Library/Frameworks/OpenAL.framework/Headers
-    else
+    ifeq ($(USE_OPENAL_DLOPEN),1)
+      BASE_CFLAGS += -DUSE_OPENAL_DLOPEN
       CLIENT_LDFLAGS += $(OPENALDIR)/macosx/libopenal.dylib
       CLIENT_EXTRA_FILES += $(OPENALDIR)/macosx/libopenal.dylib
-    endif
-    ifneq ($(USE_OPENAL_DLOPEN),1)
-      CLIENT_LDFLAGS += -F/Library/Frameworks -framework OpenAL
     else
-      BASE_CFLAGS += -DUSE_OPENAL_DLOPEN
+      BASE_CFLAGS += -I/System/Library/Frameworks/OpenAL.framework/Headers
+      CLIENT_LDFLAGS += -F/Library/Frameworks -framework OpenAL
     endif
   endif
 
@@ -1039,7 +1033,7 @@ ifeq ($(USE_ZLIB_NG),1)
 	@echo "Building zlib-ng in $(TARGETDIR)/libz-ng:"
 	@echo ""
 	@$(MKDIR) $(TARGETDIR)/libz-ng
-	@cd $(TARGETDIR)/libz-ng && CFLAGS="" cmake $(CURDIR)/$(ZLIBNGDIR) $(ZLIBNG_CMAKE_ARGS)
+	@cd $(TARGETDIR)/libz-ng && CFLAGS="" cmake $(CURDIR)/$(ZNGDIR) $(ZLIBNG_CMAKE_ARGS)
 	@$(MAKE) -C $(TARGETDIR)/libz-ng
 endif
 endif
