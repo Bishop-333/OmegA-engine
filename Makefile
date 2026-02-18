@@ -31,12 +31,12 @@ BUILD_CLIENT     = 1
 BUILD_SERVER     = 0
 
 USE_SDL          = 1
-USE_CURL         = 1
-USE_LOCAL_HEADERS= 0
 USE_SYSTEM_JPEG  = 0
 USE_JPEG_TURBO   = 1
+USE_CURL         = 1
 USE_SYSTEM_ZLIB  = 0
 USE_ZLIB_NG      = 1
+USE_LOCAL_HEADERS= 0
 
 USE_OGG_VORBIS    = 1
 USE_SYSTEM_OGG    = 0
@@ -368,39 +368,6 @@ endif
 
 BASE_CFLAGS =
 
-ifeq ($(USE_SYSTEM_JPEG),1)
-  BASE_CFLAGS += -DUSE_SYSTEM_JPEG
-else
-ifeq ($(USE_JPEG_TURBO),1)
-  BASE_CFLAGS += -DUSE_JPEG_TURBO
-  JPTURBO_CMAKE_ARGS += -G"Unix Makefiles" -DCMAKE_C_COMPILER=$(CC) -DCMAKE_SYSTEM_PROCESSOR=$(ARCH) -DENABLE_SHARED=OFF -DCMAKE_INSTALL_PREFIX=$(CURDIR)/$(TARGETDIR)/libjpeg-turbo
-  ifdef MINGW
-    JPTURBO_CMAKE_ARGS += -DCMAKE_SYSTEM_NAME=Windows
-  endif
-  ifeq ($(COMPILE_PLATFORM),darwin)
-    JPTURBO_CMAKE_ARGS += -DCMAKE_OSX_ARCHITECTURES=$(ARCH) -DCMAKE_OSX_DEPLOYMENT_TARGET=$(MACOSX_VERSION_MIN)
-    ifeq ($(ARCH),x86_64)
-      JPTURBO_CMAKE_ARGS += -DWITH_SIMD=FALSE
-    endif
-  endif
-endif
-endif
-
-ifeq ($(USE_SYSTEM_ZLIB),1)
-  BASE_CFLAGS += -DUSE_SYSTEM_ZLIB
-else
-ifeq ($(USE_ZLIB_NG),1)
-  BASE_CFLAGS += -DUSE_ZLIB_NG
-  ZLIBNG_CMAKE_ARGS += -G"Unix Makefiles" -DCMAKE_C_COMPILER=$(CC) -DCMAKE_SYSTEM_PROCESSOR=$(ARCH) -DBUILD_TESTING=OFF -DZLIB_COMPAT=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=$(CURDIR)/$(TARGETDIR)/libz-ng
-  ifdef MINGW
-    ZLIBNG_CMAKE_ARGS += -DCMAKE_SYSTEM_NAME=Windows
-  endif
-  ifeq ($(COMPILE_PLATFORM),darwin)
-    ZLIBNG_CMAKE_ARGS += -DCMAKE_OSX_ARCHITECTURES=$(ARCH) -DCMAKE_OSX_DEPLOYMENT_TARGET=$(MACOSX_VERSION_MIN)
-  endif
-endif
-endif
-
 ifneq ($(HAVE_VM_COMPILED),true)
   BASE_CFLAGS += -DNO_VM_COMPILED
 endif
@@ -419,6 +386,24 @@ ifeq ($(USE_LOCAL_HEADERS),1)
   BASE_CFLAGS += -DUSE_LOCAL_HEADERS=1
 endif
 
+ifeq ($(USE_SYSTEM_JPEG),1)
+  BASE_CFLAGS += -DUSE_SYSTEM_JPEG
+else
+ifeq ($(USE_JPEG_TURBO),1)
+  BASE_CFLAGS += -DUSE_JPEG_TURBO
+  JPTURBO_CMAKE_ARGS += -G"Unix Makefiles" -DCMAKE_C_COMPILER=$(CC) -DCMAKE_SYSTEM_PROCESSOR=$(ARCH) -DENABLE_SHARED=OFF -DCMAKE_INSTALL_PREFIX=$(CURDIR)/$(TARGETDIR)/libjpeg-turbo
+  ifdef MINGW
+    JPTURBO_CMAKE_ARGS += -DCMAKE_SYSTEM_NAME=Windows
+  endif
+  ifeq ($(COMPILE_PLATFORM),darwin)
+    JPTURBO_CMAKE_ARGS += -DCMAKE_OSX_ARCHITECTURES=$(ARCH) -DCMAKE_OSX_DEPLOYMENT_TARGET=$(MACOSX_VERSION_MIN)
+    ifeq ($(ARCH),x86_64)
+      JPTURBO_CMAKE_ARGS += -DWITH_SIMD=FALSE
+    endif
+  endif
+endif
+endif
+
 ifeq ($(USE_CURL),1)
   BASE_CFLAGS += -DUSE_CURL
   ifeq ($(USE_CURL_DLOPEN),1)
@@ -432,6 +417,21 @@ ifeq ($(USE_CURL),1)
       endif
     endif
   endif
+endif
+
+ifeq ($(USE_SYSTEM_ZLIB),1)
+  BASE_CFLAGS += -DUSE_SYSTEM_ZLIB
+else
+ifeq ($(USE_ZLIB_NG),1)
+  BASE_CFLAGS += -DUSE_ZLIB_NG
+  ZLIBNG_CMAKE_ARGS += -G"Unix Makefiles" -DCMAKE_C_COMPILER=$(CC) -DCMAKE_SYSTEM_PROCESSOR=$(ARCH) -DBUILD_TESTING=OFF -DZLIB_COMPAT=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=$(CURDIR)/$(TARGETDIR)/libz-ng
+  ifdef MINGW
+    ZLIBNG_CMAKE_ARGS += -DCMAKE_SYSTEM_NAME=Windows
+  endif
+  ifeq ($(COMPILE_PLATFORM),darwin)
+    ZLIBNG_CMAKE_ARGS += -DCMAKE_OSX_ARCHITECTURES=$(ARCH) -DCMAKE_OSX_DEPLOYMENT_TARGET=$(MACOSX_VERSION_MIN)
+  endif
+endif
 endif
 
 ifeq ($(USE_VULKAN_API),1)
@@ -569,15 +569,6 @@ ifdef MINGW
     endif
   endif
 
-  ifeq ($(USE_CURL),1)
-    BASE_CFLAGS += -I$(CURLDIR)/include
-    CLIENT_LDFLAGS += -L$(TARGETDIR)/libcurl/lib
-    CLIENT_LDFLAGS += -lcurl -lcrypt32
-    ifeq ($(ARCH),x86_64)
-        CLIENT_LDFLAGS += -liphlpapi -lbcrypt
-    endif
-  endif
-
   ifeq ($(USE_JPEG_TURBO),1)
     BASE_CFLAGS += -I$(TARGETDIR)/libjpeg-turbo -I$(JPTURBODIR)/src
     CLIENT_LDFLAGS += $(TARGETDIR)/libjpeg-turbo/libjpeg.a
@@ -585,11 +576,13 @@ ifdef MINGW
     BASE_CFLAGS += -I$(JPDIR)
   endif
 
-  ifeq ($(USE_ZLIB_NG),1)
-    BASE_CFLAGS += -I$(TARGETDIR)/libz-ng
-    LDFLAGS += $(TARGETDIR)/libz-ng/libz.a
-  else
-    LDFLAGS += -lz
+  ifeq ($(USE_CURL),1)
+    BASE_CFLAGS += -I$(CURLDIR)/include
+    CLIENT_LDFLAGS += -L$(TARGETDIR)/libcurl/lib
+    CLIENT_LDFLAGS += -lcurl -lcrypt32
+    ifeq ($(ARCH),x86_64)
+        CLIENT_LDFLAGS += -liphlpapi -lbcrypt
+    endif
   endif
 
   ifeq ($(USE_OGG_VORBIS),1)
@@ -604,6 +597,13 @@ ifdef MINGW
     else
       CLIENT_LDFLAGS += $(OPENAL_LIBS)
     endif
+  endif
+
+  ifeq ($(USE_ZLIB_NG),1)
+    BASE_CFLAGS += -I$(TARGETDIR)/libz-ng
+    LDFLAGS += $(TARGETDIR)/libz-ng/libz.a
+  else
+    LDFLAGS += -lz
   endif
 
   DEBUG_CFLAGS = $(BASE_CFLAGS) -DDEBUG -D_DEBUG -g -O0
@@ -692,15 +692,6 @@ ifeq ($(COMPILE_PLATFORM),darwin)
   endif
   endif
 
-  ifeq ($(USE_SYSTEM_ZLIB),1)
-    LDFLAGS += -lz
-  else
-  ifeq ($(USE_ZLIB_NG),1)
-    BASE_CFLAGS += -I$(TARGETDIR)/libz-ng
-    LDFLAGS += $(TARGETDIR)/libz-ng/libz.a
-  endif
-  endif
-
   ifeq ($(USE_OGG_VORBIS),1)
     BASE_CFLAGS += -DUSE_OGG_VORBIS $(OGG_FLAGS) $(VORBIS_FLAGS)
     CLIENT_LDFLAGS += $(OGG_LIBS) $(VORBIS_LIBS)
@@ -719,6 +710,15 @@ ifeq ($(COMPILE_PLATFORM),darwin)
     else
       BASE_CFLAGS += -DUSE_OPENAL_DLOPEN
     endif
+  endif
+
+  ifeq ($(USE_SYSTEM_ZLIB),1)
+    LDFLAGS += -lz
+  else
+  ifeq ($(USE_ZLIB_NG),1)
+    BASE_CFLAGS += -I$(TARGETDIR)/libz-ng
+    LDFLAGS += $(TARGETDIR)/libz-ng/libz.a
+  endif
   endif
 
   DEBUG_CFLAGS = $(BASE_CFLAGS) -DDEBUG -D_DEBUG -g -O0
@@ -795,15 +795,6 @@ else
   endif
   endif
 
-  ifeq ($(USE_SYSTEM_ZLIB),1)
-    LDFLAGS += -lz
-  else
-  ifeq ($(USE_ZLIB_NG),1)
-    BASE_CFLAGS += -I$(TARGETDIR)/libz-ng
-    LDFLAGS += $(TARGETDIR)/libz-ng/libz.a
-  endif
-  endif
-
   ifeq ($(USE_CURL),1)
     ifeq ($(USE_CURL_DLOPEN),0)
       CLIENT_LDFLAGS += -lcurl
@@ -822,6 +813,15 @@ else
     else
       CLIENT_LDFLAGS += $(OPENAL_LIBS)
     endif
+  endif
+
+  ifeq ($(USE_SYSTEM_ZLIB),1)
+    LDFLAGS += -lz
+  else
+  ifeq ($(USE_ZLIB_NG),1)
+    BASE_CFLAGS += -I$(TARGETDIR)/libz-ng
+    LDFLAGS += $(TARGETDIR)/libz-ng/libz.a
+  endif
   endif
 
   ifeq ($(PLATFORM),linux)
@@ -1015,6 +1015,14 @@ ifneq ($(BUILD_SERVER),0)
 endif
 
 thirdparty:
+ifeq ($(USE_JPEG_TURBO),1)
+	@echo ""
+	@echo "Building libjpeg-turbo in $(TARGETDIR)/libjpeg-turbo:"
+	@echo ""
+	$(MKDIR) $(TARGETDIR)/libjpeg-turbo
+	cd $(TARGETDIR)/libjpeg-turbo && CFLAGS="" cmake $(CURDIR)/$(JPTURBODIR) $(JPTURBO_CMAKE_ARGS)
+	@$(MAKE) -C $(TARGETDIR)/libjpeg-turbo
+endif
 ifeq ($(USE_CURL),1)
 ifdef MINGW
 	@echo ""
@@ -1024,14 +1032,6 @@ ifdef MINGW
 	cd $(TARGETDIR)/libcurl && CFLAGS="" cmake $(CURDIR)/$(MOUNT_DIR)/libcurl $(CURL_CMAKE_ARGS)
 	@$(MAKE) -C $(TARGETDIR)/libcurl
 endif
-endif
-ifeq ($(USE_JPEG_TURBO),1)
-	@echo ""
-	@echo "Building libjpeg-turbo in $(TARGETDIR)/libjpeg-turbo:"
-	@echo ""
-	$(MKDIR) $(TARGETDIR)/libjpeg-turbo
-	cd $(TARGETDIR)/libjpeg-turbo && CFLAGS="" cmake $(CURDIR)/$(JPTURBODIR) $(JPTURBO_CMAKE_ARGS)
-	@$(MAKE) -C $(TARGETDIR)/libjpeg-turbo
 endif
 ifneq ($(USE_SYSTEM_ZLIB),1)
 ifeq ($(USE_ZLIB_NG),1)
