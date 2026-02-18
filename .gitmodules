@@ -1,9 +1,9 @@
-[submodule "code/libcurl"]
-	path = code/libcurl
+[submodule "code/thirdparty/libcurl"]
+	path = code/thirdparty/libcurl
 	url = https://github.com/curl/curl.git
-[submodule "code/libjpeg-turbo"]
-	path = code/libjpeg-turbo
+[submodule "code/thirdparty/libjpeg-turbo"]
+	path = code/thirdparty/libjpeg-turbo
 	url = https://github.com/libjpeg-turbo/libjpeg-turbo.git
-[submodule "code/zlib-ng"]
-	path = code/zlib-ng
+[submodule "code/thirdparty/zlib-ng"]
+	path = code/thirdparty/zlib-ng
 	url = https://github.com/zlib-ng/zlib-ng.git
