@@ -403,6 +403,9 @@ endif
 
 ifeq ($(USE_SDL),1)
   SDL_CMAKE_ARGS += $(CMAKE_ARGS) -DSDL_SHARED=OFF -DSDL_TEST=OFF -DCMAKE_INSTALL_PREFIX=$(CURDIR)/$(TARGETDIR)/libsdl
+  ifeq ($(COMPILE_PLATFORM),darwin)
+    SDL_CMAKE_ARGS += -DCMAKE_C_FLAGS="-Wno-deprecated-declarations -Wno-gnu-folding-constant"
+  endif
 endif
 
 ifeq ($(USE_SYSTEM_JPEG),1)
