@@ -304,9 +304,6 @@ ifneq ($(call bin_path, $(PKG_CONFIG)),)
     OPENAL_CFLAGS ?= $(shell $(PKG_CONFIG) --silence-errors --cflags openal || true)
     OPENAL_LIBS ?= $(shell $(PKG_CONFIG) --silence-errors --libs openal)
   endif
-else
-  # assume they're in the system default paths (no -I or -L needed)
-  OPENAL_LIBS ?= -lopenal
 endif
 
 # supply some reasonable defaults for SDL/X11
@@ -318,6 +315,16 @@ ifeq ($(X11_LIBS),)
 endif
 ifeq ($(SDL_LIBS),)
   SDL_LIBS = -lSDL2
+endif
+
+# supply some reasonable defaults for OpenAL
+ifeq ($(OPENAL_FLAGS),)
+  OPENAL_FLAGS = -I$(OPENALDIR)/include
+endif
+ifeq ($(USE_SYSTEM_OPENAL),1)
+  ifeq ($(OPENAL_LIBS),)
+    OPENAL_LIBS = -lopenal
+  endif
 endif
 
 # supply some reasonable defaults for ogg/vorbis
@@ -391,7 +398,7 @@ ifeq ($(USE_SYSTEM_JPEG),1)
 else
 ifeq ($(USE_JPEG_TURBO),1)
   BASE_CFLAGS += -DUSE_JPEG_TURBO
-  JPTURBO_CMAKE_ARGS += -G"Unix Makefiles" -DCMAKE_C_COMPILER=$(CC) -DCMAKE_SYSTEM_PROCESSOR=$(ARCH) -DENABLE_SHARED=OFF -DCMAKE_INSTALL_PREFIX=$(CURDIR)/$(TARGETDIR)/libjpeg-turbo
+  JPTURBO_CMAKE_ARGS += -G"Unix Makefiles" -DCMAKE_C_COMPILER=$(CC) -DCMAKE_SYSTEM_PROCESSOR=$(ARCH) -DENABLE_SHARED=OFF
   ifdef MINGW
     JPTURBO_CMAKE_ARGS += -DCMAKE_SYSTEM_NAME=Windows
   endif
@@ -411,7 +418,7 @@ ifeq ($(USE_CURL),1)
   else
     ifeq ($(MINGW),1)
       BASE_CFLAGS += -DCURL_STATICLIB
-      CURL_CMAKE_ARGS += -G"Unix Makefiles" -DCMAKE_C_COMPILER=$(CC) -DCMAKE_SYSTEM_PROCESSOR=$(ARCH) -DBUILD_CURL_EXE=OFF -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DCURL_DISABLE_LDAP=ON -DCURL_USE_LIBPSL=OFF -DCMAKE_INSTALL_PREFIX=$(CURDIR)/$(TARGETDIR)/libcurl -DCMAKE_SYSTEM_NAME=Windows
+      CURL_CMAKE_ARGS += -G"Unix Makefiles" -DCMAKE_C_COMPILER=$(CC) -DCMAKE_SYSTEM_PROCESSOR=$(ARCH) -DBUILD_CURL_EXE=OFF -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DCURL_DISABLE_LDAP=ON -DCURL_USE_LIBPSL=OFF -DCMAKE_SYSTEM_NAME=Windows
       ifeq ($(ARCH),x86)
         CURL_CMAKE_ARGS += -DENABLE_IPV6=OFF -DCURL_ENABLE_SSL=OFF
       endif
@@ -424,7 +431,7 @@ ifeq ($(USE_SYSTEM_ZLIB),1)
 else
 ifeq ($(USE_ZLIB_NG),1)
   BASE_CFLAGS += -DUSE_ZLIB_NG
-  ZLIBNG_CMAKE_ARGS += -G"Unix Makefiles" -DCMAKE_C_COMPILER=$(CC) -DCMAKE_SYSTEM_PROCESSOR=$(ARCH) -DBUILD_TESTING=OFF -DZLIB_COMPAT=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=$(CURDIR)/$(TARGETDIR)/libz-ng
+  ZLIBNG_CMAKE_ARGS += -G"Unix Makefiles" -DCMAKE_C_COMPILER=$(CC) -DCMAKE_SYSTEM_PROCESSOR=$(ARCH) -DBUILD_TESTING=OFF -DZLIB_COMPAT=ON -DBUILD_SHARED_LIBS=OFF
   ifdef MINGW
     ZLIBNG_CMAKE_ARGS += -DCMAKE_SYSTEM_NAME=Windows
   endif
@@ -583,7 +590,7 @@ ifdef MINGW
   endif
 
   ifeq ($(USE_OPENAL),1)
-    BASE_CFLAGS += -DUSE_OPENAL
+    BASE_CFLAGS += -DUSE_OPENAL $(OPENAL_FLAGS)
     ifeq ($(USE_OPENAL_DLOPEN),1)
       BASE_CFLAGS += -DUSE_OPENAL_DLOPEN
       ifeq ($(ARCH),x86)
@@ -801,7 +808,7 @@ else
   endif
 
   ifeq ($(USE_OPENAL),1)
-    BASE_CFLAGS += -DUSE_OPENAL
+    BASE_CFLAGS += -DUSE_OPENAL $(OPENAL_FLAGS)
     ifeq ($(USE_OPENAL_DLOPEN),1)
       BASE_CFLAGS += -DUSE_OPENAL_DLOPEN
     else
