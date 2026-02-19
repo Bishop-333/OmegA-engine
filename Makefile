@@ -43,7 +43,7 @@ USE_SYSTEM_OGG    = 0
 USE_SYSTEM_VORBIS = 0
 
 USE_OPENAL        = 1
-USE_OPENAL_DLOPEN = 0
+USE_OPENAL_DLOPEN = 1
 USE_SYSTEM_OPENAL = 0
 
 USE_VULKAN       = 1
@@ -658,6 +658,7 @@ ifeq ($(COMPILE_PLATFORM),darwin)
 
   ifeq ($(USE_LOCAL_HEADERS),1)
     BASE_CFLAGS += -I$(SDLHDIR)
+    CLIENT_LDFLAGS += $(LIBSDIR)/macosx/libSDL2-2.0.0.dylib
     CLIENT_EXTRA_FILES += $(LIBSDIR)/macosx/libSDL2-2.0.0.dylib
   else
   ifneq ($(SDL_INCLUDE),)
@@ -689,6 +690,7 @@ ifeq ($(COMPILE_PLATFORM),darwin)
     BASE_CFLAGS += -DUSE_OPENAL $(OPENAL_FLAGS)
     ifeq ($(USE_OPENAL_DLOPEN),1)
       BASE_CFLAGS += -DUSE_OPENAL_DLOPEN
+      CLIENT_LDFLAGS += $(OPENALDIR)/macosx/libopenal.dylib
       CLIENT_EXTRA_FILES += $(OPENALDIR)/macosx/libopenal.dylib
     else 
     ifeq ($(USE_SYSTEM_OPENAL),1)
