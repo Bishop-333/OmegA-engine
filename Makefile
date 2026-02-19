@@ -679,14 +679,15 @@ ifeq ($(COMPILE_PLATFORM),darwin)
     LDFLAGS += -arch arm64
   endif
 
-  ifeq ($(USE_VULKAN),1)
-    CLIENT_LDFLAGS += $(VULKANDIR)/macosx/libMoltenVK.dylib
-    CLIENT_EXTRA_FILES += $(VULKANDIR)/macosx/libMoltenVK.dylib
-  endif
+  SDL_MAC_FRAMEWORKS += -framework Cocoa -framework Carbon -framework IOKit
+  SDL_MAC_FRAMEWORKS += -framework CoreAudio -framework AudioToolbox
+  SDL_MAC_FRAMEWORKS += -framework CoreHaptics -framework GameController -framework ForceFeedback
+  SDL_MAC_FRAMEWORKS += -framework CoreVideo -framework Metal  
 
   ifeq ($(USE_LOCAL_HEADERS),1)
     BASE_CFLAGS += -I$(SDLHDIR)
     CLIENT_LDFLAGS += $(TARGETDIR)/libsdl/libsdl2.a
+    CLIENT_LDFLAGS += $(SDL_MAC_FRAMEWORKS) 
   else
   ifneq ($(SDL_INCLUDE),)
     BASE_CFLAGS += $(SDL_INCLUDE)
@@ -735,6 +736,11 @@ ifeq ($(COMPILE_PLATFORM),darwin)
     BASE_CFLAGS += -I$(TARGETDIR)/libz-ng
     LDFLAGS += $(TARGETDIR)/libz-ng/libz.a
   endif
+  endif
+
+  ifeq ($(USE_VULKAN),1)
+    CLIENT_LDFLAGS += $(VULKANDIR)/macosx/libMoltenVK.dylib
+    CLIENT_EXTRA_FILES += $(VULKANDIR)/macosx/libMoltenVK.dylib
   endif
 
   DEBUG_CFLAGS = $(BASE_CFLAGS) -DDEBUG -D_DEBUG -g -O0
