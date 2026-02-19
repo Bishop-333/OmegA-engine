@@ -606,8 +606,11 @@ ifdef MINGW
     BASE_CFLAGS += -DUSE_OPENAL $(OPENAL_FLAGS)
     ifeq ($(USE_OPENAL_DLOPEN),1)
       BASE_CFLAGS += -DUSE_OPENAL_DLOPEN
-    else
-      CLIENT_LDFLAGS += $(TARGETDIR)/libopenal/libOpenAL32.a
+      ifeq ($(ARCH),x86)
+        CLIENT_EXTRA_FILES += $(OPENALDIR)/windows/mingw/lib32/OpenAL32.dll
+      else
+        CLIENT_EXTRA_FILES += $(OPENALDIR)/windows/mingw/lib64/OpenAL64.dll
+      endif
     endif
   endif
 
@@ -713,9 +716,9 @@ ifeq ($(COMPILE_PLATFORM),darwin)
     BASE_CFLAGS += -DUSE_OPENAL $(OPENAL_FLAGS)
     ifeq ($(USE_OPENAL_DLOPEN),1)
       BASE_CFLAGS += -DUSE_OPENAL_DLOPEN
-      CLIENT_LDFLAGS += -L$(OPENALDIR)/windows/mingw/lib64
-      CLIENT_LDFLAGS += -lSDL264
-      CLIENT_EXTRA_FILES += $(LIBSDIR)/windows/mingw/lib64/SDL264.dll
+      CLIENT_LDFLAGS += -L$(OPENALDIR)/macosx
+      CLIENT_LDFLAGS += -lopenal
+      CLIENT_EXTRA_FILES += $(OPENALDIR)/macosx/libopenal.dylib
     else 
     ifeq ($(USE_SYSTEM_OPENAL),1)
       BASE_CFLAGS += -I/System/Library/Frameworks/OpenAL.framework/Headers
