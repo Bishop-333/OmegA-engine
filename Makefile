@@ -319,7 +319,7 @@ endif
 
 # supply some reasonable defaults for OpenAL
 ifeq ($(OPENAL_FLAGS),)
-  OPENAL_FLAGS = -I$(OPENALDIR)/include
+  OPENAL_FLAGS = -I$(OPENALDIR)/include/AL
 endif
 ifeq ($(USE_SYSTEM_OPENAL),1)
   ifeq ($(OPENAL_LIBS),)
