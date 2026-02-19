@@ -255,7 +255,7 @@ RCDIR=$(MOUNT_DIR)/renderercommon
 R1DIR=$(MOUNT_DIR)/renderer
 RVDIR=$(MOUNT_DIR)/renderervk
 SDLDIR=$(MOUNT_DIR)/sdl
-SDLHDIR=$(MOUNT_DIR)/thirdparty/libsdl/include
+SDLHDIR=$(MOUNT_DIR)/thirdparty/libsdl/include/SDL2
 LIBSDIR=$(MOUNT_DIR)/thirdparty/libsdl
 
 CMDIR=$(MOUNT_DIR)/qcommon
@@ -399,13 +399,6 @@ ifdef MINGW
 endif
 ifeq ($(COMPILE_PLATFORM),darwin)
   CMAKE_ARGS += -DCMAKE_OSX_ARCHITECTURES=$(ARCH) -DCMAKE_OSX_DEPLOYMENT_TARGET=$(MACOSX_VERSION_MIN)
-endif
-
-ifeq ($(USE_SDL),1)
-  SDL_CMAKE_ARGS += $(CMAKE_ARGS) -DSDL_SHARED=OFF -DSDL_TEST=OFF -DCMAKE_INSTALL_PREFIX=$(CURDIR)/$(TARGETDIR)/libsdl
-  ifeq ($(COMPILE_PLATFORM),darwin)
-    SDL_CMAKE_ARGS += -DCMAKE_C_FLAGS="-Wno-deprecated-declarations -Wno-gnu-folding-constant"
-  endif
 endif
 
 ifeq ($(USE_SYSTEM_JPEG),1)
@@ -556,7 +549,15 @@ ifdef MINGW
 
   ifeq ($(USE_SDL),1)
     BASE_CFLAGS += -DUSE_LOCAL_HEADERS=1 -I$(SDLHDIR)
-    CLIENT_LDFLAGS += $(TARGETDIR)/libsdl/libSDL2.a
+    ifeq ($(ARCH),x86)
+      CLIENT_LDFLAGS += -L$(MOUNT_DIR)/libsdl/windows/mingw/lib32
+      CLIENT_LDFLAGS += -lSDL2
+      CLIENT_EXTRA_FILES += $(MOUNT_DIR)/libsdl/windows/mingw/lib32/SDL2.dll
+    else
+      CLIENT_LDFLAGS += -L$(MOUNT_DIR)/libsdl/windows/mingw/lib64
+      CLIENT_LDFLAGS += -lSDL264
+      CLIENT_EXTRA_FILES += $(MOUNT_DIR)/libsdl/windows/mingw/lib64/SDL264.dll
+    endif
   endif
 
   ifeq ($(USE_JPEG_TURBO),1)
@@ -655,15 +656,9 @@ ifeq ($(COMPILE_PLATFORM),darwin)
     LDFLAGS += -arch arm64
   endif
 
-  SDL_MAC_FRAMEWORKS += -framework Cocoa -framework Carbon -framework IOKit
-  SDL_MAC_FRAMEWORKS += -framework CoreAudio -framework AudioToolbox
-  SDL_MAC_FRAMEWORKS += -framework CoreHaptics -framework GameController -framework ForceFeedback
-  SDL_MAC_FRAMEWORKS += -framework CoreVideo -framework Metal
-
   ifeq ($(USE_LOCAL_HEADERS),1)
     BASE_CFLAGS += -I$(SDLHDIR)
-    CLIENT_LDFLAGS += $(TARGETDIR)/libsdl/libSDL2.a
-    CLIENT_LDFLAGS += $(SDL_MAC_FRAMEWORKS) 
+    CLIENT_EXTRA_FILES += $(MOUNT_DIR)/libsdl/macosx/libSDL2-2.0.0.dylib
   else
   ifneq ($(SDL_INCLUDE),)
     BASE_CFLAGS += $(SDL_INCLUDE)
@@ -699,6 +694,7 @@ ifeq ($(COMPILE_PLATFORM),darwin)
     ifeq ($(USE_SYSTEM_OPENAL),1)
       BASE_CFLAGS += -I/System/Library/Frameworks/OpenAL.framework/Headers
       CLIENT_LDFLAGS += -F/Library/Frameworks -framework OpenAL
+    endif
     endif
   endif
 
@@ -1010,14 +1006,6 @@ ifneq ($(BUILD_SERVER),0)
 endif
 
 thirdparty:
-ifeq ($(USE_SDL),1)
-	@echo ""
-	@echo "Building SDL2 in $(TARGETDIR)/libsdl:"
-	@echo ""
-	$(MKDIR) $(TARGETDIR)/libsdl
-	cd $(TARGETDIR)/libsdl && CFLAGS="" cmake $(CURDIR)/$(LIBSDIR) $(SDL_CMAKE_ARGS)
-	@$(MAKE) -C $(TARGETDIR)/libsdl
-endif
 ifeq ($(USE_JPEG_TURBO),1)
 	@echo ""
 	@echo "Building libjpeg-turbo in $(TARGETDIR)/libjpeg-turbo:"
