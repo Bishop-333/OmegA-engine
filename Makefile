@@ -682,7 +682,7 @@ ifeq ($(COMPILE_PLATFORM),darwin)
   SDL_MAC_FRAMEWORKS += -framework Cocoa -framework Carbon -framework IOKit
   SDL_MAC_FRAMEWORKS += -framework CoreAudio -framework AudioToolbox
   SDL_MAC_FRAMEWORKS += -framework CoreHaptics -framework GameController -framework ForceFeedback
-  SDL_MAC_FRAMEWORKS += -framework CoreVideo -framework Metal  
+  SDL_MAC_FRAMEWORKS += -framework CoreVideo -framework Metal
 
   ifeq ($(USE_LOCAL_HEADERS),1)
     BASE_CFLAGS += -I$(SDLHDIR)
