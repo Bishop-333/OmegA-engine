@@ -414,11 +414,6 @@ else
 ifeq ($(USE_JPEG_TURBO),1)
   BASE_CFLAGS += -DUSE_JPEG_TURBO
   JPTURBO_CMAKE_ARGS += $(CMAKE_ARGS) -DENABLE_SHARED=OFF -DCMAKE_INSTALL_PREFIX=$(CURDIR)/$(TARGETDIR)/libjpeg-turbo
-  ifeq ($(COMPILE_PLATFORM),darwin)
-    ifeq ($(ARCH),x86_64)
-      JPTURBO_CMAKE_ARGS += -DWITH_SIMD=FALSE
-    endif
-  endif
 endif
 endif
 
