@@ -432,14 +432,6 @@ ifeq ($(USE_CURL),1)
   endif
 endif
 
-ifeq ($(USE_OPENAL),1)
-  BASE_CFLAGS += -DUSE_OPENAL
-  OPENAL_CMAKE_ARGS += $(CMAKE_ARGS) -DCMAKE_CXX_COMPILER=$(CXX) -DLIBTYPE=STATIC -DALSOFT_UTILS=OFF -DALSOFT_EXAMPLES=OFF -DCMAKE_INSTALL_PREFIX=$(CURDIR)/$(TARGETDIR)/libopenal
-  ifeq ($(COMPILE_PLATFORM),darwin)
-    OPENAL_CMAKE_ARGS += -DCMAKE_CXX_FLAGS="-Wno-deprecated-anon-enum-enum-conversion"
-  endif
-endif
-
 ifeq ($(USE_SYSTEM_ZLIB),1)
   BASE_CFLAGS += -DUSE_SYSTEM_ZLIB
 else
@@ -716,8 +708,6 @@ ifeq ($(COMPILE_PLATFORM),darwin)
     BASE_CFLAGS += -DUSE_OPENAL $(OPENAL_FLAGS)
     ifeq ($(USE_OPENAL_DLOPEN),1)
       BASE_CFLAGS += -DUSE_OPENAL_DLOPEN
-      CLIENT_LDFLAGS += -L$(OPENALDIR)/macosx
-      CLIENT_LDFLAGS += -lopenal
       CLIENT_EXTRA_FILES += $(OPENALDIR)/macosx/libopenal.dylib
     else 
     ifeq ($(USE_SYSTEM_OPENAL),1)
@@ -1059,14 +1049,6 @@ ifdef MINGW
 	cd $(TARGETDIR)/libcurl && CFLAGS="" cmake $(CURDIR)/$(CURLDIR) $(CURL_CMAKE_ARGS)
 	@$(MAKE) -C $(TARGETDIR)/libcurl
 endif
-endif
-ifeq ($(USE_OPENAL),1)
-	@echo ""
-	@echo "Building OpenAL in $(TARGETDIR)/libopenal:"
-	@echo ""
-	$(MKDIR) $(TARGETDIR)/libopenal
-	cd $(TARGETDIR)/libopenal && CFLAGS="" cmake $(CURDIR)/$(OPENALDIR) $(OPENAL_CMAKE_ARGS)
-	@$(MAKE) -C $(TARGETDIR)/libopenal
 endif
 ifneq ($(USE_SYSTEM_ZLIB),1)
 ifeq ($(USE_ZLIB_NG),1)
