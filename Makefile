@@ -43,7 +43,7 @@ USE_SYSTEM_OGG    = 0
 USE_SYSTEM_VORBIS = 0
 
 USE_OPENAL        = 1
-USE_OPENAL_DLOPEN = 1
+USE_OPENAL_DLOPEN = 0
 USE_SYSTEM_OPENAL = 0
 
 USE_VULKAN       = 1
@@ -404,9 +404,6 @@ ifeq ($(USE_JPEG_TURBO),1)
   endif
   ifeq ($(COMPILE_PLATFORM),darwin)
     JPTURBO_CMAKE_ARGS += -DCMAKE_OSX_ARCHITECTURES=$(ARCH) -DCMAKE_OSX_DEPLOYMENT_TARGET=$(MACOSX_VERSION_MIN)
-    ifeq ($(ARCH),x86_64)
-      JPTURBO_CMAKE_ARGS += -DWITH_SIMD=FALSE
-    endif
   endif
 endif
 endif
@@ -423,6 +420,18 @@ ifeq ($(USE_CURL),1)
         CURL_CMAKE_ARGS += -DENABLE_IPV6=OFF -DCURL_ENABLE_SSL=OFF
       endif
     endif
+  endif
+endif
+
+ifeq ($(USE_OPENAL),1)
+  BASE_CFLAGS += -DUSE_OPENAL
+  OPENAL_CMAKE_ARGS += -G"Unix Makefiles" -DCMAKE_C_COMPILER=$(CC) -DCMAKE_CXX_COMPILER=$(CXX) -DCMAKE_SYSTEM_PROCESSOR=$(ARCH) -DLIBTYPE=STATIC -DALSOFT_UTILS=OFF
+
+  ifdef MINGW
+    OPENAL_CMAKE_ARGS += -DCMAKE_SYSTEM_NAME=Windows
+  endif
+  ifeq ($(COMPILE_PLATFORM),darwin)
+    OPENAL_CMAKE_ARGS += -DCMAKE_OSX_ARCHITECTURES=$(ARCH) -DCMAKE_OSX_DEPLOYMENT_TARGET=$(MACOSX_VERSION_MIN)
   endif
 endif
 
@@ -481,6 +490,12 @@ ifdef MINGW
       override CC=
     endif
 
+    # If CXX is already set to something generic, we probably want to use
+    # something more specific
+    ifneq ($(findstring $(strip $(CXX)),++ g++),)
+      override CXX=
+    endif
+
     ifneq ($(findstring $(strip $(STRIP)),strip),)
       override STRIP=
     endif
@@ -498,6 +513,11 @@ ifdef MINGW
          $(call bin_path, $(MINGW_PREFIX)-gcc))))
     endif
 
+    ifndef CXX
+      override CXX=$(firstword $(strip $(foreach MINGW_PREFIX, $(MINGW_PREFIXES), \
+         $(call bin_path, $(MINGW_PREFIX)-g++))))
+    endif
+
     ifndef STRIP
       override STRIP=$(firstword $(strip $(foreach MINGW_PREFIX, $(MINGW_PREFIXES), \
          $(call bin_path, $(MINGW_PREFIX)-strip))))
@@ -512,6 +532,9 @@ ifdef MINGW
     # so check that CC points to a real binary and use gcc if it doesn't
     ifeq ($(call bin_path, $(CC)),)
       override CC=gcc
+    endif
+    ifeq ($(call bin_path, $(CXX)),)
+      override CXX=g++
     endif
 
   endif
@@ -593,13 +616,8 @@ ifdef MINGW
     BASE_CFLAGS += -DUSE_OPENAL $(OPENAL_FLAGS)
     ifeq ($(USE_OPENAL_DLOPEN),1)
       BASE_CFLAGS += -DUSE_OPENAL_DLOPEN
-      ifeq ($(ARCH),x86)
-        CLIENT_EXTRA_FILES += $(OPENALDIR)/windows/mingw/lib32/OpenAL32.dll
-      else
-        CLIENT_EXTRA_FILES += $(OPENALDIR)/windows/mingw/lib64/OpenAL64.dll
-      endif
     else
-      CLIENT_LDFLAGS += $(OPENAL_LIBS)
+      CLIENT_LDFLAGS += $(TARGETDIR)/libopenal/libopenal.a
     endif
   endif
 
@@ -702,13 +720,17 @@ ifeq ($(COMPILE_PLATFORM),darwin)
   endif
 
   ifeq ($(USE_OPENAL),1)
+    BASE_CFLAGS += -DUSE_OPENAL $(OPENAL_FLAGS)
     ifeq ($(USE_OPENAL_DLOPEN),1)
       BASE_CFLAGS += -DUSE_OPENAL_DLOPEN
-      CLIENT_LDFLAGS += $(OPENALDIR)/macosx/libopenal.dylib
-      CLIENT_EXTRA_FILES += $(OPENALDIR)/macosx/libopenal.dylib
-    else
+    else 
+    ifeq ($(USE_SYSTEM_OPENAL),1)
       BASE_CFLAGS += -I/System/Library/Frameworks/OpenAL.framework/Headers
       CLIENT_LDFLAGS += -F/Library/Frameworks -framework OpenAL
+    else
+      CLIENT_LDFLAGS += $(TARGETDIR)/libopenal/libopenal.a
+      CLIENT_LDFLAGS += -lc++ -framework CoreAudio -framework AudioToolbox -framework CoreFoundation
+    endif
     endif
   endif
 
@@ -1032,6 +1054,14 @@ ifdef MINGW
 	cd $(TARGETDIR)/libcurl && CFLAGS="" cmake $(CURDIR)/$(MOUNT_DIR)/libcurl $(CURL_CMAKE_ARGS)
 	@$(MAKE) -C $(TARGETDIR)/libcurl
 endif
+endif
+ifeq ($(USE_OPENAL),1)
+	@echo ""
+	@echo "Building OpenAL in $(TARGETDIR)/libopenal:"
+	@echo ""
+	$(MKDIR) $(TARGETDIR)/libopenal
+	cd $(TARGETDIR)/libopenal && CFLAGS="" cmake $(CURDIR)/$(OPENALDIR) $(OPENAL_CMAKE_ARGS)
+	@$(MAKE) -C $(TARGETDIR)/libopenal
 endif
 ifneq ($(USE_SYSTEM_ZLIB),1)
 ifeq ($(USE_ZLIB_NG),1)
