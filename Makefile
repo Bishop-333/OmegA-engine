@@ -581,16 +581,7 @@ ifdef MINGW
 
   ifeq ($(USE_SDL),1)
     BASE_CFLAGS += -DUSE_LOCAL_HEADERS=1 -I$(SDLHDIR)
-    #CLIENT_CFLAGS += -DUSE_LOCAL_HEADERS=1
-    ifeq ($(ARCH),x86)
-      CLIENT_LDFLAGS += -L$(LIBSDIR)/windows/mingw/lib32
-      CLIENT_LDFLAGS += -lSDL2
-      CLIENT_EXTRA_FILES += $(LIBSDIR)/windows/mingw/lib32/SDL2.dll
-    else
-      CLIENT_LDFLAGS += -L$(LIBSDIR)/windows/mingw/lib64
-      CLIENT_LDFLAGS += -lSDL264
-      CLIENT_EXTRA_FILES += $(LIBSDIR)/windows/mingw/lib64/SDL264.dll
-    endif
+    CLIENT_LDFLAGS += $(TARGETDIR)/libsdl/libsdl2.a
   endif
 
   ifeq ($(USE_JPEG_TURBO),1)
@@ -693,8 +684,7 @@ ifeq ($(COMPILE_PLATFORM),darwin)
 
   ifeq ($(USE_LOCAL_HEADERS),1)
     BASE_CFLAGS += -I$(SDLHDIR)
-    CLIENT_LDFLAGS += $(LIBSDIR)/macosx/libSDL2-2.0.0.dylib
-    CLIENT_EXTRA_FILES += $(LIBSDIR)/macosx/libSDL2-2.0.0.dylib
+    CLIENT_LDFLAGS += $(TARGETDIR)/libsdl/libsdl2.a
   else
   ifneq ($(SDL_INCLUDE),)
     BASE_CFLAGS += $(SDL_INCLUDE)
@@ -1039,6 +1029,14 @@ ifneq ($(BUILD_SERVER),0)
 endif
 
 thirdparty:
+ifeq ($(USE_SDL),1)
+	@echo ""
+	@echo "Building SDL2 in $(TARGETDIR)/libsdl2:"
+	@echo ""
+	$(MKDIR) $(TARGETDIR)/libsdl2
+	cd $(TARGETDIR)/libsdl2 && CFLAGS="" cmake $(CURDIR)/$(SDLDIR) $(SDL_CMAKE_ARGS)
+	@$(MAKE) -C $(TARGETDIR)/libsdl2
+endif
 ifeq ($(USE_JPEG_TURBO),1)
 	@echo ""
 	@echo "Building libjpeg-turbo in $(TARGETDIR)/libjpeg-turbo:"
