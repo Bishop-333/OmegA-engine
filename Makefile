@@ -602,8 +602,8 @@ ifdef MINGW
 
   ifeq ($(USE_CURL),1)
     BASE_CFLAGS += -I$(CURLDIR)/include
-    CLIENT_LDFLAGS += -L$(TARGETDIR)/libcurl/lib
-    CLIENT_LDFLAGS += -lcurl -lcrypt32
+    CLIENT_LDFLAGS += $(TARGETDIR)/libcurl/lib/libcurl.a
+    CLIENT_LDFLAGS += -lcrypt32
     ifeq ($(ARCH),x86_64)
         CLIENT_LDFLAGS += -liphlpapi -lbcrypt
     endif
@@ -619,7 +619,7 @@ ifdef MINGW
     ifeq ($(USE_OPENAL_DLOPEN),1)
       BASE_CFLAGS += -DUSE_OPENAL_DLOPEN
     else
-      CLIENT_LDFLAGS += $(TARGETDIR)/libopenal/libopenal.a
+      CLIENT_LDFLAGS += $(TARGETDIR)/libopenal/libOpenAL32.a
     endif
   endif
 
