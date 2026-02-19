@@ -713,14 +713,13 @@ ifeq ($(COMPILE_PLATFORM),darwin)
     BASE_CFLAGS += -DUSE_OPENAL $(OPENAL_FLAGS)
     ifeq ($(USE_OPENAL_DLOPEN),1)
       BASE_CFLAGS += -DUSE_OPENAL_DLOPEN
+      CLIENT_LDFLAGS += -L$(OPENALDIR)/windows/mingw/lib64
+      CLIENT_LDFLAGS += -lSDL264
+      CLIENT_EXTRA_FILES += $(LIBSDIR)/windows/mingw/lib64/SDL264.dll
     else 
     ifeq ($(USE_SYSTEM_OPENAL),1)
       BASE_CFLAGS += -I/System/Library/Frameworks/OpenAL.framework/Headers
       CLIENT_LDFLAGS += -F/Library/Frameworks -framework OpenAL
-    else
-      CLIENT_LDFLAGS += $(TARGETDIR)/libopenal/libopenal.a
-      CLIENT_LDFLAGS += -lc++ -framework CoreAudio -framework AudioToolbox -framework CoreFoundation
-    endif
     endif
   endif
 

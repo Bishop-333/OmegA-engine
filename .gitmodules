@@ -7,9 +7,6 @@
 [submodule "code/thirdparty/libjpeg-turbo"]
 	path = code/thirdparty/libjpeg-turbo
 	url = https://github.com/libjpeg-turbo/libjpeg-turbo.git
-[submodule "code/thirdparty/libopenal"]
-	path = code/thirdparty/libopenal
-	url = https://github.com/kcat/openal-soft.git
 [submodule "code/thirdparty/libz-ng"]
 	path = code/thirdparty/libz-ng
 	url = https://github.com/zlib-ng/zlib-ng.git
