@@ -578,7 +578,7 @@ ifdef MINGW
 
   ifeq ($(USE_SDL),1)
     BASE_CFLAGS += -DUSE_LOCAL_HEADERS=1 -I$(SDLHDIR)
-    CLIENT_LDFLAGS += $(TARGETDIR)/libsdl/libsdl2.a
+    CLIENT_LDFLAGS += $(TARGETDIR)/libsdl/libSDL2.a
   endif
 
   ifeq ($(USE_JPEG_TURBO),1)
@@ -681,7 +681,7 @@ ifeq ($(COMPILE_PLATFORM),darwin)
 
   ifeq ($(USE_LOCAL_HEADERS),1)
     BASE_CFLAGS += -I$(SDLHDIR)
-    CLIENT_LDFLAGS += $(TARGETDIR)/libsdl/libsdl2.a
+    CLIENT_LDFLAGS += $(TARGETDIR)/libsdl/libSDL2.a
     CLIENT_LDFLAGS += $(SDL_MAC_FRAMEWORKS) 
   else
   ifneq ($(SDL_INCLUDE),)
