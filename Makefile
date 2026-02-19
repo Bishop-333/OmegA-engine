@@ -1041,11 +1041,11 @@ endif
 thirdparty:
 ifeq ($(USE_SDL),1)
 	@echo ""
-	@echo "Building SDL2 in $(TARGETDIR)/libsdl2:"
+	@echo "Building SDL2 in $(TARGETDIR)/libsdl:"
 	@echo ""
-	$(MKDIR) $(TARGETDIR)/libsdl2
-	cd $(TARGETDIR)/libsdl2 && CFLAGS="" cmake $(CURDIR)/$(SDLDIR) $(SDL_CMAKE_ARGS)
-	@$(MAKE) -C $(TARGETDIR)/libsdl2
+	$(MKDIR) $(TARGETDIR)/libsdl
+	cd $(TARGETDIR)/libsdl && CFLAGS="" cmake $(CURDIR)/$(SDLDIR) $(SDL_CMAKE_ARGS)
+	@$(MAKE) -C $(TARGETDIR)/libsdl
 endif
 ifeq ($(USE_JPEG_TURBO),1)
 	@echo ""

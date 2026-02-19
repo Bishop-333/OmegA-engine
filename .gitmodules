@@ -1,3 +1,6 @@
+[submodule "code/thirdparty/libsdl"]
+	path = code/thirdparty/libsdl
+	url = https://github.com/libsdl-org/SDL.git
 [submodule "code/thirdparty/libcurl"]
 	path = code/thirdparty/libcurl
 	url = https://github.com/curl/curl.git
