@@ -702,7 +702,6 @@ ifeq ($(COMPILE_PLATFORM),darwin)
   endif
 
   ifeq ($(USE_OPENAL),1)
-    BASE_CFLAGS += -DUSE_OPENAL
     ifeq ($(USE_OPENAL_DLOPEN),1)
       BASE_CFLAGS += -DUSE_OPENAL_DLOPEN
       CLIENT_LDFLAGS += $(OPENALDIR)/macosx/libopenal.dylib
