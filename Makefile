@@ -1053,7 +1053,7 @@ ifdef MINGW
 	@echo "Building curl in $(TARGETDIR)/libcurl:"
 	@echo ""
 	$(MKDIR) $(TARGETDIR)/libcurl
-	cd $(TARGETDIR)/libcurl && CFLAGS="" cmake $(CURDIR)/$(MOUNT_DIR)/libcurl $(CURL_CMAKE_ARGS)
+	cd $(TARGETDIR)/libcurl && CFLAGS="" cmake $(CURDIR)/$(CURLDIR) $(CURL_CMAKE_ARGS)
 	@$(MAKE) -C $(TARGETDIR)/libcurl
 endif
 endif
