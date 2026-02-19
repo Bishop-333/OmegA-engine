@@ -481,12 +481,6 @@ ifdef MINGW
       override CC=
     endif
 
-    # If CXX is already set to something generic, we probably want to use
-    # something more specific
-    ifneq ($(findstring $(strip $(CXX)),++ g++),)
-      override CXX=
-    endif
-
     ifneq ($(findstring $(strip $(STRIP)),strip),)
       override STRIP=
     endif
@@ -504,11 +498,6 @@ ifdef MINGW
          $(call bin_path, $(MINGW_PREFIX)-gcc))))
     endif
 
-    ifndef CXX
-      override CXX=$(firstword $(strip $(foreach MINGW_PREFIX, $(MINGW_PREFIXES), \
-         $(call bin_path, $(MINGW_PREFIX)-g++))))
-    endif
-
     ifndef STRIP
       override STRIP=$(firstword $(strip $(foreach MINGW_PREFIX, $(MINGW_PREFIXES), \
          $(call bin_path, $(MINGW_PREFIX)-strip))))
@@ -523,9 +512,6 @@ ifdef MINGW
     # so check that CC points to a real binary and use gcc if it doesn't
     ifeq ($(call bin_path, $(CC)),)
       override CC=gcc
-    endif
-    ifeq ($(call bin_path, $(CXX)),)
-      override CXX=g++
     endif
 
   endif
