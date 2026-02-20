@@ -707,8 +707,7 @@ ifeq ($(COMPILE_PLATFORM),darwin)
     LDFLAGS += -L$(TARGETDIR)/libz-ng/lib
     LDFLAGS += -lz
   else
-    BASE_CFLAGS += $(ZLIB_CFLAGS)
-    LDFLAGS += $(ZLIB_LIBS)
+    LDFLAGS += -lz
   endif
 
   ifeq ($(USE_VULKAN),1)
