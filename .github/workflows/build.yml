@@ -40,12 +40,12 @@ jobs:
 
     - name: Build
       run: |
-        make release -j$(nproc) PLATFORM=mingw64
+        make install -j$(nproc) PLATFORM=mingw64 DESTDIR=bin
 
     - uses: actions/upload-artifact@v6
       with:
         name: release-mingw64-x86_64
-        path: build/release-mingw64-x86_64
+        path: bin
         if-no-files-found: error
         retention-days: 5
         
@@ -68,12 +68,12 @@ jobs:
 
     - name: Build
       run: |
-        make release -j$(nproc) BUILD_SERVER=1
+        make install -j$(nproc) DESTDIR=bin BUILD_SERVER=1
 
     - uses: actions/upload-artifact@v6
       with:
         name: release-linux-x86_64
-        path: build/release-linux-x86_64
+        path: bin
         if-no-files-found: error
         retention-days: 5
 
@@ -96,12 +96,12 @@ jobs:
 
     - name: Build
       run: |
-        make release -j$(nproc) BUILD_SERVER=1
+        make install -j$(nproc) DESTDIR=bin BUILD_SERVER=1
 
     - uses: actions/upload-artifact@v6
       with:
         name: release-linux-arm64
-        path: build/release-linux-arm64
+        path: bin
         if-no-files-found: error
         retention-days: 5
 
@@ -122,8 +122,8 @@ jobs:
 
     - name: Build
       run: |
-        make release -j$(sysctl -n hw.logicalcpu) ARCH=x86_64
-        make release -j$(sysctl -n hw.logicalcpu) ARCH=arm64
+        make install -j$(sysctl -n hw.logicalcpu) ARCH=x86_64 DESTDIR=bin INSTALL=ginstall
+        make install -j$(sysctl -n hw.logicalcpu) ARCH=arm64 DESTDIR=bin INSTALL=ginstall
         ./make-macosx-app.sh release
         hdiutil create -format UDZO -srcfolder build/release-darwin-universal2/OmegA.app build/omega-engine-macos-universal2.dmg
 

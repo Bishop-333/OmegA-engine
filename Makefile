@@ -570,6 +570,9 @@ ifdef MINGW
     BASE_CFLAGS += -I$(TARGETDIR)/libcurl/include
     CLIENT_LDFLAGS += -L$(TARGETDIR)/libcurl/lib
     CLIENT_LDFLAGS += -lcurl -lcrypt32
+    ifneq ($(USE_ZLIB_NG),1)
+        CLIENT_LDFLAGS += -lz
+    endif
     ifeq ($(ARCH),x86_64)
         CLIENT_LDFLAGS += -liphlpapi -lbcrypt
     endif
@@ -1074,18 +1077,20 @@ ifdef MINGW
 	@echo ""
 	@echo "Building curl in $(TARGETDIR)/libcurl:"
 	@echo ""
-	$(MKDIR) $(TARGETDIR)/libcurl
-	cd $(TARGETDIR)/libcurl && CFLAGS="" cmake $(CURDIR)/$(CURLDIR) $(CURL_CMAKE_ARGS)
-	@$(MAKE) -C $(TARGETDIR)/libcurl
+	$(MKDIR) $(TARGETDIR)/libcurl/build
+	cd $(TARGETDIR)/libcurl/build && CFLAGS="" cmake $(CURDIR)/$(CURLDIR) $(CURL_CMAKE_ARGS)
+	@$(MAKE) -C $(TARGETDIR)/libcurl/build
+	@$(MAKE) -C $(TARGETDIR)/libcurl/build install
 endif
 endif
 ifeq ($(USE_ZLIB_NG),1)
 	@echo ""
 	@echo "Building zlib-ng in $(TARGETDIR)/libz-ng:"
 	@echo ""
-	@$(MKDIR) $(TARGETDIR)/libz-ng
-	@cd $(TARGETDIR)/libz-ng && CFLAGS="" cmake $(CURDIR)/$(ZNGDIR) $(ZLIBNG_CMAKE_ARGS)
-	@$(MAKE) -C $(TARGETDIR)/libz-ng
+	@$(MKDIR) $(TARGETDIR)/libz-ng/build
+	@cd $(TARGETDIR)/libz-ng/build && CFLAGS="" cmake $(CURDIR)/$(ZNGDIR) $(ZLIBNG_CMAKE_ARGS)
+	@$(MAKE) -C $(TARGETDIR)/libz-ng/build
+	@$(MAKE) -C $(TARGETDIR)/libz-ng/build install
 endif
 
 #############################################################################
