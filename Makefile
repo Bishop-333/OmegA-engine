@@ -1070,7 +1070,7 @@ ifeq ($(USE_JPEG_TURBO),1)
 	$(MKDIR) $(TARGETDIR)/libjpeg-turbo/build
 	cd $(TARGETDIR)/libjpeg-turbo/build && CFLAGS="" cmake $(CURDIR)/$(JPTURBODIR) $(JPTURBO_CMAKE_ARGS)
 	@$(MAKE) -C $(TARGETDIR)/libjpeg-turbo/build
-	@$(MAKE) -C $(TARGETDIR)/libjpeg-turbo/build INSTALL="$(INSTALL)" DESTDIR=""
+	@$(MAKE) -C $(TARGETDIR)/libjpeg-turbo/build install DESTDIR=""
 endif
 ifeq ($(USE_CURL),1)
 ifdef MINGW
@@ -1080,7 +1080,7 @@ ifdef MINGW
 	$(MKDIR) $(TARGETDIR)/libcurl/build
 	cd $(TARGETDIR)/libcurl/build && CFLAGS="" cmake $(CURDIR)/$(CURLDIR) $(CURL_CMAKE_ARGS)
 	@$(MAKE) -C $(TARGETDIR)/libcurl/build
-	@$(MAKE) -C $(TARGETDIR)/libcurl/build INSTALL="$(INSTALL)" DESTDIR=""
+	@$(MAKE) -C $(TARGETDIR)/libcurl/build install DESTDIR=""
 endif
 endif
 ifeq ($(USE_ZLIB_NG),1)
@@ -1090,7 +1090,7 @@ ifeq ($(USE_ZLIB_NG),1)
 	@$(MKDIR) $(TARGETDIR)/libz-ng/build
 	@cd $(TARGETDIR)/libz-ng/build && CFLAGS="" cmake $(CURDIR)/$(ZNGDIR) $(ZLIBNG_CMAKE_ARGS)
 	@$(MAKE) -C $(TARGETDIR)/libz-ng/build
-	@$(MAKE) -C $(TARGETDIR)/libz-ng/build INSTALL="$(INSTALL)" DESTDIR=""
+	@$(MAKE) -C $(TARGETDIR)/libz-ng/build install DESTDIR=""
 endif
 
 #############################################################################
