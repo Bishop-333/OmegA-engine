@@ -33,9 +33,9 @@ BUILD_SERVER     = 0
 USE_SDL          = 1
 USE_SYSTEM_JPEG  = 0
 USE_JPEG_TURBO   = 1
-USE_CURL         = 1
 USE_SYSTEM_ZLIB  = 0
 USE_ZLIB_NG      = 1
+USE_CURL         = 1
 USE_LOCAL_HEADERS= 0
 
 USE_OGG_VORBIS    = 1
@@ -413,6 +413,14 @@ ifeq ($(USE_JPEG_TURBO),1)
 endif
 endif
 
+ifeq ($(USE_SYSTEM_ZLIB),1)
+  BASE_CFLAGS += -DUSE_SYSTEM_ZLIB
+else
+ifeq ($(USE_ZLIB_NG),1)
+  BASE_CFLAGS += -DUSE_ZLIB_NG
+endif
+endif
+
 ifeq ($(USE_CURL),1)
   BASE_CFLAGS += -DUSE_CURL
   ifeq ($(USE_CURL_DLOPEN),1)
@@ -422,14 +430,6 @@ ifeq ($(USE_CURL),1)
       BASE_CFLAGS += -DCURL_STATICLIB
     endif
   endif
-endif
-
-ifeq ($(USE_SYSTEM_ZLIB),1)
-  BASE_CFLAGS += -DUSE_SYSTEM_ZLIB
-else
-ifeq ($(USE_ZLIB_NG),1)
-  BASE_CFLAGS += -DUSE_ZLIB_NG
-endif
 endif
 
 ifeq ($(USE_VULKAN_API),1)
@@ -566,18 +566,6 @@ ifdef MINGW
     BASE_CFLAGS += -I$(JPDIR)
   endif
 
-  ifeq ($(USE_CURL),1)
-    BASE_CFLAGS += -I$(TARGETDIR)/libcurl/include
-    CLIENT_LDFLAGS += -L$(TARGETDIR)/libcurl/lib
-    CLIENT_LDFLAGS += -lcurl -lcrypt32
-    ifneq ($(USE_ZLIB_NG),1)
-        CLIENT_LDFLAGS += -lz
-    endif
-    ifeq ($(ARCH),x86_64)
-        CLIENT_LDFLAGS += -liphlpapi -lbcrypt
-    endif
-  endif
-
   ifeq ($(USE_OGG_VORBIS),1)
     BASE_CFLAGS += -DUSE_OGG_VORBIS $(OGG_CFLAGS) $(VORBIS_CFLAGS)
     CLIENT_LDFLAGS += $(OGG_LIBS) $(VORBIS_LIBS)
@@ -602,6 +590,18 @@ ifdef MINGW
   else
     BASE_CFLAGS += $(ZLIB_CFLAGS)
     LDFLAGS += $(ZLIB_LIBS)
+  endif
+
+  ifeq ($(USE_CURL),1)
+    BASE_CFLAGS += -I$(TARGETDIR)/libcurl/include
+    CLIENT_LDFLAGS += -L$(TARGETDIR)/libcurl/lib
+    CLIENT_LDFLAGS += -lcurl -lcrypt32
+    ifneq ($(USE_ZLIB_NG),1)
+        CLIENT_LDFLAGS += -lz
+    endif
+    ifeq ($(ARCH),x86_64)
+        CLIENT_LDFLAGS += -liphlpapi -lbcrypt
+    endif
   endif
 
   DEBUG_CFLAGS = $(BASE_CFLAGS) -DDEBUG -D_DEBUG -g -O0
@@ -793,12 +793,6 @@ else
   endif
   endif
 
-  ifeq ($(USE_CURL),1)
-    ifeq ($(USE_CURL_DLOPEN),0)
-      CLIENT_LDFLAGS += -lcurl
-    endif
-  endif
-
   ifeq ($(USE_OGG_VORBIS),1)
     BASE_CFLAGS += -DUSE_OGG_VORBIS $(OGG_CFLAGS) $(VORBIS_CFLAGS)
     CLIENT_LDFLAGS += $(OGG_LIBS) $(VORBIS_LIBS)
@@ -820,6 +814,12 @@ else
   else
     BASE_CFLAGS += $(ZLIB_CFLAGS)
     LDFLAGS += $(ZLIB_LIBS)
+  endif
+
+  ifeq ($(USE_CURL),1)
+    ifeq ($(USE_CURL_DLOPEN),0)
+      CLIENT_LDFLAGS += -lcurl
+    endif
   endif
 
   ifeq ($(PLATFORM),linux)
@@ -952,6 +952,15 @@ ifeq ($(USE_JPEG_TURBO),1)
 endif
 endif
 
+ifeq ($(USE_SYSTEM_ZLIB),1)
+  BASE_CFLAGS += -DUSE_SYSTEM_ZLIB
+else
+ifeq ($(USE_ZLIB_NG),1)
+  BASE_CFLAGS += -DUSE_ZLIB_NG
+  ZLIBNG_CMAKE_ARGS += $(CMAKE_ARGS) -DBUILD_TESTING=OFF -DZLIB_COMPAT=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=$(CURDIR)/$(TARGETDIR)/libz-ng
+endif
+endif
+
 ifeq ($(USE_CURL),1)
   BASE_CFLAGS += -DUSE_CURL
   ifeq ($(USE_CURL_DLOPEN),1)
@@ -963,17 +972,11 @@ ifeq ($(USE_CURL),1)
       ifeq ($(ARCH),x86)
         CURL_CMAKE_ARGS += -DENABLE_IPV6=OFF -DCURL_ENABLE_SSL=OFF
       endif
+      ifeq ($(USE_ZLIB_NG),1)
+        CURL_CMAKE_ARGS += -DZLIB_LIBRARY=$(CURDIR)/$(TARGETDIR)/libz-ng/lib/libz.a -DZLIB_INCLUDE_DIR=$(CURDIR)/$(TARGETDIR)/libz-ng/include
+      endif
     endif
   endif
-endif
-
-ifeq ($(USE_SYSTEM_ZLIB),1)
-  BASE_CFLAGS += -DUSE_SYSTEM_ZLIB
-else
-ifeq ($(USE_ZLIB_NG),1)
-  BASE_CFLAGS += -DUSE_ZLIB_NG
-  ZLIBNG_CMAKE_ARGS += $(CMAKE_ARGS) -DBUILD_TESTING=OFF -DZLIB_COMPAT=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=$(CURDIR)/$(TARGETDIR)/libz-ng
-endif
 endif
 
 #############################################################################
@@ -1072,6 +1075,15 @@ ifeq ($(USE_JPEG_TURBO),1)
 	@cmake --build $(TARGETDIR)/libjpeg-turbo/build
 	@DESTDIR="" cmake --install $(TARGETDIR)/libjpeg-turbo/build
 endif
+ifeq ($(USE_ZLIB_NG),1)
+	@echo ""
+	@echo "Building zlib-ng in $(TARGETDIR)/libz-ng:"
+	@echo ""
+	@$(MKDIR) $(TARGETDIR)/libz-ng/build
+	@cd $(TARGETDIR)/libz-ng/build && CFLAGS="" cmake $(CURDIR)/$(ZNGDIR) $(ZLIBNG_CMAKE_ARGS)
+	@cmake --build $(TARGETDIR)/libz-ng/build
+	@DESTDIR="" cmake --install $(TARGETDIR)/libz-ng/build
+endif
 ifeq ($(USE_CURL),1)
 ifdef MINGW
 	@echo ""
@@ -1082,15 +1094,6 @@ ifdef MINGW
 	@cmake --build $(TARGETDIR)/libcurl/build
 	@DESTDIR="" cmake --install $(TARGETDIR)/libcurl/build
 endif
-endif
-ifeq ($(USE_ZLIB_NG),1)
-	@echo ""
-	@echo "Building zlib-ng in $(TARGETDIR)/libz-ng:"
-	@echo ""
-	@$(MKDIR) $(TARGETDIR)/libz-ng/build
-	@cd $(TARGETDIR)/libz-ng/build && CFLAGS="" cmake $(CURDIR)/$(ZNGDIR) $(ZLIBNG_CMAKE_ARGS)
-	@cmake --build $(TARGETDIR)/libz-ng/build
-	@DESTDIR="" cmake --install $(TARGETDIR)/libz-ng/build
 endif
 
 #############################################################################
