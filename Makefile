@@ -31,11 +31,11 @@ BUILD_CLIENT     = 1
 BUILD_SERVER     = 0
 
 USE_SDL          = 1
-USE_SYSTEM_JPEG  = 0
 USE_JPEG_TURBO   = 1
-USE_SYSTEM_ZLIB  = 0
-USE_ZLIB_NG      = 1
+USE_SYSTEM_JPEG  = 0
 USE_CURL         = 1
+USE_ZLIB_NG      = 1
+USE_SYSTEM_ZLIB  = 0
 USE_LOCAL_HEADERS= 0
 
 USE_OGG_VORBIS    = 1
@@ -100,7 +100,6 @@ endif
 -include Makefile.local
 
 ifeq ($(COMPILE_PLATFORM),darwin)
-  USE_SDL=1
   USE_LOCAL_HEADERS=1
   USE_SYSTEM_ZLIB=1
 endif
@@ -187,6 +186,10 @@ ifndef USE_LOCAL_HEADERS
 USE_LOCAL_HEADERS=1
 endif
 
+ifndef USE_JPEG_TURBO
+USE_JPEG_TURBO=1
+endif
+
 ifndef USE_CURL
 USE_CURL=1
 endif
@@ -221,6 +224,14 @@ endif
 
 ifndef USE_SYSTEM_OPENAL
   USE_SYSTEM_OPENAL=1
+endif
+
+ifndef USE_ZLIB_NG
+  USE_ZLIB_NG=1
+endif
+
+ifndef USE_SYSTEM_ZLIB
+  USE_SYSTEM_ZLIB=1
 endif
 
 ifeq ($(USE_RENDERER_DLOPEN),0)
@@ -413,14 +424,6 @@ ifeq ($(USE_JPEG_TURBO),1)
 endif
 endif
 
-ifeq ($(USE_SYSTEM_ZLIB),1)
-  BASE_CFLAGS += -DUSE_SYSTEM_ZLIB
-else
-ifeq ($(USE_ZLIB_NG),1)
-  BASE_CFLAGS += -DUSE_ZLIB_NG
-endif
-endif
-
 ifeq ($(USE_CURL),1)
   BASE_CFLAGS += -DUSE_CURL
   ifeq ($(USE_CURL_DLOPEN),1)
@@ -430,6 +433,14 @@ ifeq ($(USE_CURL),1)
       BASE_CFLAGS += -DCURL_STATICLIB
     endif
   endif
+endif
+
+ifeq ($(USE_SYSTEM_ZLIB),1)
+  BASE_CFLAGS += -DUSE_SYSTEM_ZLIB
+else
+ifeq ($(USE_ZLIB_NG),1)
+  BASE_CFLAGS += -DUSE_ZLIB_NG
+endif
 endif
 
 ifeq ($(USE_VULKAN_API),1)
@@ -566,6 +577,15 @@ ifdef MINGW
     BASE_CFLAGS += -I$(JPDIR)
   endif
 
+  ifeq ($(USE_CURL),1)
+    BASE_CFLAGS += -I$(TARGETDIR)/libcurl/include
+    CLIENT_LDFLAGS += -L$(TARGETDIR)/libcurl/lib
+    CLIENT_LDFLAGS += -lcurl -lcrypt32
+    ifeq ($(ARCH),x86_64)
+        CLIENT_LDFLAGS += -liphlpapi -lbcrypt
+    endif
+  endif
+
   ifeq ($(USE_OGG_VORBIS),1)
     BASE_CFLAGS += -DUSE_OGG_VORBIS $(OGG_CFLAGS) $(VORBIS_CFLAGS)
     CLIENT_LDFLAGS += $(OGG_LIBS) $(VORBIS_LIBS)
@@ -590,18 +610,6 @@ ifdef MINGW
   else
     BASE_CFLAGS += $(ZLIB_CFLAGS)
     LDFLAGS += $(ZLIB_LIBS)
-  endif
-
-  ifeq ($(USE_CURL),1)
-    BASE_CFLAGS += -I$(TARGETDIR)/libcurl/include
-    CLIENT_LDFLAGS += -L$(TARGETDIR)/libcurl/lib
-    CLIENT_LDFLAGS += -lcurl -lcrypt32
-    ifneq ($(USE_ZLIB_NG),1)
-        CLIENT_LDFLAGS += -lz
-    endif
-    ifeq ($(ARCH),x86_64)
-        CLIENT_LDFLAGS += -liphlpapi -lbcrypt
-    endif
   endif
 
   DEBUG_CFLAGS = $(BASE_CFLAGS) -DDEBUG -D_DEBUG -g -O0
@@ -793,6 +801,12 @@ else
   endif
   endif
 
+  ifeq ($(USE_CURL),1)
+    ifeq ($(USE_CURL_DLOPEN),0)
+      CLIENT_LDFLAGS += -lcurl
+    endif
+  endif
+
   ifeq ($(USE_OGG_VORBIS),1)
     BASE_CFLAGS += -DUSE_OGG_VORBIS $(OGG_CFLAGS) $(VORBIS_CFLAGS)
     CLIENT_LDFLAGS += $(OGG_LIBS) $(VORBIS_LIBS)
@@ -814,12 +828,6 @@ else
   else
     BASE_CFLAGS += $(ZLIB_CFLAGS)
     LDFLAGS += $(ZLIB_LIBS)
-  endif
-
-  ifeq ($(USE_CURL),1)
-    ifeq ($(USE_CURL_DLOPEN),0)
-      CLIENT_LDFLAGS += -lcurl
-    endif
   endif
 
   ifeq ($(PLATFORM),linux)
