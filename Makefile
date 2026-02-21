@@ -930,7 +930,7 @@ endif
 # THIRDPARTY LIBRARIES CONFIGURATION
 #############################################################################
 
-CMAKE_ARGS = -G"Unix Makefiles" -DCMAKE_C_COMPILER=$(CC) -DCMAKE_SYSTEM_PROCESSOR=$(ARCH) -DCMAKE_BUILD_TYPE=Release
+CMAKE_ARGS = -DCMAKE_C_COMPILER=$(CC) -DCMAKE_SYSTEM_PROCESSOR=$(ARCH) -DCMAKE_BUILD_TYPE=Release
 ifdef MINGW
   CMAKE_ARGS += -DCMAKE_SYSTEM_NAME=Windows
 endif
@@ -1069,8 +1069,8 @@ ifeq ($(USE_JPEG_TURBO),1)
 	@echo ""
 	$(MKDIR) $(TARGETDIR)/libjpeg-turbo/build
 	cd $(TARGETDIR)/libjpeg-turbo/build && CFLAGS="" cmake $(CURDIR)/$(JPTURBODIR) $(JPTURBO_CMAKE_ARGS)
-	@$(MAKE) -C $(TARGETDIR)/libjpeg-turbo/build
-	@$(MAKE) -C $(TARGETDIR)/libjpeg-turbo/build install DESTDIR=""
+	@cmake --build $(TARGETDIR)/libjpeg-turbo/build
+	@cmake --install $(TARGETDIR)/libjpeg-turbo/build
 endif
 ifeq ($(USE_CURL),1)
 ifdef MINGW
@@ -1079,8 +1079,8 @@ ifdef MINGW
 	@echo ""
 	$(MKDIR) $(TARGETDIR)/libcurl/build
 	cd $(TARGETDIR)/libcurl/build && CFLAGS="" cmake $(CURDIR)/$(CURLDIR) $(CURL_CMAKE_ARGS)
-	@$(MAKE) -C $(TARGETDIR)/libcurl/build
-	@$(MAKE) -C $(TARGETDIR)/libcurl/build install DESTDIR=""
+	@cmake --build $(TARGETDIR)/libcurl/build
+	@cmake --install $(TARGETDIR)/libcurl/build
 endif
 endif
 ifeq ($(USE_ZLIB_NG),1)
@@ -1089,8 +1089,8 @@ ifeq ($(USE_ZLIB_NG),1)
 	@echo ""
 	@$(MKDIR) $(TARGETDIR)/libz-ng/build
 	@cd $(TARGETDIR)/libz-ng/build && CFLAGS="" cmake $(CURDIR)/$(ZNGDIR) $(ZLIBNG_CMAKE_ARGS)
-	@$(MAKE) -C $(TARGETDIR)/libz-ng/build
-	@$(MAKE) -C $(TARGETDIR)/libz-ng/build install DESTDIR=""
+	@cmake --build $(TARGETDIR)/libz-ng/build
+	@cmake --install $(TARGETDIR)/libz-ng/build
 endif
 
 #############################################################################
