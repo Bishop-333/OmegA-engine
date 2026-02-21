@@ -32,7 +32,7 @@ jobs:
     - name: Install tools
       run: |
         sudo apt-get -qq update
-        sudo apt-get -y install gcc-mingw-w64-x86-64 nasm
+        sudo apt-get -y install gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 nasm
 
     - uses: actions/checkout@v6
       with:
