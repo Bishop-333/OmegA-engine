@@ -32,7 +32,7 @@ jobs:
     - name: Install tools
       run: |
         sudo apt-get -qq update
-        sudo apt-get -y install gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 nasm
+        sudo apt-get -y install gcc-mingw-w64-x86-64 nasm
 
     - uses: actions/checkout@v6
       with:
@@ -40,12 +40,16 @@ jobs:
 
     - name: Build
       run: |
-        make install -j$(nproc) PLATFORM=mingw64 DESTDIR=bin
+        make release -j$(nproc) PLATFORM=mingw64
+
+    - name: Compress binaries
+      run: |
+        7z a -r build/omega-engine-windows-x86_64.zip ./build/release-mingw64-x86_64
 
     - uses: actions/upload-artifact@v6
       with:
         name: release-mingw64-x86_64
-        path: bin
+        path: build/omega-engine-windows-x86_64.zip
         if-no-files-found: error
         retention-days: 5
         
@@ -68,12 +72,16 @@ jobs:
 
     - name: Build
       run: |
-        make install -j$(nproc) DESTDIR=bin BUILD_SERVER=1
+        make release -j$(nproc) BUILD_SERVER=1
+
+    - name: Compress binaries
+      run: |
+        tar -czf build/omega-engine-linux-x86_64.tar.gz -C build/release-linux-x86_64 .
 
     - uses: actions/upload-artifact@v6
       with:
         name: release-linux-x86_64
-        path: bin
+        path: build/omega-engine-linux-x86_64.tar.gz
         if-no-files-found: error
         retention-days: 5
 
@@ -96,12 +104,16 @@ jobs:
 
     - name: Build
       run: |
-        make install -j$(nproc) DESTDIR=bin BUILD_SERVER=1
+        make release -j$(nproc) BUILD_SERVER=1
+
+    - name: Compress binaries
+      run: |
+        tar -czf build/omega-engine-linux-arm64.tar.gz -C build/release-linux-arm64 .
 
     - uses: actions/upload-artifact@v6
       with:
         name: release-linux-arm64
-        path: bin
+        path: build/omega-engine-linux-arm64.tar.gz
         if-no-files-found: error
         retention-days: 5
 
@@ -113,17 +125,14 @@ jobs:
 
     steps:
 
-    - name: Install tools
-      run: brew install coreutils sdl2
-
     - uses: actions/checkout@v6
       with:
         submodules: recursive
 
     - name: Build
       run: |
-        make install -j$(sysctl -n hw.logicalcpu) ARCH=x86_64 DESTDIR=bin INSTALL=ginstall
-        make install -j$(sysctl -n hw.logicalcpu) ARCH=arm64 DESTDIR=bin INSTALL=ginstall
+        make release -j$(sysctl -n hw.logicalcpu) ARCH=x86_64
+        make release -j$(sysctl -n hw.logicalcpu) ARCH=arm64
         ./make-macosx-app.sh release
         hdiutil create -format UDZO -srcfolder build/release-darwin-universal2/OmegA.app build/omega-engine-macos-universal2.dmg
 
@@ -144,9 +153,9 @@ jobs:
 
       - name: Create binary archives
         run: |
-          7z a -r omega-engine-linux-x86_64.zip      ./release-linux-x86_64
-          7z a -r omega-engine-linux-arm64.zip       ./release-linux-arm64
-          7z a -r omega-engine-windows-x86_64.zip    ./release-mingw64-x86_64
+          cp ./release-linux-x86_64/omega-engine-linux-x86_64.tar.gz .
+          cp ./release-linux-arm64/omega-engine-linux-arm64.tar.gz .
+          cp ./release-mingw64-x86_64/omega-engine-windows-x86_64.zip .
           cp ./release-darwin-universal2/omega-engine-macos-universal2.dmg .
       - name: Create latest build
         uses: czietz/action-automatic-releases@latest
@@ -156,5 +165,6 @@ jobs:
           prerelease: true
           title: Development Build
           files: |
+            *.tar.gz
             *.zip
             *.dmg
