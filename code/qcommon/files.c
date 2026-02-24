@@ -364,6 +364,7 @@ void Com_AppendCDKey( const char *filename );
 void Com_ReadCDKey( const char *filename );
 
 static int FS_GetModList( char *listbuf, int bufsize );
+static qboolean FS_IsBaseGame( const char *game );
 void FS_Reload( void );
 
 
@@ -1594,13 +1595,35 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 	// we can do that as long as we know properties of our hash function
 	fullHash = FS_HashFileName( filename, 0U );
 
+	if ( !Q_stricmp( filename, Q3CONFIG_CFG ) ) {
+		const char *cfgDir = fs_basegame->string;
+		if ( fs_gamedirvar->string[0] && !FS_IsBaseGame( fs_gamedirvar->string ) ) {
+			cfgDir = fs_gamedirvar->string;
+		}
+		netpath = FS_BuildOSPath( fs_homepath->string, cfgDir, filename );
+		temp = Sys_FOpen( netpath, "rb" );
+		if ( temp ) {
+			length = FS_FileLength( temp );
+			if ( file == NULL ) {
+				fclose( temp );
+				return length;
+			}
+			*file = FS_HandleForFile();
+			f = &fsh[ *file ];
+			FS_InitHandle( f );
+			f->handleFiles.file.o = temp;
+			Q_strncpyz( f->name, filename, sizeof( f->name ) );
+			f->zipFile = qfalse;
+			if ( fs_debug->integer ) {
+				Com_Printf( "FS_FOpenFileRead: %s (fast path)\n", filename );
+			}
+			return length;
+		}
+	}
+
 	if ( file == NULL ) {
 		// just wants to see if file is there
 		for ( search = fs_searchpaths ; search ; search = search->next ) {
-			// Skip q3config.cfg lookup in pak files.
-			if ( search->pack && !Q_stricmp( filename, Q3CONFIG_CFG ) ) {
-				continue;
-			}
 			// is the element a pak file?
 			if ( search->pack && search->pack->hashTable[ (hash = fullHash & (search->pack->hashSize-1)) ] ) {
 				// skip non-pure files
