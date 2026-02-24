@@ -1597,6 +1597,10 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 	if ( file == NULL ) {
 		// just wants to see if file is there
 		for ( search = fs_searchpaths ; search ; search = search->next ) {
+			// Skip q3config.cfg lookup in pak files.
+			if ( search->pack && !Q_stricmp( filename, Q3CONFIG_CFG ) ) {
+				continue;
+			}
 			// is the element a pak file?
 			if ( search->pack && search->pack->hashTable[ (hash = fullHash & (search->pack->hashSize-1)) ] ) {
 				// skip non-pure files
