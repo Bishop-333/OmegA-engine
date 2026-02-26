@@ -1051,8 +1051,6 @@ endif
 ifneq ($(TARGETS),)
 	@$(MAKE) $(TARGETS) V=$(V)
 endif
-	@echo "  Cleanup:"
-	rm -rf $(B)/*/
 
 makedirs:
 	@if [ ! -d $(BUILD_DIR) ];then $(MKDIR) $(BUILD_DIR);fi
