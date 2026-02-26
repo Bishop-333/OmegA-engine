@@ -40,11 +40,11 @@ jobs:
 
     - name: Build
       run: |
-        make release -j$(nproc) PLATFORM=mingw64
+        make install -j$(nproc) PLATFORM=mingw64 DESTDIR=bin
 
-    - name: Compress binaries
+    - name: Create archive
       run: |
-        7z a -r build/omega-engine-windows-x86_64.zip ./build/release-mingw64-x86_64
+        7z a -r build/omega-engine-windows-x86_64.zip ./bin/*
 
     - uses: actions/upload-artifact@v6
       with:
@@ -72,11 +72,11 @@ jobs:
 
     - name: Build
       run: |
-        make release -j$(nproc) BUILD_SERVER=1
+        make install -j$(nproc) BUILD_SERVER=1 DESTDIR=bin
 
-    - name: Compress binaries
+    - name: Create archive
       run: |
-        tar -czf build/omega-engine-linux-x86_64.tar.gz -C build/release-linux-x86_64 .
+        tar -czf build/omega-engine-linux-x86_64.tar.gz -C bin .
 
     - uses: actions/upload-artifact@v6
       with:
@@ -104,11 +104,11 @@ jobs:
 
     - name: Build
       run: |
-        make release -j$(nproc) BUILD_SERVER=1
+        make install -j$(nproc) BUILD_SERVER=1 DESTDIR=bin
 
-    - name: Compress binaries
+    - name: Create archive
       run: |
-        tar -czf build/omega-engine-linux-arm64.tar.gz -C build/release-linux-arm64 .
+        tar -czf build/omega-engine-linux-arm64.tar.gz -C bin .
 
     - uses: actions/upload-artifact@v6
       with:
