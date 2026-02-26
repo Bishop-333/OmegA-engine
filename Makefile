@@ -178,7 +178,11 @@ GENERATE_DEPENDENCIES=1
 endif
 
 ifndef USE_CCACHE
+ifneq ($(shell which ccache 2> /dev/null),)
+USE_CCACHE=1
+else
 USE_CCACHE=0
+endif
 endif
 export USE_CCACHE
 
@@ -874,8 +878,9 @@ ifneq ($(BUILD_CLIENT),0)
   endif
 endif
 
+CC_REAL := $(CC)
 ifeq ($(USE_CCACHE),1)
-  CC := ccache $(CC)
+  CC := ccache $(CC_REAL)
 endif
 
 ifneq ($(USE_RENDERER_DLOPEN),0)
@@ -938,7 +943,10 @@ endif
 # THIRDPARTY LIBRARIES CONFIGURATION
 #############################################################################
 
-CMAKE_ARGS = -DCMAKE_C_COMPILER=$(CC) -DCMAKE_SYSTEM_PROCESSOR=$(ARCH) -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_LIBDIR=lib
+CMAKE_ARGS = -DCMAKE_C_COMPILER=$(CC_REAL) -DCMAKE_SYSTEM_PROCESSOR=$(ARCH) -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_LIBDIR=lib
+ifeq ($(USE_CCACHE),1)
+  CMAKE_ARGS += -DCMAKE_C_COMPILER_LAUNCHER=ccache
+endif
 ifdef MINGW
   CMAKE_ARGS += -DCMAKE_SYSTEM_NAME=Windows
 endif
