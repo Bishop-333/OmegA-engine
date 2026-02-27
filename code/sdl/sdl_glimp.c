@@ -622,7 +622,7 @@ if ( !vulkan ) {
 				continue;
 			}
 
-			if ( SDL_GetWindowDisplayMode( SDL_window, &mode ) >= 0 )
+			if ( mode.w > 0 && mode.h > 0 )
 			{
 				config->displayFrequency = mode.refresh_rate;
 				config->vidWidth = mode.w;
