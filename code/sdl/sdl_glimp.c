@@ -246,41 +246,47 @@ static void GLimp_DetectAvailableModes(void)
 	int i, j;
 	char buf[ MAX_STRING_CHARS ] = { 0 };
 	int numSDLModes;
+	SDL_DisplayMode **fsmodes = NULL;
 	SDL_Rect *modes;
 	int numModes = 0;
 
+	const SDL_DisplayMode *pwindowMode = NULL;
 	SDL_DisplayMode windowMode;
-	int display = SDL_GetWindowDisplayIndex( SDL_window );
-	if( display < 0 )
+	SDL_DisplayID display = SDL_GetDisplayForWindow( SDL_window );
+	if( display == 0 )
 	{
 		Com_WPrintf( "Couldn't get window display index, no resolutions detected: %s\n", SDL_GetError() );
 		return;
 	}
-	numSDLModes = SDL_GetNumDisplayModes( display );
+	fsmodes = SDL_GetFullscreenDisplayModes( display, &numSDLModes );
+	pwindowMode = SDL_GetWindowFullscreenMode( SDL_window );
 
-	if( SDL_GetWindowDisplayMode( SDL_window, &windowMode ) < 0 || numSDLModes <= 0 )
+	if( pwindowMode == NULL || numSDLModes <= 0 )
 	{
 		Com_WPrintf( "Couldn't get window display mode, no resolutions detected: %s\n", SDL_GetError() );
+		SDL_free( fsmodes );
 		return;
 	}
+	SDL_copyp( &windowMode, pwindowMode );
 
 	modes = SDL_calloc( (size_t)numSDLModes, sizeof( SDL_Rect ) );
 	if ( !modes )
 	{
 		Com_Error( ERR_FATAL, "Out of memory" );
+		SDL_free( fsmodes );
+		return;
 	}
 
 	for( i = 0; i < numSDLModes; i++ )
 	{
 		SDL_DisplayMode mode;
-
-		if( SDL_GetDisplayMode( display, i, &mode ) < 0 )
-			continue;
+		SDL_copyp( &mode, fsmodes[i] );
 
 		if( !mode.w || !mode.h )
 		{
 			Com_Printf( "Display supports any resolution\n" );
 			SDL_free( modes );
+			SDL_free( fsmodes );
 			return;
 		}
 
@@ -326,6 +332,7 @@ static void GLimp_DetectAvailableModes(void)
 		Cvar_Set( "r_availableModes", buf );
 	}
 	SDL_free( modes );
+	SDL_free( fsmodes );
 }
 
 
