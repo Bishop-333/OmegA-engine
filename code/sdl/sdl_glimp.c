@@ -705,10 +705,10 @@ if ( !vulkan ) {
 
 #ifdef USE_VULKAN_API
 	if ( vulkan )
-		SDL_Vulkan_GetDrawableSize( SDL_window, &config->vidWidth, &config->vidHeight );
+		SDL_GetWindowSizeInPixels( SDL_window, &config->vidWidth, &config->vidHeight );
 	else
 #endif
-		SDL_GL_GetDrawableSize( SDL_window, &config->vidWidth, &config->vidHeight );
+		SDL_GetWindowSizeInPixels( SDL_window, &config->vidWidth, &config->vidHeight );
 
 	// save render dimensions as renderer may change it in advance
 	glw_state.window_width = config->vidWidth;
