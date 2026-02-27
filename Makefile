@@ -270,7 +270,7 @@ RCDIR=$(MOUNT_DIR)/renderercommon
 R1DIR=$(MOUNT_DIR)/renderer
 RVDIR=$(MOUNT_DIR)/renderervk
 SDLDIR=$(MOUNT_DIR)/sdl
-SDLHDIR=$(MOUNT_DIR)/thirdparty/libsdl/include/SDL2
+SDLHDIR=$(MOUNT_DIR)/thirdparty/libsdl/include
 LIBSDIR=$(MOUNT_DIR)/thirdparty/libsdl
 
 CMDIR=$(MOUNT_DIR)/qcommon
@@ -301,8 +301,8 @@ MKDIR=mkdir -p
 
 ifneq ($(call bin_path, $(PKG_CONFIG)),)
   ifneq ($(USE_SDL),0)
-    SDL_INCLUDE ?= $(shell $(PKG_CONFIG) --silence-errors --cflags-only-I sdl2)
-    SDL_LIBS ?= $(shell $(PKG_CONFIG) --silence-errors --libs sdl2)
+    SDL_INCLUDE ?= $(shell $(PKG_CONFIG) --silence-errors --cflags-only-I sdl3)
+    SDL_LIBS ?= $(shell $(PKG_CONFIG) --silence-errors --libs sdl3)
   else
     X11_INCLUDE ?= $(shell $(PKG_CONFIG) --silence-errors --cflags-only-I x11)
     X11_LIBS ?= $(shell $(PKG_CONFIG) --silence-errors --libs x11)
@@ -333,7 +333,7 @@ ifeq ($(X11_LIBS),)
   X11_LIBS = -lX11
 endif
 ifeq ($(SDL_LIBS),)
-  SDL_LIBS = -lSDL2
+  SDL_LIBS = -lSDL3
 endif
 
 # supply some reasonable defaults for ogg/vorbis
@@ -564,12 +564,12 @@ ifdef MINGW
     BASE_CFLAGS += -DUSE_LOCAL_HEADERS=1 -I$(SDLHDIR)
     ifeq ($(ARCH),x86)
       CLIENT_LDFLAGS += -L$(LIBSDIR)/windows/mingw/lib32
-      CLIENT_LDFLAGS += -lSDL2
-      CLIENT_EXTRA_FILES += $(LIBSDIR)/windows/mingw/lib32/SDL2.dll
+      CLIENT_LDFLAGS += -lSDL3
+      CLIENT_EXTRA_FILES += $(LIBSDIR)/windows/mingw/lib32/SDL3.dll
     else
       CLIENT_LDFLAGS += -L$(LIBSDIR)/windows/mingw/lib64
-      CLIENT_LDFLAGS += -lSDL264
-      CLIENT_EXTRA_FILES += $(LIBSDIR)/windows/mingw/lib64/SDL264.dll
+      CLIENT_LDFLAGS += -lSDL3
+      CLIENT_EXTRA_FILES += $(LIBSDIR)/windows/mingw/lib64/SDL3.dll
     endif
   endif
 
@@ -674,15 +674,15 @@ ifeq ($(COMPILE_PLATFORM),darwin)
 
   ifeq ($(USE_LOCAL_HEADERS),1)
     BASE_CFLAGS += -I$(SDLHDIR)
-    CLIENT_LDFLAGS += $(LIBSDIR)/macosx/libSDL2-2.0.0.dylib
-    CLIENT_EXTRA_FILES += $(LIBSDIR)/macosx/libSDL2-2.0.0.dylib
+    CLIENT_LDFLAGS += $(LIBSDIR)/macosx/libSDL3.0.dylib
+    CLIENT_EXTRA_FILES += $(LIBSDIR)/macosx/libSDL3.0.dylib
   else
   ifneq ($(SDL_INCLUDE),)
     BASE_CFLAGS += $(SDL_INCLUDE)
     CLIENT_LDFLAGS = $(SDL_LIBS)
   else
-    BASE_CFLAGS += -I/Library/Frameworks/SDL2.framework/Headers
-    CLIENT_LDFLAGS += -F/Library/Frameworks -framework SDL2
+    BASE_CFLAGS += -I/Library/Frameworks/SDL3.framework/Headers
+    CLIENT_LDFLAGS += -F/Library/Frameworks -framework SDL3
   endif
   endif
 
