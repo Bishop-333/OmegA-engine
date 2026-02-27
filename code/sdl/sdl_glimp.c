@@ -116,12 +116,13 @@ static int FindNearestDisplay( int *x, int *y, int w, int h )
 	const int cx = *x + w / 2;
 	const int cy = *y + h / 2;
 	int i, index, numDisplays;
+	SDL_DisplayID *displays = NULL;
 	SDL_Rect *list, *m;
 
 	index = -1; // selected display index
 
-	numDisplays = SDL_GetNumVideoDisplays();
-	if ( numDisplays <= 0 )
+	displays = SDL_GetDisplays( &numDisplays );
+	if ( numDisplays <= 0 || displays == NULL )
 		return -1;
 
 	glw_state.monitorCount = numDisplays;
@@ -130,7 +131,7 @@ static int FindNearestDisplay( int *x, int *y, int w, int h )
 
 	for ( i = 0; i < numDisplays; i++ )
 	{
-		SDL_GetDisplayBounds( i, list + i );
+		SDL_GetDisplayBounds( displays[ i ], list + i );
 		//Com_Printf( "[%i]: x=%i, y=%i, w=%i, h=%i\n", i, list[i].x, list[i].y, list[i].w, list[i].h );
 	}
 
@@ -177,6 +178,7 @@ static int FindNearestDisplay( int *x, int *y, int w, int h )
 	}
 
 	Z_Free( list );
+	SDL_free( displays );
 
 	return index;
 }
