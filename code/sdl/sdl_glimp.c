@@ -749,10 +749,9 @@ static rserr_t GLimp_StartDriverAndSetMode( int mode, const char *modeFS, qboole
 		}
 
 		driverName = SDL_GetCurrentVideoDriver();
-		SDL_VERSION( &compiled );
 
 		Com_Printf( "SDL using driver \"%s\"\n", driverName );
-		Com_Printf( "SDL version %d.%d.%d\n", compiled.major, compiled.minor, compiled.patch );
+		Com_Printf( "SDL version %d.%d.%d\n", SDL_VERSIONNUM_MAJOR( compiled ), SDL_VERSIONNUM_MINOR( compiled ), SDL_VERSIONNUM_MICRO( compiled ) );
 	}
 
 	err = GLW_SetMode( mode, modeFS, fullscreen, vulkan );
