@@ -98,7 +98,6 @@ static void IN_PrintKey( const SDL_KeyboardEvent *event, keyNum_t key, qboolean 
 	if( event->mod & SDL_KMOD_NUM )      Com_Printf( " KMOD_NUM" );
 	if( event->mod & SDL_KMOD_CAPS )     Com_Printf( " KMOD_CAPS" );
 	if( event->mod & SDL_KMOD_MODE )     Com_Printf( " KMOD_MODE" );
-	if( event->mod & SDL_KMOD_RESERVED ) Com_Printf( " KMOD_RESERVED" );
 
 	Com_Printf( " Q:0x%02x(%s)\n", key, Key_KeynumToString( key ) );
 }
@@ -1324,8 +1323,8 @@ void HandleEvents( void )
 												}
 												break;
 			// mouse focus:
-			case SDL_EVENT_WINDOW_ENTER: mouse_focus = qtrue; break;
-			case SDL_EVENT_WINDOW_LEAVE: if ( glw_state.isFullscreen ) mouse_focus = qfalse; break;
+			case SDL_EVENT_WINDOW_MOUSE_ENTER: mouse_focus = qtrue; break;
+			case SDL_EVENT_WINDOW_MOUSE_LEAVE: if ( glw_state.isFullscreen ) mouse_focus = qfalse; break;
 			default:
 				break;
 		}
