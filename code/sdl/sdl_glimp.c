@@ -432,7 +432,7 @@ if ( !vulkan ) {
 	// Destroy existing state if it exists
 	if ( SDL_glContext != NULL )
 	{
-		SDL_GL_DeleteContext( SDL_glContext );
+		SDL_GL_DestroyContext( SDL_glContext );
 		SDL_glContext = NULL;
 	}
 
@@ -589,11 +589,12 @@ if ( !vulkan ) {
 				SDL_GL_SetAttribute( SDL_GL_ACCELERATED_VISUAL, 1 );
 		}
 
-		if ( ( SDL_window = SDL_CreateWindow( cl_title, x, y, config->vidWidth, config->vidHeight, flags ) ) == NULL )
+		if ( ( SDL_window = SDL_CreateWindow( cl_title, config->vidWidth, config->vidHeight, flags ) ) == NULL )
 		{
 			Com_DPrintf( "SDL_CreateWindow failed: %s\n", SDL_GetError() );
 			continue;
 		}
+		SDL_SetWindowPosition( SDL_window, x, y );
 
 		if ( fullscreen )
 		{
@@ -609,11 +610,9 @@ if ( !vulkan ) {
 			mode.w = config->vidWidth;
 			mode.h = config->vidHeight;
 			mode.refresh_rate = /* config->displayFrequency = */ Cvar_VariableIntegerValue( "r_displayRefresh" );
-			mode.driverdata = NULL;
-
-			if ( SDL_SetWindowDisplayMode( SDL_window, &mode ) < 0 )
+			if ( !SDL_SetWindowFullscreenMode( SDL_window, &mode ) )
 			{
-				Com_DPrintf( "SDL_SetWindowDisplayMode failed: %s\n", SDL_GetError( ) );
+				Com_DPrintf( "SDL_SetWindowFullscreenMode failed: %s\n", SDL_GetError( ) );
 				continue;
 			}
 
@@ -646,7 +645,7 @@ if ( !vulkan ) {
 				}
 			}
 
-			if ( SDL_GL_SetSwapInterval( r_swapInterval->integer ) == -1 )
+			if ( !SDL_GL_SetSwapInterval( r_swapInterval->integer ) )
 			{
 				Com_DPrintf( "SDL_GL_SetSwapInterval failed: %s\n", SDL_GetError( ) );
 			}
@@ -684,7 +683,7 @@ if ( !vulkan ) {
 		if ( icon )
 		{
 			SDL_SetWindowIcon( SDL_window, icon );
-			SDL_FreeSurface( icon );
+			SDL_DestroySurface( icon );
 		}
 #endif
 	}
