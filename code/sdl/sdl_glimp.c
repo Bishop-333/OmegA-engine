@@ -409,8 +409,10 @@ if ( !vulkan ) {
 	config->isFullscreen = fullscreen;
 	glw_state.isFullscreen = fullscreen;
 
-	if( SDL_GetDesktopDisplayMode( display, &desktopMode ) == 0 )
+	pdesktopMode = SDL_GetDesktopDisplayMode( display );
+	if( pdesktopMode )
 	{
+		SDL_copyp( &desktopMode, pdesktopMode );
 		displayAspect = (float)desktopMode.w / (float)desktopMode.h;
 
 		Com_Printf( "Display aspect: %.3f\n", displayAspect );
