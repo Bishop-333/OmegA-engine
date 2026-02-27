@@ -21,9 +21,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #ifdef USE_LOCAL_HEADERS
-#	include "SDL.h"
+#	include "SDL3/SDL.h"
 #else
-#	include <SDL.h>
+#	include <SDL3/SDL.h>
 #endif
 
 #include "../client/client.h"
@@ -76,7 +76,7 @@ static qboolean mouse_focus;
 IN_PrintKey
 ===============
 */
-static void IN_PrintKey( const SDL_Keysym *keysym, keyNum_t key, qboolean down )
+static void IN_PrintKey( const SDL_KeyboardEvent *event, keyNum_t key, qboolean down )
 {
 	if( down )
 		Com_Printf( "+ " );
@@ -84,21 +84,21 @@ static void IN_PrintKey( const SDL_Keysym *keysym, keyNum_t key, qboolean down )
 		Com_Printf( "  " );
 
 	Com_Printf( "Scancode: 0x%02x(%s) Sym: 0x%02x(%s)",
-			keysym->scancode, SDL_GetScancodeName( keysym->scancode ),
-			keysym->sym, SDL_GetKeyName( keysym->sym ) );
+			event->scancode, SDL_GetScancodeName( event->scancode ),
+			event->key, SDL_GetKeyName( event->key ) );
 
-	if( keysym->mod & KMOD_LSHIFT )   Com_Printf( " KMOD_LSHIFT" );
-	if( keysym->mod & KMOD_RSHIFT )   Com_Printf( " KMOD_RSHIFT" );
-	if( keysym->mod & KMOD_LCTRL )    Com_Printf( " KMOD_LCTRL" );
-	if( keysym->mod & KMOD_RCTRL )    Com_Printf( " KMOD_RCTRL" );
-	if( keysym->mod & KMOD_LALT )     Com_Printf( " KMOD_LALT" );
-	if( keysym->mod & KMOD_RALT )     Com_Printf( " KMOD_RALT" );
-	if( keysym->mod & KMOD_LGUI )     Com_Printf( " KMOD_LGUI" );
-	if( keysym->mod & KMOD_RGUI )     Com_Printf( " KMOD_RGUI" );
-	if( keysym->mod & KMOD_NUM )      Com_Printf( " KMOD_NUM" );
-	if( keysym->mod & KMOD_CAPS )     Com_Printf( " KMOD_CAPS" );
-	if( keysym->mod & KMOD_MODE )     Com_Printf( " KMOD_MODE" );
-	if( keysym->mod & KMOD_RESERVED ) Com_Printf( " KMOD_RESERVED" );
+	if( event->mod & SDL_KMOD_LSHIFT )   Com_Printf( " KMOD_LSHIFT" );
+	if( event->mod & SDL_KMOD_RSHIFT )   Com_Printf( " KMOD_RSHIFT" );
+	if( event->mod & SDL_KMOD_LCTRL )    Com_Printf( " KMOD_LCTRL" );
+	if( event->mod & SDL_KMOD_RCTRL )    Com_Printf( " KMOD_RCTRL" );
+	if( event->mod & SDL_KMOD_LALT )     Com_Printf( " KMOD_LALT" );
+	if( event->mod & SDL_KMOD_RALT )     Com_Printf( " KMOD_RALT" );
+	if( event->mod & SDL_KMOD_LGUI )     Com_Printf( " KMOD_LGUI" );
+	if( event->mod & SDL_KMOD_RGUI )     Com_Printf( " KMOD_RGUI" );
+	if( event->mod & SDL_KMOD_NUM )      Com_Printf( " KMOD_NUM" );
+	if( event->mod & SDL_KMOD_CAPS )     Com_Printf( " KMOD_CAPS" );
+	if( event->mod & SDL_KMOD_MODE )     Com_Printf( " KMOD_MODE" );
+	if( event->mod & SDL_KMOD_RESERVED ) Com_Printf( " KMOD_RESERVED" );
 
 	Com_Printf( " Q:0x%02x(%s)\n", key, Key_KeynumToString( key ) );
 }
@@ -205,30 +205,30 @@ static qboolean IN_IsConsoleKey( keyNum_t key, int character )
 IN_TranslateSDLToQ3Key
 ===============
 */
-static keyNum_t IN_TranslateSDLToQ3Key( SDL_Keysym *keysym, qboolean down )
+static keyNum_t IN_TranslateSDLToQ3Key( const SDL_KeyboardEvent *event, qboolean down )
 {
 	keyNum_t key = 0;
 
-	if ( keysym->scancode >= SDL_SCANCODE_1 && keysym->scancode <= SDL_SCANCODE_0 )
+	if ( event->scancode >= SDL_SCANCODE_1 && event->scancode <= SDL_SCANCODE_0 )
 	{
 		// Always map the number keys as such even if they actually map
 		// to other characters (eg, "1" is "&" on an AZERTY keyboard).
 		// This is required for SDL before 2.0.6, except on Windows
 		// which already had this behavior.
-		if( keysym->scancode == SDL_SCANCODE_0 )
+		if( event->scancode == SDL_SCANCODE_0 )
 			key = '0';
 		else
-			key = '1' + keysym->scancode - SDL_SCANCODE_1;
+			key = '1' + event->scancode - SDL_SCANCODE_1;
 	}
 	else if ( in_forceCharset->integer > 0 )
 	{
-		if ( keysym->scancode >= SDL_SCANCODE_A && keysym->scancode <= SDL_SCANCODE_Z )
+		if ( event->scancode >= SDL_SCANCODE_A && event->scancode <= SDL_SCANCODE_Z )
 		{
-			key = 'a' + keysym->scancode - SDL_SCANCODE_A;
+			key = 'a' + event->scancode - SDL_SCANCODE_A;
 		}
 		else
 		{
-			switch ( keysym->scancode )
+			switch ( event->scancode )
 			{
 				case SDL_SCANCODE_MINUS:        key = '-';  break;
 				case SDL_SCANCODE_EQUALS:       key = '=';  break;
@@ -248,14 +248,14 @@ static keyNum_t IN_TranslateSDLToQ3Key( SDL_Keysym *keysym, qboolean down )
 		}
 	}
 
-	if( !key && keysym->sym >= SDLK_SPACE && keysym->sym < SDLK_DELETE )
+	if( !key && event->key >= SDLK_SPACE && event->key < SDLK_DELETE )
 	{
 		// These happen to match the ASCII chars
-		key = (int)keysym->sym;
+		key = (int)event->key;
 	}
 	else if( !key )
 	{
-		switch( keysym->sym )
+		switch( event->key )
 		{
 			case SDLK_PAGEUP:       key = K_PGUP;          break;
 			case SDLK_KP_9:         key = K_KP_PGUP;       break;
@@ -339,14 +339,14 @@ static keyNum_t IN_TranslateSDLToQ3Key( SDL_Keysym *keysym, qboolean down )
 #if 1
 				key = 0;
 #else
-				if( !( keysym->sym & SDLK_SCANCODE_MASK ) && keysym->scancode <= 95 )
+				if( !( event->key & SDLK_SCANCODE_MASK ) && event->scancode <= 95 )
 				{
 					// Map Unicode characters to 95 world keys using the key's scan code.
 					// FIXME: There aren't enough world keys to cover all the scancodes.
 					// Maybe create a map of scancode to quake key at start up and on
 					// key map change; allocate world key numbers as needed similar
 					// to SDL 1.2.
-					key = K_WORLD_0 + (int)keysym->scancode;
+					key = K_WORLD_0 + (int)event->scancode;
 				}
 #endif
 				break;
@@ -354,9 +354,9 @@ static keyNum_t IN_TranslateSDLToQ3Key( SDL_Keysym *keysym, qboolean down )
 	}
 
 	if ( in_keyboardDebug->integer )
-		IN_PrintKey( keysym, key, down );
+		IN_PrintKey( event, key, down );
 
-	if ( keysym->scancode == SDL_SCANCODE_GRAVE )
+	if ( event->scancode == SDL_SCANCODE_GRAVE )
 	{
 		//SDL_Keycode translated = SDL_GetKeyFromScancode( SDL_SCANCODE_GRAVE );
 
@@ -390,7 +390,7 @@ static void IN_GobbleMouseEvents( void )
 	SDL_PumpEvents();
 
 	while( ( val = SDL_PeepEvents( dummy, ARRAY_LEN( dummy ), SDL_GETEVENT,
-		SDL_MOUSEMOTION, SDL_MOUSEWHEEL ) ) > 0 ) { }
+		SDL_EVENT_MOUSE_MOTION, SDL_EVENT_MOUSE_WHEEL ) ) > 0 ) { }
 
 	if ( val < 0 )
 		Com_Printf( "%s failed: %s\n", __func__, SDL_GetError() );
@@ -413,11 +413,10 @@ static void IN_ActivateMouse( void )
 	{
 		IN_GobbleMouseEvents();
 
-		SDL_SetRelativeMouseMode( in_mouse->integer == 1 ? SDL_TRUE : SDL_FALSE );
-		SDL_SetWindowGrab( SDL_window, SDL_TRUE );
+		SDL_SetWindowRelativeMouseMode( SDL_window, true );
 
 		if ( glw_state.isFullscreen )
-			SDL_ShowCursor( SDL_FALSE );
+			SDL_ShowCursor();
 
 		SDL_WarpMouseInWindow( SDL_window, glw_state.window_width / 2, glw_state.window_height / 2 );
 
@@ -432,11 +431,9 @@ static void IN_ActivateMouse( void )
 		if ( in_nograb->modified || !mouseActive )
 		{
 			if ( in_nograb->integer ) {
-				SDL_SetRelativeMouseMode( SDL_FALSE );
-				SDL_SetWindowGrab( SDL_window, SDL_FALSE );
+				SDL_SetWindowRelativeMouseMode( SDL_window, false );
 			} else {
-				SDL_SetRelativeMouseMode( in_mouse->integer == 1 ? SDL_TRUE : SDL_FALSE );
-				SDL_SetWindowGrab( SDL_window, SDL_TRUE );
+				SDL_SetWindowRelativeMouseMode( SDL_window, true );
 			}
 
 			in_nograb->modified = qfalse;
@@ -466,15 +463,14 @@ static void IN_DeactivateMouse( void )
 #endif
 		IN_GobbleMouseEvents();
 
-		SDL_SetWindowGrab( SDL_window, SDL_FALSE );
-		SDL_SetRelativeMouseMode( SDL_FALSE );
+		SDL_SetWindowRelativeMouseMode( SDL_window, false );
 
 		if ( gw_active )
 			SDL_WarpMouseInWindow( SDL_window, glw_state.window_width / 2, glw_state.window_height / 2 );
 		else
 		{
 			if ( glw_state.isFullscreen )
-				SDL_ShowCursor( SDL_TRUE );
+				SDL_ShowCursor();
 
 			if ( drv && strcmp( drv, "x11" ) == 0 ) {
 				SDL_WarpMouseGlobal( glw_state.desktop_width / 2, glw_state.desktop_height / 2 );
@@ -487,7 +483,7 @@ static void IN_DeactivateMouse( void )
 	// Always show the cursor when the mouse is disabled,
 	// but not when fullscreen
 	if ( !glw_state.isFullscreen )
-		SDL_ShowCursor( SDL_TRUE );
+		SDL_ShowCursor();
 }
 
 
@@ -556,7 +552,7 @@ static void IN_InitJoystick( void )
 	if (!SDL_WasInit(SDL_INIT_JOYSTICK))
 	{
 		Com_DPrintf("Calling SDL_Init(SDL_INIT_JOYSTICK)...\n");
-		if (SDL_Init(SDL_INIT_JOYSTICK) != 0)
+		if (!SDL_Init(SDL_INIT_JOYSTICK))
 		{
 			Com_DPrintf("SDL_Init(SDL_INIT_JOYSTICK) failed: %s\n", SDL_GetError());
 			return;
@@ -567,7 +563,7 @@ static void IN_InitJoystick( void )
 	if (!SDL_WasInit(SDL_INIT_GAMECONTROLLER))
 	{
 		Com_DPrintf("Calling SDL_Init(SDL_INIT_GAMECONTROLLER)...\n");
-		if (SDL_Init(SDL_INIT_GAMECONTROLLER) != 0)
+		if (!SDL_Init(SDL_INIT_GAMECONTROLLER))
 		{
 			Com_DPrintf("SDL_Init(SDL_INIT_GAMECONTROLLER) failed: %s\n", SDL_GetError());
 			return;
@@ -1116,9 +1112,9 @@ IN_SyncModifiers
 static void IN_SyncModifiers( void ) {
     SDL_Keymod mod = SDL_GetModState();
 
-    keys[K_CTRL].down  = (mod & KMOD_CTRL)  ? qtrue : qfalse;
-    keys[K_SHIFT].down = (mod & KMOD_SHIFT) ? qtrue : qfalse;
-    keys[K_ALT].down   = (mod & KMOD_ALT)   ? qtrue : qfalse;
+    keys[K_CTRL].down  = (mod & SDL_KMOD_CTRL)  ? qtrue : qfalse;
+    keys[K_SHIFT].down = (mod & SDL_KMOD_SHIFT) ? qtrue : qfalse;
+    keys[K_ALT].down   = (mod & SDL_KMOD_ALT)   ? qtrue : qfalse;
 }
 
 
@@ -1145,10 +1141,10 @@ void HandleEvents( void )
 	{
 		switch( e.type )
 		{
-			case SDL_KEYDOWN:
+			case SDL_EVENT_KEY_DOWN:
 				if ( e.key.repeat && Key_GetCatcher() == 0 )
 					break;
-				key = IN_TranslateSDLToQ3Key( &e.key.keysym, qtrue );
+				key = IN_TranslateSDLToQ3Key( &e.key, qtrue );
 
 				if ( key == K_ENTER && keys[K_ALT].down ) {
 					Cvar_SetIntegerValue( "r_fullscreen", glw_state.isFullscreen ? 0 : 1 );
@@ -1174,17 +1170,17 @@ void HandleEvents( void )
 				lastKeyDown = key;
 				break;
 
-			case SDL_KEYUP:
-				if( ( key = IN_TranslateSDLToQ3Key( &e.key.keysym, qfalse ) ) )
+			case SDL_EVENT_KEY_UP:
+				if( ( key = IN_TranslateSDLToQ3Key( &e.key, qfalse ) ) )
 					Com_QueueEvent( in_eventTime, SE_KEY, key, qfalse, 0, NULL );
 
 				lastKeyDown = 0;
 				break;
 
-			case SDL_TEXTINPUT:
+			case SDL_EVENT_TEXT_INPUT:
 				if( lastKeyDown != K_CONSOLE )
 				{
-					char *c = e.text.text;
+					const char *c = e.text.text;
 
 					// Quick and dirty UTF-8 to UTF-32 conversion
 					while ( *c )
@@ -1231,7 +1227,7 @@ void HandleEvents( void )
 				}
 				break;
 
-			case SDL_MOUSEMOTION:
+			case SDL_EVENT_MOUSE_MOTION:
 				if( mouseActive )
 				{
 					if( !e.motion.xrel && !e.motion.yrel )
@@ -1240,8 +1236,8 @@ void HandleEvents( void )
 				}
 				break;
 
-			case SDL_MOUSEBUTTONDOWN:
-			case SDL_MOUSEBUTTONUP:
+			case SDL_EVENT_MOUSE_BUTTON_DOWN:
+			case SDL_EVENT_MOUSE_BUTTON_UP:
 				{
 					int b;
 					switch( e.button.button )
@@ -1254,11 +1250,11 @@ void HandleEvents( void )
 						default:                b = K_AUX1 + ( e.button.button - SDL_BUTTON_X2 + 1 ) % 16; break;
 					}
 					Com_QueueEvent( in_eventTime, SE_KEY, b,
-						( e.type == SDL_MOUSEBUTTONDOWN ? qtrue : qfalse ), 0, NULL );
+						( e.type == SDL_EVENT_MOUSE_BUTTON_DOWN ? qtrue : qfalse ), 0, NULL );
 				}
 				break;
 
-			case SDL_MOUSEWHEEL:
+			case SDL_EVENT_MOUSE_WHEEL:
 				if( e.wheel.y > 0 )
 				{
 					Com_QueueEvent( in_eventTime, SE_KEY, K_MWHEELUP, qtrue, 0, NULL );
@@ -1272,29 +1268,21 @@ void HandleEvents( void )
 				break;
 
 #ifdef USE_JOYSTICK
-			case SDL_CONTROLLERDEVICEADDED:
-			case SDL_CONTROLLERDEVICEREMOVED:
+			case SDL_EVENT_GAMEPAD_ADDED:
+			case SDL_EVENT_GAMEPAD_REMOVED:
 				if ( in_joystick->integer )
 					IN_InitJoystick();
 				break;
 #endif
 
-			case SDL_QUIT:
+			case SDL_EVENT_QUIT:
 				Cbuf_ExecuteText( EXEC_NOW, "quit Closed window\n" );
 				break;
 
-			case SDL_WINDOWEVENT:
-#ifdef DEBUG_EVENTS
-				Com_Printf( "%4i %s\n", e.window.timestamp, eventName( e.window.event ) );
-#endif
-				switch ( e.window.event )
-				{
-					case SDL_WINDOWEVENT_RESIZED:
-					{
-						int width, height;
-
-						width = e.window.data1;
-						height = e.window.data2;
+			case SDL_EVENT_WINDOW_RESIZED:
+			{
+				int width = e.window.data1;
+				int height = e.window.data2;
 
 						// ignore this event on fullscreen
 						if( glw_state.isFullscreen )
@@ -1302,46 +1290,42 @@ void HandleEvents( void )
 							break;
 						}
 
-						// check if size actually changed
-						if( cls.glconfig.vidWidth == width && cls.glconfig.vidHeight == height )
-						{
-							break;
-						}
-
-						Cvar_SetValue( "r_customwidth", width );
-						Cvar_SetValue( "r_customheight", height );
-						Cvar_Set( "r_mode", "-1" );
-
-						// Wait until user stops dragging for 1 second, so
-						// we aren't constantly recreating the GL context while
-						// he tries to drag...
-						vidRestartTime = Sys_Milliseconds( ) + 1000;
-					}
+				// check if size actually changed
+				if( cls.glconfig.vidWidth == width && cls.glconfig.vidHeight == height )
 					break;
-					case SDL_WINDOWEVENT_MOVED:
-						if ( gw_active && !gw_minimized && !glw_state.isFullscreen ) {
-							Cvar_SetIntegerValue( "vid_xpos", e.window.data1 );
-							Cvar_SetIntegerValue( "vid_ypos", e.window.data2 );
-						}
-						break;
-					// window states:
-					case SDL_WINDOWEVENT_HIDDEN:
-					case SDL_WINDOWEVENT_MINIMIZED:		gw_active = qfalse; gw_minimized = qtrue; break;
-					case SDL_WINDOWEVENT_SHOWN:
-					case SDL_WINDOWEVENT_RESTORED:
-					case SDL_WINDOWEVENT_MAXIMIZED:		gw_minimized = qfalse; break;
-					// keyboard focus:
-					case SDL_WINDOWEVENT_FOCUS_LOST:	lastKeyDown = 0; Key_ClearStates(); IN_SyncModifiers(); gw_active = qfalse; break;
-					case SDL_WINDOWEVENT_FOCUS_GAINED:	lastKeyDown = 0; Key_ClearStates(); IN_SyncModifiers(); gw_active = qtrue; gw_minimized = qfalse;
-														if ( re.SetColorMappings ) {
-															re.SetColorMappings();
-														}
-														break;
-					// mouse focus:
-					case SDL_WINDOWEVENT_ENTER: mouse_focus = qtrue; break;
-					case SDL_WINDOWEVENT_LEAVE: if ( glw_state.isFullscreen ) mouse_focus = qfalse; break;
+
+				Cvar_SetValue( "r_customwidth", width );
+				Cvar_SetValue( "r_customheight", height );
+				Cvar_Set( "r_mode", "-1" );
+
+				// Wait until user stops dragging for 1 second, so
+				// we aren't constantly recreating the GL context while
+				// he tries to drag...
+				vidRestartTime = Sys_Milliseconds() + 1000;
+			}
+			break;
+			case SDL_EVENT_WINDOW_MOVED:
+				if ( gw_active && !gw_minimized && !glw_state.isFullscreen ) {
+					Cvar_SetIntegerValue( "vid_xpos", e.window.data1 );
+					Cvar_SetIntegerValue( "vid_ypos", e.window.data2 );
 				}
 				break;
+			// window states:
+			case SDL_EVENT_WINDOW_HIDDEN:
+			case SDL_EVENT_WINDOW_MINIMIZED:		gw_active = qfalse; gw_minimized = qtrue; break;
+			case SDL_EVENT_WINDOW_SHOWN:
+			case SDL_EVENT_WINDOW_RESTORED:
+			case SDL_EVENT_WINDOW_MAXIMIZED:		gw_minimized = qfalse; break;
+			// keyboard focus:
+			case SDL_EVENT_WINDOW_FOCUS_LOST:	lastKeyDown = 0; Key_ClearStates(); IN_SyncModifiers(); gw_active = qfalse; break;
+			case SDL_EVENT_WINDOW_FOCUS_GAINED:	lastKeyDown = 0; Key_ClearStates(); IN_SyncModifiers(); gw_active = qtrue; gw_minimized = qfalse;
+												if ( re.SetColorMappings ) {
+													re.SetColorMappings();
+												}
+												break;
+			// mouse focus:
+			case SDL_EVENT_WINDOW_ENTER: mouse_focus = qtrue; break;
+			case SDL_EVENT_WINDOW_LEAVE: if ( glw_state.isFullscreen ) mouse_focus = qfalse; break;
 			default:
 				break;
 		}
@@ -1486,7 +1470,7 @@ void IN_Init( void )
 
 	mouseAvailable = ( in_mouse->value != 0 ) ? qtrue : qfalse;
 
-	SDL_StartTextInput();
+	SDL_StartTextInput( SDL_window );
 
 	//IN_DeactivateMouse();
 
@@ -1509,7 +1493,7 @@ IN_Shutdown
 */
 void IN_Shutdown( void )
 {
-	SDL_StopTextInput();
+	SDL_StopTextInput( SDL_window );
 
 	IN_DeactivateMouse();
 
