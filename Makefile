@@ -993,10 +993,10 @@ default: release
 all: debug release
 
 debug:
-	@$(MAKE) targets B=$(BD) CFLAGS="$(CFLAGS) $(DEBUG_CFLAGS)" LDFLAGS="$(LDFLAGS) $(DEBUG_LDFLAGS)" V=$(V) NO_STRIP=1
+	@$(MAKE) targets B=$(BD) MODE=debug CFLAGS="$(CFLAGS) $(DEBUG_CFLAGS)" LDFLAGS="$(LDFLAGS) $(DEBUG_LDFLAGS)" V=$(V) NO_STRIP=1
 
 release:
-	@$(MAKE) targets B=$(BR) CFLAGS="$(CFLAGS) $(RELEASE_CFLAGS)" V=$(V)
+	@$(MAKE) targets B=$(BR) MODE=release CFLAGS="$(CFLAGS) $(RELEASE_CFLAGS)" V=$(V)
 
 define ADD_COPY_TARGET
 TARGETS += $2
