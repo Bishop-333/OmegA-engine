@@ -456,7 +456,7 @@ if ( !vulkan ) {
 	{
 		if ( r_fullscreen->integer == 2 )
 		{
-			flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+			flags |= SDL_WINDOW_FULLSCREEN;
 		}
 		else
 		{
@@ -740,7 +740,7 @@ static rserr_t GLimp_StartDriverAndSetMode( int mode, const char *modeFS, qboole
 	if ( !SDL_WasInit( SDL_INIT_VIDEO ) )
 	{
 		const char *driverName;
-		SDL_version compiled;
+		const int compiled = SDL_GetVersion();
 
 		if ( !SDL_Init( SDL_INIT_VIDEO ) )
 		{
