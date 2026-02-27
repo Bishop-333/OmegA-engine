@@ -21,14 +21,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #ifdef USE_LOCAL_HEADERS
-#	include "SDL.h"
+#	include "SDL3/SDL.h"
 #ifdef USE_VULKAN_API
-#	include "SDL_vulkan.h"
+#	include "SDL3/SDL_vulkan.h"
 #endif
 #else
-#	include <SDL.h>
+#	include <SDL3/SDL.h>
 #ifdef USE_VULKAN_API
-#	include <SDL_vulkan.h>
+#	include <SDL3/SDL_vulkan.h>
 #endif
 #endif
 
@@ -74,7 +74,7 @@ void GLimp_Shutdown( qboolean unloadDLL )
 		if ( drv && strcmp( drv, "x11" ) == 0 ) {
 			SDL_WarpMouseGlobal( glw_state.desktop_width / 2, glw_state.desktop_height / 2 );
 		} else {
-			SDL_ShowCursor( SDL_TRUE );
+			SDL_ShowCursor();
 		}
 	}
 
