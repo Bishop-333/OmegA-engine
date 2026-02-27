@@ -920,7 +920,7 @@ void VKimp_Init( glconfig_t *config )
 		}
 	}
 
-	qvkGetInstanceProcAddr = SDL_Vulkan_GetVkGetInstanceProcAddr();
+	qvkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr) SDL_Vulkan_GetVkGetInstanceProcAddr();
 
 	if ( qvkGetInstanceProcAddr == NULL )
 	{
@@ -959,7 +959,7 @@ VK_CreateSurface
 */
 qboolean VK_CreateSurface( VkInstance instance, VkSurfaceKHR *surface )
 {
-	if ( SDL_Vulkan_CreateSurface( SDL_window, instance, surface ) == SDL_TRUE )
+	if ( SDL_Vulkan_CreateSurface( SDL_window, instance, NULL, surface ) == true )
 		return qtrue;
 	else
 		return qfalse;
