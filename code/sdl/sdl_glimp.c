@@ -976,7 +976,7 @@ void VKimp_Shutdown( qboolean unloadDLL )
 		if ( drv && strcmp( drv, "x11" ) == 0 ) {
 			SDL_WarpMouseGlobal( glw_state.desktop_width / 2, glw_state.desktop_height / 2 );
 		} else {
-			SDL_ShowCursor( SDL_TRUE );
+			SDL_ShowCursor();
 		}
 	}
 
