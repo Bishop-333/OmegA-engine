@@ -374,8 +374,8 @@ if ( !vulkan ) {
 	// If a window exists, note its display index
 	if ( SDL_window != NULL )
 	{
-		display = SDL_GetWindowDisplayIndex( SDL_window );
 		if ( display < 0 )
+		display = SDL_GetDisplayForWindow( SDL_window );
 		{
 			Com_DPrintf( "SDL_GetWindowDisplayIndex() failed: %s\n", SDL_GetError() );
 		}
@@ -392,8 +392,10 @@ if ( !vulkan ) {
 		//Com_Printf("Selected display: %i\n", display );
 	}
 
-	if ( display >= 0 && SDL_GetDesktopDisplayMode( display, &desktopMode ) == 0 )
+	pdesktopMode = SDL_GetDesktopDisplayMode( display );
+	if ( pdesktopMode )
 	{
+		SDL_copyp( &desktopMode, pdesktopMode );
 		glw_state.desktop_width = desktopMode.w;
 		glw_state.desktop_height = desktopMode.h;
 	}
@@ -737,7 +739,7 @@ static rserr_t GLimp_StartDriverAndSetMode( int mode, const char *modeFS, qboole
 		const char *driverName;
 		SDL_version compiled;
 
-		if ( SDL_Init( SDL_INIT_VIDEO ) != 0 )
+		if ( !SDL_Init( SDL_INIT_VIDEO ) )
 		{
 			Com_Printf( "SDL_Init( SDL_INIT_VIDEO ) FAILED (%s)\n", SDL_GetError() );
 			return RSERR_FATAL_ERROR;
