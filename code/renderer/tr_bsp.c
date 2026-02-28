@@ -438,9 +438,13 @@ static void R_LoadLightmaps( const lump_t *l ) {
 	if ( r_mergeLightmaps->integer && numLightmaps > 1 ) {
 		// check for low texture sizes
 		if ( glConfig.maxTextureSize >= LIGHTMAP_LEN * 2 ) {
-			tr.mergeLightmaps = qtrue;
-			R_LoadMergedLightmaps( l, image ); // reuse stack space
-			return;
+			if ( textureBorderClampAvailable ) {
+				tr.mergeLightmaps = qtrue;
+				R_LoadMergedLightmaps( l, image ); // reuse stack space
+				return;
+			} else {
+				ri.Printf( PRINT_DEVELOPER, "...GL_ARB_texture_border_clamp is not available, merged lighmaps disabled.\n" );
+			}
 		}
 	}
 

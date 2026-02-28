@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 glconfig_t	glConfig;
 qboolean	nonPowerOfTwoTextures;
 qboolean	textureFilterAnisotropic;
+qboolean    textureBorderClampAvailable;
 int			maxAnisotropy;
 int			gl_version;
 int			gl_clamp_mode;	// GL_CLAMP or GL_CLAMP_TO_EGGE
@@ -333,6 +334,8 @@ static void R_InitExtensions( void )
 
 	glConfig.textureEnvAddAvailable = qfalse;
 
+	textureBorderClampAvailable = qfalse;
+
 	textureFilterAnisotropic = qfalse;
 	maxAnisotropy = 0;
 
@@ -414,6 +417,14 @@ static void R_InitExtensions( void )
 		}
 	} else {
 		ri.Printf( PRINT_ALL, "...GL_EXT_texture_env_add not found\n" );
+	}
+
+	// GL_ARB_texture_border_clamp
+	if ( R_HaveExtension( "GL_ARB_texture_border_clamp" ) ) {
+		textureBorderClampAvailable = qtrue;
+		ri.Printf( PRINT_ALL, "...using GL_ARB_texture_border_clamp\n" );
+	} else {
+		ri.Printf( PRINT_ALL, "...GL_ARB_texture_border_clamp not found\n" );
 	}
 
 	// GL_ARB_multitexture
@@ -559,6 +570,14 @@ static void R_InitExtensions( void )
 		}
 	}
 #endif // USE_FBO
+	
+	// Check if dynamic lights are available
+#ifdef USE_PMLIGHT	
+	if (r_dlightMode->integer && !qglGenProgramsARB) 
+	{
+			ri.Printf( PRINT_ALL, "...Per-pixel dynamic lights disabled. Missing ARB shader support\n" );
+	}
+#endif	
 }
 
 
