@@ -423,10 +423,10 @@ static curl_off_t encoder_base64_size(curl_mimepart *part)
     return size;    /* Unknown size or no data. */
 
   /* Compute base64 character count. */
-  size = 4 * (1 + (size - 1) / 3);
+  size = 4 * (1 + ((size - 1) / 3));
 
   /* Effective character count must include CRLFs. */
-  return size + 2 * ((size - 1) / MAX_ENCODED_LINE_LENGTH);
+  return size + (2 * ((size - 1) / MAX_ENCODED_LINE_LENGTH));
 }
 
 /* Quoted-printable lookahead.
@@ -464,7 +464,7 @@ static size_t encoder_qp_read(char *buffer, size_t size, bool ateof,
   while(st->bufbeg < st->bufend) {
     size_t len = 1;
     size_t consumed = 1;
-    int i = st->buf[st->bufbeg];
+    int i = (unsigned char)st->buf[st->bufbeg];
     buf[0] = (char)i;
     buf[1] = aschex[(i >> 4) & 0xF];
     buf[2] = aschex[i & 0xF];

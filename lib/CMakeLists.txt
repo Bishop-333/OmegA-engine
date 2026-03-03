@@ -38,6 +38,7 @@ list(APPEND HHEADERS "${CMAKE_CURRENT_BINARY_DIR}/curl_config.h")
 
 set_property(DIRECTORY APPEND PROPERTY INCLUDE_DIRECTORIES
   "${PROJECT_BINARY_DIR}/lib"        # for "curl_config.h"
+  "${PROJECT_SOURCE_DIR}/lib"
 )
 
 if(CURL_BUILD_TESTING)
@@ -47,7 +48,7 @@ if(CURL_BUILD_TESTING)
   target_link_libraries(curlu PUBLIC ${CURL_LIBS})
   # There is plenty of parallelism when building the testdeps target.
   # Override the curlu batch size with the maximum to optimize performance.
-  set_target_properties(curlu PROPERTIES UNITY_BUILD_BATCH_SIZE 0 C_CLANG_TIDY "")
+  set_target_properties(curlu PROPERTIES UNITY_BUILD ON UNITY_BUILD_BATCH_SIZE 0 C_CLANG_TIDY "")
 
   add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/unitprotos.h"
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -125,6 +126,9 @@ if(SHARE_LIB_OBJECT AND CMAKE_VERSION VERSION_GREATER_EQUAL 3.12)
       set_target_properties(${LIB_OBJECT} PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
     endif()
   endif()
+  if(CURL_CLANG_TIDY)
+    set_target_properties(${LIB_OBJECT} PROPERTIES UNITY_BUILD OFF)
+  endif()
   if(CURL_CODE_COVERAGE)
     set_property(TARGET ${LIB_OBJECT} APPEND PROPERTY COMPILE_DEFINITIONS ${CURL_COVERAGE_MACROS})
     set_property(TARGET ${LIB_OBJECT} APPEND PROPERTY COMPILE_OPTIONS ${CURL_COVERAGE_CFLAGS})
@@ -165,6 +169,13 @@ if(BUILD_STATIC_LIBS)
         INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
     else()
       set_target_properties(${LIB_STATIC} PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
+    endif()
+  endif()
+  if(CURL_CLANG_TIDY)
+    if(BUILD_SHARED_LIBS)  # disable clang-tidy for static, and limit to the shared library, if both enabled
+      set_target_properties(${LIB_STATIC} PROPERTIES C_CLANG_TIDY "")
+    else()
+      set_target_properties(${LIB_STATIC} PROPERTIES UNITY_BUILD OFF)
     endif()
   endif()
   if(CURL_CODE_COVERAGE)
@@ -228,6 +239,9 @@ if(BUILD_SHARED_LIBS)
     else()
       set_target_properties(${LIB_SHARED} PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
     endif()
+  endif()
+  if(CURL_CLANG_TIDY)
+    set_target_properties(${LIB_SHARED} PROPERTIES UNITY_BUILD OFF)
   endif()
   if(CURL_CODE_COVERAGE)
     set_property(TARGET ${LIB_SHARED} APPEND PROPERTY COMPILE_DEFINITIONS ${CURL_COVERAGE_MACROS})

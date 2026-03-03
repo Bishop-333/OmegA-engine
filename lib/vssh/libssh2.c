@@ -21,7 +21,7 @@
  * SPDX-License-Identifier: curl
  *
  ***************************************************************************/
-#include "../curl_setup.h"
+#include "curl_setup.h"
 
 #ifdef USE_LIBSSH2
 
@@ -41,23 +41,23 @@
 #include <inet.h>
 #endif
 
-#include "../urldata.h"
-#include "../sendf.h"
-#include "../curl_trc.h"
-#include "../hostip.h"
-#include "../progress.h"
-#include "../transfer.h"
-#include "ssh.h"
-#include "../url.h"
-#include "../cfilters.h"
-#include "../connect.h"
-#include "../parsedate.h" /* for the week day and month names */
-#include "../multiif.h"
-#include "../select.h"
-#include "../curlx/fopen.h"
-#include "vssh.h"
-#include "../curlx/strparse.h"
-#include "../curlx/base64.h" /* for base64 encoding/decoding */
+#include "urldata.h"
+#include "sendf.h"
+#include "curl_trc.h"
+#include "hostip.h"
+#include "progress.h"
+#include "transfer.h"
+#include "vssh/ssh.h"
+#include "url.h"
+#include "cfilters.h"
+#include "connect.h"
+#include "parsedate.h" /* for the week day and month names */
+#include "multiif.h"
+#include "select.h"
+#include "curlx/fopen.h"
+#include "vssh/vssh.h"
+#include "curlx/strparse.h"
+#include "curlx/base64.h" /* for base64 encoding/decoding */
 
 static const char *sftp_libssh2_strerror(unsigned long err)
 {
@@ -2297,7 +2297,7 @@ static CURLcode ssh_state_sftp_close(struct Curl_easy *data,
 
   /* Check if nextstate is set and move .nextstate could be POSTQUOTE_INIT
      After nextstate is executed, the control should come back to
-     SSH_SFTP_CLOSE to pass the correct result back  */
+     SSH_SFTP_CLOSE to pass the correct result back */
   if(sshc->nextstate != SSH_NO_STATE &&
      sshc->nextstate != SSH_SFTP_CLOSE) {
     myssh_to(data, sshc, sshc->nextstate);

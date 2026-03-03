@@ -21,7 +21,7 @@
  * SPDX-License-Identifier: curl
  *
  ***************************************************************************/
-#include "../curl_setup.h"
+#include "curl_setup.h"
 
 #if defined(USE_GNUTLS) || defined(USE_WOLFSSL) || defined(USE_SCHANNEL) || \
   defined(USE_MBEDTLS) || defined(USE_RUSTLS)
@@ -36,12 +36,12 @@
 #define WANT_EXTRACT_CERTINFO /* uses Curl_extract_certinfo() */
 #endif
 
-#include "../urldata.h"
-#include "vtls.h"
-#include "../curl_trc.h"
-#include "../curlx/base64.h"
-#include "x509asn1.h"
-#include "../curlx/dynbuf.h"
+#include "urldata.h"
+#include "vtls/vtls.h"
+#include "curl_trc.h"
+#include "curlx/base64.h"
+#include "vtls/x509asn1.h"
+#include "curlx/dynbuf.h"
 
 /*
  * Constants.
@@ -983,7 +983,7 @@ static int do_pubkey(struct Curl_easy *data, int certnum, const char *algo,
     if(!certnum)
       infof(data, "   ECC Public Key (%zu bits)", len);
     if(data->set.ssl.certinfo) {
-      char q[sizeof(len) * 8 / 3 + 1];
+      char q[(sizeof(len) * 8 / 3) + 1];
       (void)curl_msnprintf(q, sizeof(q), "%zu", len);
       if(ssl_push_certinfo(data, certnum, "ECC Public Key", q))
         return 1;
@@ -1018,7 +1018,7 @@ static int do_pubkey(struct Curl_easy *data, int certnum, const char *algo,
     if(!certnum)
       infof(data, "   RSA Public Key (%zu bits)", len);
     if(data->set.ssl.certinfo) {
-      char r[sizeof(len) * 8 / 3 + 1];
+      char r[(sizeof(len) * 8 / 3) + 1];
       curl_msnprintf(r, sizeof(r), "%zu", len);
       if(ssl_push_certinfo(data, certnum, "RSA Public Key", r))
         return 1;

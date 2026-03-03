@@ -25,7 +25,7 @@
  * Source file for all OpenSSL-specific code for the TLS/SSL layer. No code
  * but vtls.c should ever call or use these functions.
  */
-#include "../curl_setup.h"
+#include "curl_setup.h"
 
 #if defined(USE_QUICHE) || defined(USE_OPENSSL)
 
@@ -62,28 +62,28 @@
 #undef OCSP_RESPONSE
 #endif
 
-#include "../urldata.h"
-#include "../curl_trc.h"
-#include "../httpsrr.h"
-#include "../formdata.h" /* for the boundary function */
-#include "../url.h" /* for the ssl config check function */
-#include "../curlx/inet_pton.h"
-#include "openssl.h"
-#include "../connect.h"
-#include "../progress.h"
-#include "vtls.h"
-#include "vtls_int.h"
-#include "vtls_scache.h"
-#include "../vauth/vauth.h"
-#include "keylog.h"
-#include "hostcheck.h"
-#include "../transfer.h"
-#include "../multiif.h"
-#include "../curlx/strerr.h"
-#include "../curlx/strparse.h"
-#include "../curlx/strcopy.h"
-#include "../curlx/strdup.h"
-#include "apple.h"
+#include "urldata.h"
+#include "curl_trc.h"
+#include "httpsrr.h"
+#include "formdata.h" /* for the boundary function */
+#include "url.h" /* for the ssl config check function */
+#include "curlx/inet_pton.h"
+#include "vtls/openssl.h"
+#include "connect.h"
+#include "progress.h"
+#include "vtls/vtls.h"
+#include "vtls/vtls_int.h"
+#include "vtls/vtls_scache.h"
+#include "vauth/vauth.h"
+#include "vtls/keylog.h"
+#include "vtls/hostcheck.h"
+#include "transfer.h"
+#include "multiif.h"
+#include "curlx/strerr.h"
+#include "curlx/strparse.h"
+#include "curlx/strcopy.h"
+#include "curlx/strdup.h"
+#include "vtls/apple.h"
 
 #include <openssl/rand.h>
 #include <openssl/x509v3.h>
@@ -389,6 +389,13 @@ static CURLcode get_pkey_dh(struct Curl_easy *data,
   return result;
 }
 
+#ifdef HAVE_OPENSSL3
+/* from OpenSSL commit fc756e594ed5a27af378 */
+typedef const X509_PUBKEY pubkeytype_t;
+#else
+typedef X509_PUBKEY pubkeytype_t;
+#endif
+
 static CURLcode ossl_certchain(struct Curl_easy *data, SSL *ssl)
 {
   CURLcode result;
@@ -453,7 +460,7 @@ static CURLcode ossl_certchain(struct Curl_easy *data, SSL *ssl)
 
     {
       const X509_ALGOR *sigalg = NULL;
-      X509_PUBKEY *xpubkey = NULL;
+      pubkeytype_t *xpubkey = NULL;
       ASN1_OBJECT *pubkeyoid = NULL;
 
       X509_get0_signature(&psig, &sigalg, x);
@@ -2564,9 +2571,11 @@ static void ossl_trace(int direction, int ssl_ver, int content_type,
      && content_type != SSL3_RT_INNER_CONTENT_TYPE
 #endif
     ) {
-    const char *msg_name, *tls_rt_name;
+    const char *msg_name = "Truncated message";
+    const char *tls_rt_name;
     char ssl_buf[1024];
-    int msg_type, txt_len;
+    int msg_type = 0;
+    int txt_len;
 
     /* the info given when the version is zero is not that useful for us */
 
@@ -2582,15 +2591,21 @@ static void ossl_trace(int direction, int ssl_ver, int content_type,
       tls_rt_name = "";
 
     if(content_type == SSL3_RT_CHANGE_CIPHER_SPEC) {
-      msg_type = *(const char *)buf;
-      msg_name = "Change cipher spec";
+      if(len) {
+        msg_type = *(const unsigned char *)buf;
+        msg_name = "Change cipher spec";
+      }
     }
     else if(content_type == SSL3_RT_ALERT) {
-      msg_type = (((const char *)buf)[0] << 8) + ((const char *)buf)[1];
-      msg_name = SSL_alert_desc_string_long(msg_type);
+      if(len >= 2) {
+        msg_type =
+          (((const unsigned char *)buf)[0] << 8) +
+           ((const unsigned char *)buf)[1];
+        msg_name = SSL_alert_desc_string_long(msg_type);
+      }
     }
-    else {
-      msg_type = *(const char *)buf;
+    else if(len) {
+      msg_type = *(const unsigned char *)buf;
       msg_name = ssl_msg_type(ssl_ver, msg_type);
     }
 
@@ -2904,8 +2919,8 @@ static CURLcode ossl_win_load_store(struct Curl_easy *data,
        * depending on what is found. For more details see
        * CertGetEnhancedKeyUsage doc.
        */
-      if(CertGetEnhancedKeyUsage(pContext, 0, NULL, &req_size)) {
-        if(req_size && req_size > enhkey_usage_size) {
+      if(CertGetEnhancedKeyUsage(pContext, 0, NULL, &req_size) && req_size) {
+        if(req_size > enhkey_usage_size) {
           void *tmp = curlx_realloc(enhkey_usage, req_size);
 
           if(!tmp) {
@@ -5369,7 +5384,7 @@ static CURLcode ossl_random(struct Curl_easy *data,
     if(!rand_enough())
       return CURLE_FAILED_INIT;
   }
-  /* RAND_bytes() returns 1 on success, 0 otherwise.  */
+  /* RAND_bytes() returns 1 on success, 0 otherwise. */
   rc = RAND_bytes(entropy, (ossl_valsize_t)curlx_uztosi(length));
   return rc == 1 ? CURLE_OK : CURLE_FAILED_INIT;
 }

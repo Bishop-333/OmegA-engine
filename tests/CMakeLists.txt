@@ -29,18 +29,21 @@ mark_as_advanced(TEST_NGHTTPX)
 # Consumed variables: TEST_NGHTTPX
 configure_file("config.in" "${CMAKE_CURRENT_BINARY_DIR}/config" @ONLY)
 
-add_custom_target(testdeps)
+add_custom_target(testbins)
 if(BUILD_CURL_EXE)
-  add_dependencies(testdeps "curlinfo")
+  add_dependencies(testbins "curlinfo")
 endif()
 if(CURL_BUILD_EVERYTHING)
-  set_target_properties(testdeps PROPERTIES EXCLUDE_FROM_ALL FALSE)
+  set_target_properties(testbins PROPERTIES EXCLUDE_FROM_ALL FALSE)
 endif()
 
 if(CURL_CLANG_TIDY)
   add_custom_target(tests-clang-tidy)
-  add_dependencies(testdeps tests-clang-tidy)
+  add_dependencies(testbins tests-clang-tidy)
 endif()
+
+add_custom_target(testdeps)
+add_dependencies(testdeps "testbins")
 
 add_subdirectory(http)
 add_subdirectory(server)
@@ -100,6 +103,7 @@ function(curl_add_pytests _targetname _test_flags)
       list(APPEND _depends "${EXE_NAME}" "curlinfo")
     endif()
     list(APPEND _depends "libtests")
+    list(APPEND _depends "build-certs")
   endif()
   string(REPLACE " " ";" _test_flags_list "${_test_flags}")
   add_custom_target(${_targetname}

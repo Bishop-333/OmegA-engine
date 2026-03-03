@@ -24,7 +24,7 @@
  * SPDX-License-Identifier: curl
  *
  ***************************************************************************/
-#include "../curl_setup.h"
+#include "curl_setup.h"
 
 #ifdef USE_LIBSSH
 
@@ -42,21 +42,21 @@
 #include <inet.h>
 #endif
 
-#include "../urldata.h"
-#include "../sendf.h"
-#include "../curl_trc.h"
-#include "../hostip.h"
-#include "../progress.h"
-#include "../transfer.h"
-#include "ssh.h"
-#include "../url.h"
-#include "../cfilters.h"
-#include "../connect.h"
-#include "../parsedate.h"          /* for the week day and month names */
-#include "../curlx/strparse.h"
-#include "../multiif.h"
-#include "../select.h"
-#include "vssh.h"
+#include "urldata.h"
+#include "sendf.h"
+#include "curl_trc.h"
+#include "hostip.h"
+#include "progress.h"
+#include "transfer.h"
+#include "vssh/ssh.h"
+#include "url.h"
+#include "cfilters.h"
+#include "connect.h"
+#include "parsedate.h"          /* for the week day and month names */
+#include "curlx/strparse.h"
+#include "multiif.h"
+#include "select.h"
+#include "vssh/vssh.h"
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -1227,7 +1227,7 @@ static int myssh_in_SFTP_CLOSE(struct Curl_easy *data,
 
   /* Check if nextstate is set and move .nextstate could be POSTQUOTE_INIT
      After nextstate is executed, the control should come back to
-     SSH_SFTP_CLOSE to pass the correct result back  */
+     SSH_SFTP_CLOSE to pass the correct result back */
   if(sshc->nextstate != SSH_NO_STATE &&
      sshc->nextstate != SSH_SFTP_CLOSE) {
     myssh_to(data, sshc, sshc->nextstate);

@@ -31,12 +31,15 @@ concurrency:
 
 permissions: {}
 
-# Deprecated Apple APIs and the macos-version-min value required to avoid
-# deprecation warnings with llvm/clang:
+# Apple APIs and the macos-version-min value required to avoid deprecation
+# warnings with llvm/clang, and/or the feature getting enabled at build-time
+# or runtime:
 #
-# - 10.7  Lion (2011)          - GSS
-# - 10.9  Mavericks (2013)     - LDAP
-#
+# - 10.7   Lion (2011)          - GSS (build-time, deprecated MIT Kerberos shim)
+# - 10.9   Mavericks (2013)     - LDAP (build-time, deprecated), OCSP (runtime)
+# - 10.11  El Capitan (2015)    - connectx() (runtime)
+# - 10.12  Sierra (2016)        - clock_gettime() (build-time, runtime)
+# - 10.14  Mojave (2018)        - SecTrustEvaluateWithError() (runtime)
 
 env:
   CURL_CI: github
@@ -198,7 +201,7 @@ jobs:
 
   macos:
     name: "${{ matrix.build.generate && 'CM' || 'AM' }} ${{ matrix.build.compiler }} ${{ matrix.build.name }}"
-    runs-on: macos-15
+    runs-on: ${{ matrix.build.image || 'macos-15' }}
     timeout-minutes: 15
     env:
       DEVELOPER_DIR: "/Applications/Xcode${{ matrix.build.xcode && format('_{0}', matrix.build.xcode) || '' }}.app/Contents/Developer"
@@ -267,9 +270,10 @@ jobs:
             install: libnghttp3 libngtcp2 gsasl rtmpdump
             generate: -DOPENSSL_ROOT_DIR=/opt/homebrew/opt/openssl -DCURL_USE_GSASL=ON -DUSE_LIBRTMP=ON -DUSE_APPLE_IDN=ON -DUSE_NGTCP2=ON -DCURL_DISABLE_VERBOSE_STRINGS=ON -DUSE_APPLE_SECTRUST=ON
           - name: 'MultiSSL AppleIDN clang-tidy +examples'
+            image: macos-26
             compiler: clang
             install: llvm gnutls nettle libressl krb5 mbedtls gsasl rustls-ffi rtmpdump libssh fish
-            install_steps: clang-tidy skiprun
+            install_steps: skiprun
             chkprefill: _chkprefill
             generate: >-
               -DCURL_USE_OPENSSL=ON -DOPENSSL_ROOT_DIR=/opt/homebrew/opt/libressl -DCURL_DEFAULT_SSL_BACKEND=openssl
@@ -281,9 +285,10 @@ jobs:
               -DCURL_COMPLETION_FISH=ON -DCURL_COMPLETION_ZSH=ON
 
           - name: 'HTTP/3 clang-tidy'
+            image: macos-26
             compiler: clang
             install: llvm libnghttp3 libngtcp2 openldap krb5
-            install_steps: clang-tidy skipall
+            install_steps: skipall
             generate: >-
               -DCURL_USE_OPENSSL=ON -DOPENSSL_ROOT_DIR=/opt/homebrew/opt/openssl -DUSE_NGTCP2=ON
               -DLDAP_INCLUDE_DIR=/opt/homebrew/opt/openldap/include -DLDAP_LIBRARY=/opt/homebrew/opt/openldap/lib/libldap.dylib -DLDAP_LBER_LIBRARY=/opt/homebrew/opt/openldap/lib/liblber.dylib

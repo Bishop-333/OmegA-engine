@@ -774,6 +774,18 @@ static CURLcode rtsp_filter_rtp(struct Curl_easy *data,
         break;
       rtp_buf = curlx_dyn_ptr(&rtspc->buf);
       rtspc->rtp_len = RTP_PKT_LENGTH(rtp_buf) + 4;
+      if(rtspc->rtp_len == 4) {
+        /* zero-length payload, the 4-byte header is the complete RTP
+           message. Dispatch immediately without entering RTP_PARSE_DATA. */
+        DEBUGF(infof(data, "RTP write channel %d rtp_len %zu (no payload)",
+                     rtspc->rtp_channel, rtspc->rtp_len));
+        result = rtp_client_write(data, rtp_buf, rtspc->rtp_len);
+        curlx_dyn_free(&rtspc->buf);
+        rtspc->state = RTP_PARSE_SKIP;
+        if(result)
+          goto out;
+        break;
+      }
       rtspc->state = RTP_PARSE_DATA;
       break;
     }
@@ -902,8 +914,8 @@ static CURLcode rtsp_rtp_write_resp(struct Curl_easy *data,
   /* we SHOULD have consumed all bytes, unless the response is borked.
    * In which case we write out the left over bytes, letting the client
    * writer deal with it (it will report EXCESS and fail the transfer). */
-  DEBUGF(infof(data, "rtsp_rtp_write_resp(len=%zu, in_header=%d, done=%d "
-               " rtspc->state=%d, req.size=%" FMT_OFF_T ")",
+  DEBUGF(infof(data, "rtsp_rtp_write_resp(len=%zu, in_header=%d, done=%d, "
+               "rtspc->state=%d, req.size=%" FMT_OFF_T ")",
                blen, rtspc->in_header, data->req.done, rtspc->state,
                data->req.size));
   if(!result && (is_eos || blen)) {

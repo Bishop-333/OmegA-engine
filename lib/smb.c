@@ -548,7 +548,7 @@ static CURLcode smb_recv_message(struct Curl_easy *data,
 
   if(nbt_size >= msg_size + 1) {
     /* Add the word count */
-    msg_size += 1 + ((unsigned char)buf[msg_size]) * sizeof(unsigned short);
+    msg_size += 1 + (((unsigned char)buf[msg_size]) * sizeof(unsigned short));
     if(nbt_size >= msg_size + sizeof(unsigned short)) {
       /* Add the byte count */
       msg_size += sizeof(unsigned short) +
@@ -1249,7 +1249,7 @@ const struct Curl_scheme Curl_scheme_smb = {
  */
 const struct Curl_scheme Curl_scheme_smbs = {
   "smbs",                               /* scheme */
-#if defined(CURL_DISABLE_SMB) || !defined(USE_CURL_NTLM_CORE) ||        \
+#if defined(CURL_DISABLE_SMB) || !defined(USE_CURL_NTLM_CORE) || \
   !defined(USE_SSL)
   ZERO_NULL,
 #else

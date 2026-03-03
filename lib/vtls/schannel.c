@@ -27,7 +27,7 @@
  * Source file for all Schannel-specific code for the TLS/SSL layer. No code
  * but vtls.c should ever call or use these functions.
  */
-#include "../curl_setup.h"
+#include "curl_setup.h"
 
 #ifdef USE_SCHANNEL
 
@@ -35,25 +35,25 @@
 #error "cannot compile Schannel support without SSPI."
 #endif
 
-#include "schannel.h"
-#include "schannel_int.h"
-#include "vtls.h"
-#include "vtls_int.h"
-#include "vtls_scache.h"
-#include "../curl_trc.h"
-#include "../connect.h" /* for the connect timeout */
-#include "../curlx/strdup.h"
-#include "../strerror.h"
-#include "../select.h" /* for the socket readiness */
-#include "../curlx/fopen.h"
-#include "../curlx/multibyte.h"
-#include "x509asn1.h"
-#include "../system_win32.h"
-#include "../curlx/version_win32.h"
-#include "../rand.h"
-#include "../curlx/strparse.h"
-#include "../progress.h"
-#include "../curl_sha256.h"
+#include "vtls/schannel.h"
+#include "vtls/schannel_int.h"
+#include "vtls/vtls.h"
+#include "vtls/vtls_int.h"
+#include "vtls/vtls_scache.h"
+#include "curl_trc.h"
+#include "connect.h" /* for the connect timeout */
+#include "curlx/strdup.h"
+#include "strerror.h"
+#include "select.h" /* for the socket readiness */
+#include "curlx/fopen.h"
+#include "curlx/multibyte.h"
+#include "vtls/x509asn1.h"
+#include "system_win32.h"
+#include "curlx/version_win32.h"
+#include "rand.h"
+#include "curlx/strparse.h"
+#include "progress.h"
+#include "curl_sha256.h"
 
 /* Some verbose debug messages are wrapped by SCH_DEV() instead of DEBUGF()
  * and only shown if CURL_SCHANNEL_DEV_DEBUG was defined at build time. These
@@ -407,7 +407,7 @@ static CURLcode get_client_cert(struct Curl_easy *data,
     if((fInCert || blob) && data->set.ssl.cert_type &&
        !curl_strequal(data->set.ssl.cert_type, "P12")) {
       failf(data, "schannel: certificate format compatibility error "
-            " for %s",
+            "for %s",
             blob ? "(memory blob)" : data->set.ssl.primary.clientcert);
       curlx_free(cert_store_path);
       if(fInCert)
@@ -416,7 +416,7 @@ static CURLcode get_client_cert(struct Curl_easy *data,
     }
 
     if(fInCert || blob) {
-      /* Reading a .P12 or .pfx file, like the example at bottom of
+      /* Reading a .p12 or .pfx file, like the example at bottom of
          https://learn.microsoft.com/archive/msdn-technet-forums/3e7bc95f-b21a-4bcd-bd2c-7f996718cae5
       */
       CRYPT_DATA_BLOB datablob;
@@ -2030,8 +2030,8 @@ static CURLcode schannel_send(struct Curl_cfilter *cf, struct Curl_easy *data,
       timediff_t timeout_ms = Curl_timeleft_ms(data);
       if(timeout_ms < 0) {
         /* we already got the timeout */
-        failf(data, "schannel: timed out sending data "
-              "(bytes sent: %zu)", *pnwritten);
+        failf(data, "schannel: timed out sending data (bytes sent: %zu)",
+              *pnwritten);
         result = CURLE_OPERATION_TIMEDOUT;
         break;
       }
@@ -2045,8 +2045,8 @@ static CURLcode schannel_send(struct Curl_cfilter *cf, struct Curl_easy *data,
         break;
       }
       else if(what == 0) {
-        failf(data, "schannel: timed out sending data "
-              "(bytes sent: %zu)", *pnwritten);
+        failf(data, "schannel: timed out sending data (bytes sent: %zu)",
+              *pnwritten);
         result = CURLE_OPERATION_TIMEDOUT;
         break;
       }

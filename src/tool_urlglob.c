@@ -93,7 +93,7 @@ static CURLcode glob_set(struct URLGlob *glob, const char **patternp,
 {
   /* processes a set expression with the point behind the opening '{'
      ','-separated elements are collected until the next closing '}'
-  */
+   */
   struct URLPattern *pat;
   bool done = FALSE;
   const char *pattern = *patternp;
@@ -217,7 +217,7 @@ static CURLcode glob_range(struct URLGlob *glob, const char **patternp,
      - num range: e.g. "0-9]", "17-2000]"
      - num range with leading zeros: e.g. "001-999]"
      expression is checked for well-formedness and collected until the next ']'
-  */
+   */
   struct URLPattern *pat;
   const char *pattern = *patternp;
   const char *c;
@@ -269,11 +269,11 @@ static CURLcode glob_range(struct URLGlob *glob, const char **patternp,
 
     /* if there was a ":[num]" thing, use that as step or else use 1 */
     pat->c.ascii.step = step;
-    pat->c.ascii.letter = pat->c.ascii.min = min_c;
-    pat->c.ascii.max = max_c;
+    pat->c.ascii.letter = pat->c.ascii.min = (unsigned char)min_c;
+    pat->c.ascii.max = (unsigned char)max_c;
 
-    if(multiply(amount, ((pat->c.ascii.max - pat->c.ascii.min) /
-                         pat->c.ascii.step + 1)))
+    if(multiply(amount, (((pat->c.ascii.max - pat->c.ascii.min) /
+                         pat->c.ascii.step) + 1)))
       return globerror(glob, "range overflow", *posp, CURLE_URL_MALFORMAT);
   }
   else if(ISDIGIT(*pattern)) {
@@ -328,8 +328,8 @@ static CURLcode glob_range(struct URLGlob *glob, const char **patternp,
     pat->c.num.max = max_n;
     pat->c.num.step = step_n;
 
-    if(multiply(amount, ((pat->c.num.max - pat->c.num.min) /
-                         pat->c.num.step + 1)))
+    if(multiply(amount, (((pat->c.num.max - pat->c.num.min) /
+                         pat->c.num.step) + 1)))
       return globerror(glob, "range overflow", *posp, CURLE_URL_MALFORMAT);
   }
   else
@@ -460,7 +460,7 @@ static CURLcode glob_parse(struct URLGlob *glob, const char *pattern,
       curlx_dyn_reset(&glob->buf);
     }
     else {
-      if(!*pattern) /* done  */
+      if(!*pattern) /* done */
         break;
       else if(*pattern == '{') {
         /* process set pattern */

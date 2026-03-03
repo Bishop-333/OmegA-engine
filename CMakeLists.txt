@@ -273,7 +273,6 @@ if(CURL_CLANG_TIDY)
     set(PICKY_COMPILER OFF)  # Do a best effort and skip passing non-clang warning options to clang-tidy.
     # This lets through warning options enabled via CURL_WERROR=ON, affecting lib and src.
   endif()
-  set(CMAKE_UNITY_BUILD OFF)  # clang-tidy is not looking into #included sources, thus not compatible with unity builds.
   set(CURL_DISABLE_TYPECHECK ON)  # to improve performance and avoid potential interference.
   set(CMAKE_C_CLANG_TIDY "${CLANG_TIDY}")
   list(APPEND CMAKE_C_CLANG_TIDY "--config-file=${PROJECT_SOURCE_DIR}/.clang-tidy.yml")
@@ -883,6 +882,10 @@ if(CURL_USE_WOLFSSL)
     set(_valid_default_ssl_backend TRUE)
   endif()
   set(_curl_ca_bundle_supported TRUE)
+
+  if(USE_OPENSSL AND WOLFSSL_VERSION VERSION_LESS 5.7.6)
+    message(FATAL_ERROR "wolfSSL 5.7.6 or newer is required to coexist with OpenSSL.")
+  endif()
 
   set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS "WOLFSSL_OPTIONS_IGNORE_SYS")
 endif()
@@ -2336,8 +2339,7 @@ if(NOT CURL_DISABLE_INSTALL)
     FILES_MATCHING PATTERN "*.h")
 
   include(CMakePackageConfigHelpers)
-  write_basic_package_version_file(
-    "${_version_config}"
+  write_basic_package_version_file("${_version_config}"
     VERSION ${_curl_version}
     COMPATIBILITY SameMajorVersion)
   file(READ "${_version_config}" _generated_version_config)

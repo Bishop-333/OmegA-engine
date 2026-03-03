@@ -21,11 +21,11 @@
  * SPDX-License-Identifier: curl
  *
  ***************************************************************************/
-#include "timeval.h"
+#include "curlx/timeval.h"
 
 #ifdef _WIN32
 
-#include "../system_win32.h"
+#include "system_win32.h"
 
 LARGE_INTEGER Curl_freq;
 
@@ -191,9 +191,8 @@ timediff_t curlx_ptimediff_ms(const struct curltime *newer,
     return TIMEDIFF_T_MAX;
   else if(diff <= (TIMEDIFF_T_MIN / 1000))
     return TIMEDIFF_T_MIN;
-  return diff * 1000 + (newer->tv_usec - older->tv_usec) / 1000;
+  return (diff * 1000) + ((newer->tv_usec - older->tv_usec) / 1000);
 }
-
 
 timediff_t curlx_timediff_ms(struct curltime newer, struct curltime older)
 {
@@ -212,7 +211,7 @@ timediff_t curlx_timediff_ceil_ms(struct curltime newer,
     return TIMEDIFF_T_MAX;
   else if(diff <= (TIMEDIFF_T_MIN / 1000))
     return TIMEDIFF_T_MIN;
-  return diff * 1000 + (newer.tv_usec - older.tv_usec + 999) / 1000;
+  return (diff * 1000) + ((newer.tv_usec - older.tv_usec + 999) / 1000);
 }
 
 /*
@@ -227,7 +226,7 @@ timediff_t curlx_ptimediff_us(const struct curltime *newer,
     return TIMEDIFF_T_MAX;
   else if(diff <= (TIMEDIFF_T_MIN / 1000000))
     return TIMEDIFF_T_MIN;
-  return diff * 1000000 + newer->tv_usec - older->tv_usec;
+  return (diff * 1000000) + newer->tv_usec - older->tv_usec;
 }
 
 timediff_t curlx_timediff_us(struct curltime newer, struct curltime older)

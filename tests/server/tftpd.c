@@ -146,8 +146,8 @@ struct bf {
   tftphdr_storage_t buf;  /* room for data packet */
 };
 
-#define BF_ALLOC -3       /* allocated but not yet filled */
-#define BF_FREE  -2       /* free */
+#define BF_ALLOC (-3)       /* allocated but not yet filled */
+#define BF_FREE  (-2)       /* free */
 
 #define opcode_RRQ   1
 #define opcode_WRQ   2
@@ -359,7 +359,7 @@ static void read_ahead(struct testcase *test,
     }
     else {
       if(test->rcount) {
-        c = test->rptr[0];
+        c = (unsigned char)test->rptr[0];
         test->rptr++;
         test->rcount--;
       }
@@ -451,7 +451,7 @@ static ssize_t write_behind(struct testcase *test, int convert)
   p = writebuf;
   ct = count;
   while(ct--) {                   /* loop over the buffer */
-    c = *p++;                     /* pick up a character */
+    c = (unsigned char)*p++;      /* pick up a character */
     if(prevchar == '\r') {        /* if prev char was cr */
       if(c == '\n')               /* if have cr,lf then just */
         curl_lseek(test->ofile, -1, SEEK_CUR); /* smash lf on top of the cr */
@@ -1167,6 +1167,7 @@ static int test_tftpd(int argc, const char **argv)
        port we actually got and update the listener port value with it. */
     curl_socklen_t la_size;
     srvr_sockaddr_union_t localaddr;
+    memset(&localaddr, 0, sizeof(localaddr));
 #ifdef USE_IPV6
     if(!use_ipv6)
 #endif
@@ -1175,7 +1176,6 @@ static int test_tftpd(int argc, const char **argv)
     else
       la_size = sizeof(localaddr.sa6);
 #endif
-    memset(&localaddr.sa, 0, (size_t)la_size);
     if(getsockname(sock, &localaddr.sa, &la_size) < 0) {
       error = SOCKERRNO;
       logmsg("getsockname() failed with error (%d) %s",

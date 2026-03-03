@@ -269,7 +269,7 @@ CURL_EXTERN CURLMsg *curl_multi_info_read(CURLM *multi_handle,
  *
  * Returns: A pointer to a null-terminated error message.
  */
-CURL_EXTERN const char *curl_multi_strerror(CURLMcode);
+CURL_EXTERN const char *curl_multi_strerror(CURLMcode error);
 
 /*
  * Name:    curl_multi_socket() and
@@ -329,7 +329,7 @@ curl_multi_socket_all(CURLM *multi_handle, int *running_handles);
 /* This macro below was added in 7.16.3 to push users who recompile to use
  * the new curl_multi_socket_action() instead of the old curl_multi_socket()
  */
-#define curl_multi_socket(x,y,z) curl_multi_socket_action(x,y,0,z)
+#define curl_multi_socket(x, y, z) curl_multi_socket_action(x, y, 0, z)
 #endif
 
 /*

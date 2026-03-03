@@ -17,9 +17,7 @@
  *
  * SPDX-License-Identifier: ISC
  */
-#include "../curl_setup.h"
-
-#include "strparse.h"
+#include "curl_setup.h"
 
 #ifndef HAVE_INET_PTON
 
@@ -33,7 +31,8 @@
 #include <arpa/inet.h>
 #endif
 
-#include "inet_pton.h"
+#include "curlx/inet_pton.h"
+#include "curlx/strparse.h"
 
 #define IN6ADDRSZ       16
 #define INADDRSZ         4
@@ -71,7 +70,7 @@ static int inet_pton4(const char *src, unsigned char *dst)
   octets = 0;
   tp = tmp;
   *tp = 0;
-  while((ch = *src++) != '\0') {
+  while((ch = (unsigned char)*src++) != '\0') {
     if(ISDIGIT(ch)) {
       unsigned int val = (*tp * 10) + (ch - '0');
 
@@ -130,7 +129,7 @@ static int inet_pton6(const char *src, unsigned char *dst)
   curtok = src;
   saw_xdigit = 0;
   val = 0;
-  while((ch = *src++) != '\0') {
+  while((ch = (unsigned char)*src++) != '\0') {
     if(ISXDIGIT(ch)) {
       val <<= 4;
       val |= curlx_hexval(ch);
