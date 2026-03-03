@@ -107,7 +107,7 @@ CURLcode Curl_setblobopt(struct curl_blob **blobp,
 
   if(blob) {
     struct curl_blob *nblob;
-    if(blob->len > CURL_MAX_INPUT_LENGTH)
+    if(!blob->len || (blob->len > CURL_MAX_INPUT_LENGTH))
       return CURLE_BAD_FUNCTION_ARGUMENT;
     nblob = (struct curl_blob *)
       curlx_malloc(sizeof(struct curl_blob) +
@@ -128,7 +128,8 @@ CURLcode Curl_setblobopt(struct curl_blob **blobp,
   return CURLE_OK;
 }
 
-static CURLcode setstropt_userpwd(char *option, char **userp, char **passwdp)
+static CURLcode setstropt_userpwd(const char *option, char **userp,
+                                  char **passwdp)
 {
   char *user = NULL;
   char *passwd = NULL;
@@ -189,8 +190,8 @@ static CURLcode setstropt_interface(char *option, char **devp,
 }
 
 #ifdef USE_SSL
-#define C_SSLVERSION_VALUE(x)     (x & 0xffff)
-#define C_SSLVERSION_MAX_VALUE(x) ((unsigned long)x & 0xffff0000)
+#define C_SSLVERSION_VALUE(x)     ((x) & 0xffff)
+#define C_SSLVERSION_MAX_VALUE(x) ((unsigned long)(x) & 0xffff0000)
 #endif
 
 static CURLcode protocol2num(const char *str, curl_prot_t *val)
@@ -1664,7 +1665,7 @@ static CURLcode cookiefile(struct Curl_easy *data, const char *ptr)
 
 #ifndef CURL_DISABLE_PROXY
 static CURLcode setopt_cptr_proxy(struct Curl_easy *data, CURLoption option,
-                                  char *ptr)
+                                  const char *ptr)
 {
   CURLcode result = CURLE_OK;
   struct UserDefined *s = &data->set;
@@ -1832,6 +1833,46 @@ static CURLcode setopt_cptr_proxy(struct Curl_easy *data, CURLoption option,
 }
 #endif
 
+#if !defined(CURL_DISABLE_HTTP) || !defined(CURL_DISABLE_MQTT)
+/*
+ * A string with POST data. Makes curl HTTP POST. Even if it is NULL. If
+ * needed, CURLOPT_POSTFIELDSIZE must have been set prior to
+ * CURLOPT_COPYPOSTFIELDS and not altered later.
+ */
+static CURLcode setopt_copypostfields(const char *ptr, struct UserDefined *s)
+{
+  CURLcode result = CURLE_OK;
+  if(!ptr || s->postfieldsize == -1)
+    result = Curl_setstropt(&s->str[STRING_COPYPOSTFIELDS], ptr);
+  else {
+    size_t pflen;
+
+    if(s->postfieldsize < 0)
+      return CURLE_BAD_FUNCTION_ARGUMENT;
+    pflen = curlx_sotouz_range(s->postfieldsize, 0, SIZE_MAX);
+    if(pflen == SIZE_MAX)
+      return CURLE_OUT_OF_MEMORY;
+    else {
+      /* Allocate even when size == 0. This satisfies the need of possible
+         later address compare to detect the COPYPOSTFIELDS mode, and to mark
+         that postfields is used rather than read function or form data.
+      */
+      char *p = curlx_memdup0(ptr, pflen);
+      if(!p)
+        return CURLE_OUT_OF_MEMORY;
+      else {
+        curlx_free(s->str[STRING_COPYPOSTFIELDS]);
+        s->str[STRING_COPYPOSTFIELDS] = p;
+      }
+    }
+  }
+
+  s->postfields = s->str[STRING_COPYPOSTFIELDS];
+  s->method = HTTPREQ_POST;
+  return result;
+}
+#endif
+
 static CURLcode setopt_cptr(struct Curl_easy *data, CURLoption option,
                             char *ptr)
 {
@@ -1901,40 +1942,7 @@ static CURLcode setopt_cptr(struct Curl_easy *data, CURLoption option,
 
 #if !defined(CURL_DISABLE_HTTP) || !defined(CURL_DISABLE_MQTT)
   case CURLOPT_COPYPOSTFIELDS:
-    /*
-     * A string with POST data. Makes curl HTTP POST. Even if it is NULL.
-     * If needed, CURLOPT_POSTFIELDSIZE must have been set prior to
-     * CURLOPT_COPYPOSTFIELDS and not altered later.
-     */
-    if(!ptr || s->postfieldsize == -1)
-      result = Curl_setstropt(&s->str[STRING_COPYPOSTFIELDS], ptr);
-    else {
-      size_t pflen;
-
-      if(s->postfieldsize < 0)
-        return CURLE_BAD_FUNCTION_ARGUMENT;
-      pflen = curlx_sotouz_range(s->postfieldsize, 0, SIZE_MAX);
-      if(pflen == SIZE_MAX)
-        return CURLE_OUT_OF_MEMORY;
-      else {
-        /* Allocate even when size == 0. This satisfies the need of possible
-           later address compare to detect the COPYPOSTFIELDS mode, and to
-           mark that postfields is used rather than read function or form
-           data.
-        */
-        char *p = curlx_memdup0(ptr, pflen);
-        if(!p)
-          return CURLE_OUT_OF_MEMORY;
-        else {
-          curlx_free(s->str[STRING_COPYPOSTFIELDS]);
-          s->str[STRING_COPYPOSTFIELDS] = p;
-        }
-      }
-    }
-
-    s->postfields = s->str[STRING_COPYPOSTFIELDS];
-    s->method = HTTPREQ_POST;
-    break;
+    return setopt_copypostfields(ptr, s);
 
   case CURLOPT_POSTFIELDS:
     /*

@@ -26,7 +26,7 @@
  * but vtls.c should ever call or use these functions.
  *
  */
-#include "../curl_setup.h"
+#include "curl_setup.h"
 
 #ifdef USE_WOLFSSL
 
@@ -35,6 +35,9 @@
 
 #if LIBWOLFSSL_VERSION_HEX < 0x03004006 /* wolfSSL 3.4.6 (2015) */
 #error "wolfSSL version should be at least 3.4.6"
+#endif
+#if defined(OPENSSL_COEXIST) && LIBWOLFSSL_VERSION_HEX < 0x05007006
+#error "wolfSSL 5.7.6 or newer is required to coexist with OpenSSL"
 #endif
 
 /* To determine what functions are available we rely on one or both of:
@@ -50,22 +53,23 @@
 #endif
 #endif
 
-#include "../urldata.h"
-#include "../curl_trc.h"
-#include "../httpsrr.h"
-#include "vtls.h"
-#include "vtls_int.h"
-#include "vtls_scache.h"
-#include "keylog.h"
-#include "../connect.h" /* for the connect timeout */
-#include "../progress.h"
-#include "../curlx/strdup.h"
-#include "../curlx/strcopy.h"
-#include "x509asn1.h"
+#include "urldata.h"
+#include "curl_trc.h"
+#include "httpsrr.h"
+#include "vtls/vtls.h"
+#include "vtls/vtls_int.h"
+#include "vtls/vtls_scache.h"
+#include "vtls/keylog.h"
+#include "connect.h" /* for the connect timeout */
+#include "progress.h"
+#include "curlx/strdup.h"
+#include "curlx/strcopy.h"
+#include "vtls/x509asn1.h"
 
 #include <wolfssl/ssl.h>
 #include <wolfssl/error-ssl.h>
-#include "wolfssl.h"
+
+#include "vtls/wolfssl.h"
 
 /* KEEP_PEER_CERT is a product of the presence of build time symbol
    OPENSSL_EXTRA without NO_CERTS, depending on the version. KEEP_PEER_CERT is
@@ -1423,7 +1427,6 @@ CURLcode Curl_wssl_ctx_init(struct wssl_ctx *wctx,
       result = CURLE_SSL_CONNECT_ERROR;
       goto out;
     }
-
   }
 #endif /* HAVE_WOLFSSL_CTX_GENERATEECHCONFIG */
 

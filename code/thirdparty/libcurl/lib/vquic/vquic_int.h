@@ -23,11 +23,11 @@
  * SPDX-License-Identifier: curl
  *
  ***************************************************************************/
-#include "../curl_setup.h"
+#include "curl_setup.h"
 
 #ifdef USE_HTTP3
 
-#include "../bufq.h"
+#include "bufq.h"
 
 #define MAX_UDP_PAYLOAD_SIZE  1452
 
@@ -78,7 +78,7 @@ struct cf_quic_ctx {
 };
 
 #define H3_STREAM_CTX(ctx, data)                                        \
-  (data ? Curl_uint32_hash_get(&(ctx)->streams, (data)->mid) : NULL)
+  ((data) ? Curl_uint32_hash_get(&(ctx)->streams, (data)->mid) : NULL)
 
 CURLcode vquic_ctx_init(struct Curl_easy *data,
                         struct cf_quic_ctx *qctx);

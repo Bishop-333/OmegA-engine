@@ -3380,7 +3380,7 @@ static void multi_timeout(struct Curl_multi *multi,
   }
 
 #ifdef CURLVERBOSE
-  if(data && CURL_TRC_TIMER_is_verbose(data)) {
+  if(CURL_TRC_TIMER_is_verbose(data)) {
     struct Curl_llist_node *e = Curl_llist_head(&data->state.timeoutlist);
     if(e) {
       struct time_node *n = Curl_node_elem(e);
@@ -3725,7 +3725,7 @@ CURL **curl_multi_get_handles(CURLM *m)
 {
   struct Curl_multi *multi = m;
   void *entry;
-  unsigned int count = Curl_uint32_tbl_count(&multi->xfers);
+  size_t count = Curl_uint32_tbl_count(&multi->xfers);
   CURL **a = curlx_malloc(sizeof(struct Curl_easy *) * (count + 1));
   if(a) {
     unsigned int i = 0;
@@ -3954,7 +3954,7 @@ struct Curl_easy *Curl_multi_get_easy(struct Curl_multi *multi,
                                       uint32_t mid)
 {
   struct Curl_easy *data = Curl_uint32_tbl_get(&multi->xfers, mid);
-  if(data && GOOD_EASY_HANDLE(data))
+  if(GOOD_EASY_HANDLE(data))
     return data;
   CURL_TRC_M(multi->admin, "invalid easy handle in xfer table for mid=%u",
              mid);

@@ -229,7 +229,8 @@ target_link_libraries(my_target PRIVATE CURL::libcurl)
                                             Set `QUICK` to build examples quickly with the `curl-examples-build` target (for build tests).
                                             Set `NOEXAMPLES` to not build examples.
 - `CURL_CLANG_TIDY`:                        Run the build through `clang-tidy`. Default: `OFF`
-                                            If enabled, it implies `CMAKE_UNITY_BUILD=OFF` and `CURL_DISABLE_TYPECHECK=ON`.
+                                            If enabled, it implies `CURL_DISABLE_TYPECHECK=ON` and force-disables unity mode
+                                            for libcurl and the curl tool.
 - `CURL_CLANG_TIDYFLAGS`:                   Custom options to pass to `clang-tidy`. Default: (empty)
 - `CURL_CODE_COVERAGE`:                     Enable code coverage build options. Default: `OFF`
 - `CURL_COMPLETION_FISH`:                   Install fish completions. Default: `OFF`
@@ -551,9 +552,10 @@ Note: These variables are internal and subject to change.
 
 ## Useful build targets
 
-- `testdeps`:               Build test dependencies (servers, tools, test certificates).
+- `testbins`:               Build test binaries (servers, tools).
                             Individual targets: `curlinfo`, `libtests`, `servers`, `tunits`, `units`
-                            Test certificates: `build-certs`, `clean-certs`
+- `testdeps`:               Build test dependencies (test binaries, test certificates).
+                            Test certificates: `build-certs` (clean with `clean-certs`)
 - `tests`:                  Run tests (`runtests.pl`). Customize via the `TFLAGS` environment variable, e.g. `TFLAGS=1621`.
                             Other flavors: `test-am`, `test-ci`, `test-event`, `test-full`, `test-nonflaky`, `test-quiet`, `test-torture`
 - `curl-pytest`:            Run tests (pytest).
@@ -563,6 +565,7 @@ Note: These variables are internal and subject to change.
                             where <name> is the .c filename without extension.
 - `curl-examples-build`:    Build examples quickly but without the ability to run them. (for build tests)
 - `curl-man`:               Build man pages. (built by default unless disabled)
+- `curl`:                   Build curl tool.
 - `curl_uninstall`:         Uninstall curl.
 - `curl-completion-fish`:   Build shell completions for fish. (built by default if enabled)
 - `curl-completion-zsh`:    Build shell completions for zsh. (built by default if enabled)

@@ -24,18 +24,18 @@
  * RFC7616 DIGEST-SHA256, DIGEST-SHA512-256 authentication
  *
  ***************************************************************************/
-#include "../curl_setup.h"
+#include "curl_setup.h"
 
 #ifndef CURL_DISABLE_DIGEST_AUTH
 
-#include "vauth.h"
-#include "digest.h"
-#include "../curlx/base64.h"
-#include "../curl_md5.h"
-#include "../curl_sha256.h"
-#include "../curl_sha512_256.h"
-#include "../curlx/strparse.h"
-#include "../rand.h"
+#include "vauth/vauth.h"
+#include "vauth/digest.h"
+#include "curlx/base64.h"
+#include "curl_md5.h"
+#include "curl_sha256.h"
+#include "curl_sha512_256.h"
+#include "curlx/strparse.h"
+#include "rand.h"
 
 #ifndef USE_WINDOWS_SSPI
 #define SESSION_ALGO 1 /* for algos with this bit set */
@@ -341,9 +341,9 @@ CURLcode Curl_auth_create_digest_md5_message(struct Curl_easy *data,
   struct MD5_context *ctxt;
   char *response = NULL;
   unsigned char digest[MD5_DIGEST_LEN];
-  char HA1_hex[2 * MD5_DIGEST_LEN + 1];
-  char HA2_hex[2 * MD5_DIGEST_LEN + 1];
-  char resp_hash_hex[2 * MD5_DIGEST_LEN + 1];
+  char HA1_hex[(2 * MD5_DIGEST_LEN) + 1];
+  char HA2_hex[(2 * MD5_DIGEST_LEN) + 1];
+  char resp_hash_hex[(2 * MD5_DIGEST_LEN) + 1];
   char nonce[64];
   char realm[128];
   char algorithm[64];

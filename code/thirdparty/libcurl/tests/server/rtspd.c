@@ -180,7 +180,7 @@ static int rtspd_ProcessRequest(struct rtspd_httprequest *req)
       return 1;
     }
 
-    req->prot_version = prot_major * 10 + prot_minor;
+    req->prot_version = (prot_major * 10) + prot_minor;
 
     /* find the last slash */
     ptr = strrchr(doc, '/');
@@ -317,6 +317,7 @@ static int rtspd_ProcessRequest(struct rtspd_httprequest *req)
 
                 /* Fill it with junk data */
                 for(i = 0; i < rtp_size; i += RTP_DATA_SIZE) {
+                  /* NOLINTNEXTLINE(bugprone-not-null-terminated-result) */
                   memcpy(rtp_scratch + 4 + i, RTP_DATA, RTP_DATA_SIZE);
                 }
 
@@ -1161,6 +1162,7 @@ static int test_rtspd(int argc, const char *argv[])
        port we actually got and update the listener port value with it. */
     curl_socklen_t la_size;
     srvr_sockaddr_union_t localaddr;
+    memset(&localaddr, 0, sizeof(localaddr));
 #ifdef USE_IPV6
     if(!use_ipv6)
 #endif
@@ -1169,7 +1171,6 @@ static int test_rtspd(int argc, const char *argv[])
     else
       la_size = sizeof(localaddr.sa6);
 #endif
-    memset(&localaddr.sa, 0, (size_t)la_size);
     if(getsockname(sock, &localaddr.sa, &la_size) < 0) {
       error = SOCKERRNO;
       logmsg("getsockname() failed with error (%d) %s",

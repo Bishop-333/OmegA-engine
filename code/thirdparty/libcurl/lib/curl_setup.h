@@ -734,14 +734,9 @@
 #endif
 
 #if defined(USE_OPENSSL) && defined(USE_WOLFSSL)
-#  include <wolfssl/version.h>
-#  if LIBWOLFSSL_VERSION_HEX >= 0x05007006
-#    ifndef OPENSSL_COEXIST
-#    define OPENSSL_COEXIST
-#    endif
-#  else
-#    error "OpenSSL can only coexist with wolfSSL v5.7.6 or upper"
-#  endif
+#ifndef OPENSSL_COEXIST
+#define OPENSSL_COEXIST
+#endif
 #endif
 
 #if defined(USE_WOLFSSL) && defined(USE_GNUTLS)
@@ -1234,7 +1229,7 @@ typedef unsigned int curl_bit;
 #elif defined(_WIN32) || defined(__CYGWIN__)
 #define CURL_BINMODE(stream) (void)_setmode(fileno(stream), CURL_O_BINARY)
 #else
-#define CURL_BINMODE(stream) (void)stream
+#define CURL_BINMODE(stream) (void)(stream)
 #endif
 
 /* In Windows the default file mode is text but an application can override it.
@@ -1411,10 +1406,10 @@ CURL_EXTERN ALLOC_FUNC FILE *curl_dbg_fdopen(int filedes, const char *mode,
 #define CURL_FREEADDRINFO(data) \
   curl_dbg_freeaddrinfo(data, __LINE__, __FILE__)
 #define CURL_SOCKET(domain, type, protocol) \
-  curl_dbg_socket((int)domain, type, protocol, __LINE__, __FILE__)
+  curl_dbg_socket((int)(domain), type, protocol, __LINE__, __FILE__)
 #ifdef HAVE_SOCKETPAIR
 #define CURL_SOCKETPAIR(domain, type, protocol, socket_vector) \
-  curl_dbg_socketpair((int)domain, type, protocol, socket_vector, \
+  curl_dbg_socketpair((int)(domain), type, protocol, socket_vector, \
                       __LINE__, __FILE__)
 #endif
 #define CURL_ACCEPT(sock, addr, len) \

@@ -21,7 +21,7 @@
  * SPDX-License-Identifier: curl
  *
  ***************************************************************************/
-#include "../curl_setup.h"
+#include "curl_setup.h"
 
 #if !defined(CURL_DISABLE_HTTP) && defined(USE_NGTCP2) && defined(USE_NGHTTP3)
 #include <ngtcp2/ngtcp2.h>
@@ -36,38 +36,38 @@
 #else
 #include <ngtcp2/ngtcp2_crypto_quictls.h>
 #endif
-#include "../vtls/openssl.h"
+#include "vtls/openssl.h"
 #elif defined(USE_GNUTLS)
 #include <ngtcp2/ngtcp2_crypto_gnutls.h>
-#include "../vtls/gtls.h"
+#include "vtls/gtls.h"
 #elif defined(USE_WOLFSSL)
 #include <ngtcp2/ngtcp2_crypto_wolfssl.h>
-#include "../vtls/wolfssl.h"
+#include "vtls/wolfssl.h"
 #endif
 
-#include "../urldata.h"
-#include "../url.h"
-#include "../uint-hash.h"
-#include "../curl_trc.h"
-#include "../rand.h"
-#include "../multiif.h"
-#include "../cfilters.h"
-#include "../cf-socket.h"
-#include "../connect.h"
-#include "../progress.h"
-#include "../curlx/fopen.h"
-#include "../curlx/dynbuf.h"
-#include "../http1.h"
-#include "../select.h"
-#include "../transfer.h"
-#include "../bufref.h"
-#include "vquic.h"
-#include "vquic_int.h"
-#include "vquic-tls.h"
-#include "../vtls/keylog.h"
-#include "../vtls/vtls.h"
-#include "../vtls/vtls_scache.h"
-#include "curl_ngtcp2.h"
+#include "urldata.h"
+#include "url.h"
+#include "uint-hash.h"
+#include "curl_trc.h"
+#include "rand.h"
+#include "multiif.h"
+#include "cfilters.h"
+#include "cf-socket.h"
+#include "connect.h"
+#include "progress.h"
+#include "curlx/fopen.h"
+#include "curlx/dynbuf.h"
+#include "http1.h"
+#include "select.h"
+#include "transfer.h"
+#include "bufref.h"
+#include "vquic/vquic.h"
+#include "vquic/vquic_int.h"
+#include "vquic/vquic-tls.h"
+#include "vtls/keylog.h"
+#include "vtls/vtls.h"
+#include "vtls/vtls_scache.h"
+#include "vquic/curl_ngtcp2.h"
 
 
 #define QUIC_MAX_STREAMS       (256 * 1024)
@@ -391,8 +391,8 @@ static void pktx_update_time(struct Curl_easy *data,
   const struct curltime *pnow = Curl_pgrs_now(data);
 
   vquic_ctx_update_time(&ctx->q, pnow);
-  pktx->ts = (ngtcp2_tstamp)pnow->tv_sec * NGTCP2_SECONDS +
-             (ngtcp2_tstamp)pnow->tv_usec * NGTCP2_MICROSECONDS;
+  pktx->ts = ((ngtcp2_tstamp)pnow->tv_sec * NGTCP2_SECONDS) +
+             ((ngtcp2_tstamp)pnow->tv_usec * NGTCP2_MICROSECONDS);
 }
 
 static void pktx_init(struct pkt_io_ctx *pktx,
@@ -406,8 +406,8 @@ static void pktx_init(struct pkt_io_ctx *pktx,
   pktx->data = data;
   ngtcp2_path_storage_zero(&pktx->ps);
   vquic_ctx_set_time(&ctx->q, pnow);
-  pktx->ts = (ngtcp2_tstamp)pnow->tv_sec * NGTCP2_SECONDS +
-             (ngtcp2_tstamp)pnow->tv_usec * NGTCP2_MICROSECONDS;
+  pktx->ts = ((ngtcp2_tstamp)pnow->tv_sec * NGTCP2_SECONDS) +
+             ((ngtcp2_tstamp)pnow->tv_usec * NGTCP2_MICROSECONDS);
 }
 
 static int cb_h3_acked_req_body(nghttp3_conn *conn, int64_t stream_id,
@@ -2341,6 +2341,7 @@ static int quic_ossl_new_session_cb(SSL *ssl, SSL_SESSION *ssl_sessionid)
 
 #ifdef USE_GNUTLS
 
+#ifdef CURLVERBOSE
 static const char *gtls_hs_msg_name(int mtype)
 {
   switch(mtype) {
@@ -2367,6 +2368,7 @@ static const char *gtls_hs_msg_name(int mtype)
   }
   return "Unknown";
 }
+#endif
 
 static int quic_gtls_handshake_cb(gnutls_session_t session, unsigned int htype,
                                   unsigned when, unsigned int incoming,

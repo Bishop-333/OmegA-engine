@@ -21,7 +21,7 @@
  * SPDX-License-Identifier: curl
  *
  ***************************************************************************/
-#include "../curl_setup.h"
+#include "curl_setup.h"
 
 #ifdef USE_SSL
 
@@ -29,21 +29,21 @@
 #include <sys/types.h>
 #endif
 
-#include "../urldata.h"
-#include "../cfilters.h"
+#include "urldata.h"
+#include "cfilters.h"
 
-#include "vtls.h" /* generic SSL protos etc */
-#include "vtls_int.h"
-#include "vtls_scache.h"
-#include "vtls_spack.h"
+#include "vtls/vtls.h" /* generic SSL protos etc */
+#include "vtls/vtls_int.h"
+#include "vtls/vtls_scache.h"
+#include "vtls/vtls_spack.h"
 
-#include "../strcase.h"
-#include "../url.h"
-#include "../llist.h"
-#include "../curl_share.h"
-#include "../curl_trc.h"
-#include "../curl_sha256.h"
-#include "../rand.h"
+#include "strcase.h"
+#include "url.h"
+#include "llist.h"
+#include "curl_share.h"
+#include "curl_trc.h"
+#include "curl_sha256.h"
+#include "rand.h"
 
 
 /* a peer+tls-config we cache sessions for */
@@ -561,7 +561,7 @@ CURLcode Curl_ssl_scache_create(size_t max_peers,
 
 void Curl_ssl_scache_destroy(struct Curl_ssl_scache *scache)
 {
-  if(scache && GOOD_SCACHE(scache)) {
+  if(GOOD_SCACHE(scache)) {
     size_t i;
     scache->magic = 0;
     for(i = 0; i < scache->peer_count; ++i) {
@@ -1148,9 +1148,12 @@ CURLcode Curl_ssl_session_export(struct Curl_easy *data,
   struct Curl_ssl_scache_peer *peer;
   struct dynbuf sbuf, hbuf;
   struct Curl_llist_node *n;
-  size_t i, npeers = 0, ntickets = 0;
+  size_t i;
   curl_off_t now = time(NULL);
   CURLcode r = CURLE_OK;
+#ifdef CURLVERBOSE
+  size_t npeers = 0, ntickets = 0;
+#endif
 
   if(!export_fn)
     return CURLE_BAD_FUNCTION_ARGUMENT;
@@ -1173,7 +1176,7 @@ CURLcode Curl_ssl_session_export(struct Curl_easy *data,
     cf_scache_peer_remove_expired(peer, now);
     n = Curl_llist_head(&peer->sessions);
     if(n)
-      ++npeers;
+      VERBOSE(++npeers);
     while(n) {
       struct Curl_ssl_session *s = Curl_node_elem(n);
       if(!peer->hmac_set) {
@@ -1201,7 +1204,7 @@ CURLcode Curl_ssl_session_export(struct Curl_easy *data,
                     s->alpn, s->earlydata_max);
       if(r)
         goto out;
-      ++ntickets;
+      VERBOSE(++ntickets);
       n = Curl_node_next(n);
     }
   }

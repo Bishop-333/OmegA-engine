@@ -1,5 +1,3 @@
-#ifndef HEADER_CURL_INET_PTON_H
-#define HEADER_CURL_INET_PTON_H
 /***************************************************************************
  *                                  _   _ ____  _
  *  Project                     ___| | | |  _ \| |
@@ -23,27 +21,27 @@
  * SPDX-License-Identifier: curl
  *
  ***************************************************************************/
-#include "curl_setup.h"
+#include <curl/curl.h>
+#include <iostream>
 
-#ifdef HAVE_INET_PTON
-#ifdef HAVE_NETINET_IN_H
-#include <netinet/in.h>
-#endif
-#ifndef _WIN32
-#include <sys/socket.h>
-#endif
-#ifdef HAVE_ARPA_INET_H
-#include <arpa/inet.h>
-#endif
-#ifdef __AMIGA__
-#define curlx_inet_pton(x, y, z) \
-  inet_pton(x, (unsigned char *)CURL_UNCONST(y), z)
-#else
-#define curlx_inet_pton(x, y, z) \
-  inet_pton(x, y, z)
-#endif
-#else
-int curlx_inet_pton(int af, const char *src, void *dst);
-#endif /* HAVE_INET_PTON */
+class CurlClass {
+public:
+  void curl_multi_setopt(void *a, int b, long c) {
+    (void)a;
+    (void)b;
+    (void)c;
+    std::cout << curl_version() << std::endl;
+  }
+};
 
-#endif /* HEADER_CURL_INET_PTON_H */
+int main(int argc, const char **argv)
+{
+  (void)argc;
+  std::cout << "libcurl C++ test:" << std::endl;
+  std::cout << argv[0] << std::endl;
+  CurlClass mycurl;
+  mycurl.curl_multi_setopt(nullptr, 0, 0);
+  ::curl_easy_setopt(nullptr, CURLOPT_URL, "https://example.com/");
+  std::cout << "---" << std::endl;
+  return 0;
+}
