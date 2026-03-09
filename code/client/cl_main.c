@@ -265,7 +265,7 @@ void CL_StopRecord_f( void ) {
 		clc.recordfile = FS_INVALID_HANDLE;
 
 		// select proper extension
-		if ( clc.dm68compat || clc.demoplaying ) {
+		if ( clc.compat || clc.demoplaying ) {
 			protocol = OLD_PROTOCOL_VERSION;
 		} else {
 			protocol = NEW_PROTOCOL_VERSION;
