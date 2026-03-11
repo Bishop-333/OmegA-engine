@@ -149,7 +149,7 @@ These options are provided to select the TLS backend to use.
 
 You can build curl with *multiple* TLS backends at your choice, but some TLS
 backends cannot be combined: if you build with an OpenSSL fork (or wolfSSL),
-you cannot add another OpenSSL fork (or wolfSSL) simply because they have
+you cannot add another OpenSSL fork (or wolfSSL) because they have
 conflicting identical symbol names.
 
 When you build with multiple TLS backends, you can select the active one at
@@ -418,15 +418,15 @@ for dynamic import symbols.
 
 ## Legacy Windows and SSL
 
-Schannel (from Windows SSPI), is the native SSL library in Windows. However,
-Schannel in Windows <= XP is unable to connect to servers that no longer
-support the legacy handshakes and algorithms used by those versions. If you
-are using curl in one of those earlier versions of Windows you should choose
-another SSL backend such as OpenSSL.
+Schannel (from Windows SSPI), is the native SSL library in Windows. Schannel
+in Windows <= XP is unable to connect to servers that no longer support the
+legacy handshakes and algorithms used by those versions. If you are using curl
+in one of those earlier versions of Windows you should choose another SSL
+backend such as OpenSSL.
 
 # Android
 
-When building curl for Android you can you CMake or curl's `configure` script.
+When building curl for Android you can either use CMake or `configure`.
 
 Before you can build curl for Android, you need to install the Android NDK
 first. This can be done using the SDK Manager that is part of Android Studio.
@@ -603,11 +603,11 @@ disabling support for some features (run `./configure --help` to see them all):
 - `--disable-libcurl-option` (--libcurl C code generation support)
 - `--disable-manual` (--manual built-in documentation)
 - `--disable-mime` (MIME API)
-- `--disable-netrc`  (.netrc file)
+- `--disable-netrc` (.netrc file)
 - `--disable-progress-meter` (graphical progress meter in library)
 - `--disable-proxy` (HTTP and SOCKS proxies)
 - `--disable-socketpair` (socketpair for asynchronous name resolving)
-- `--disable-threaded-resolver`  (threaded name resolver)
+- `--disable-threaded-resolver` (threaded name resolver)
 - `--disable-tls-srp` (Secure Remote Password authentication for TLS)
 - `--disable-unix-sockets` (Unix sockets)
 - `--disable-verbose` (eliminates debugging strings and error code strings)

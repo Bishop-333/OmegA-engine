@@ -967,11 +967,11 @@ static CURLcode sftp_upload_init(struct Curl_easy *data,
             sftp_libssh2_strerror(sftperr));
       return sftp_libssh2_error_to_CURLE(sftperr);
     }
-    if(((sftperr == LIBSSH2_FX_NO_SUCH_FILE) ||
-        (sftperr == LIBSSH2_FX_FAILURE) ||
-        (sftperr == LIBSSH2_FX_NO_SUCH_PATH)) &&
-       (data->set.ftp_create_missing_dirs &&
-        (strlen(sshp->path) > 1))) {
+    if((sftperr == LIBSSH2_FX_NO_SUCH_FILE ||
+        sftperr == LIBSSH2_FX_FAILURE ||
+        sftperr == LIBSSH2_FX_NO_SUCH_PATH) &&
+       data->set.ftp_create_missing_dirs &&
+       (strlen(sshp->path) > 1)) {
       /* try to create the path remotely */
       sshc->secondCreateDirs = 1;
       myssh_to(data, sshc, SSH_SFTP_CREATE_DIRS_INIT);
@@ -1127,7 +1127,7 @@ static CURLcode ssh_state_pkey_init(struct Curl_easy *data,
     /*
      * Unless the user explicitly specifies a public key file, let
      * libssh2 extract the public key from the private key file.
-     * This is done by simply passing sshc->rsa_pub = NULL.
+     * This is done by passing sshc->rsa_pub = NULL.
      */
     if(!out_of_memory && data->set.str[STRING_SSH_PUBLIC_KEY] &&
        /* treat empty string the same way as NULL */
@@ -1289,7 +1289,7 @@ static CURLcode sftp_download_stat(struct Curl_easy *data,
      (attrs.filesize == 0)) {
     /*
      * libssh2_sftp_open() did not return an error, so maybe the server
-     * just does not support stat()
+     * does not support stat()
      * OR the server does not return a file size with a stat()
      * OR file size is 0
      */

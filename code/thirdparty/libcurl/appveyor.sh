@@ -49,9 +49,9 @@ if [ -n "${CMAKE_GENERATOR:-}" ]; then
 
   # Install custom cmake version
   if [ -n "${CMAKE_VERSION:-}" ]; then
-    cmake_ver=$(printf '%02d%02d' \
+    cmake_ver="$(printf '%02d%02d' \
       "$(echo "${CMAKE_VERSION}" | cut -f1 -d.)" \
-      "$(echo "${CMAKE_VERSION}" | cut -f2 -d.)")
+      "$(echo "${CMAKE_VERSION}" | cut -f2 -d.)")"
     if [ "${cmake_ver}" -ge '0320' ]; then
       fn="cmake-${CMAKE_VERSION}-windows-x86_64"
     else
@@ -88,8 +88,8 @@ if [ -n "${CMAKE_GENERATOR:-}" ]; then
       -DCURL_STATIC_CRT=ON \
       -DCURL_DROP_UNUSED=ON \
       -DCURL_USE_SCHANNEL=ON -DCURL_USE_LIBPSL=OFF \
-      ${CMAKE_GENERATE:-} \
       ${options} \
+      ${CMAKE_GENERATE:-} \
       || { cat "${root}"/_bld/CMakeFiles/CMake* 2>/dev/null; false; }
     [ "${APPVEYOR_BUILD_WORKER_IMAGE}" = 'Visual Studio 2013' ] && cd ..
   done

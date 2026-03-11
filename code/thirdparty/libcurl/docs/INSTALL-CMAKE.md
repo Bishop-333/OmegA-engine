@@ -155,8 +155,8 @@ assumes that CMake generates `Makefile`:
 
 # CMake usage
 
-Just as curl can be built and installed using CMake, it can also be used from
-CMake.
+This section describes how to locate and use curl/libcurl from CMake-based
+projects.
 
 ## Using `find_package`
 
@@ -552,12 +552,12 @@ Note: These variables are internal and subject to change.
 
 ## Useful build targets
 
-- `testbins`:               Build test binaries (servers, tools).
-                            Individual targets: `curlinfo`, `libtests`, `servers`, `tunits`, `units`
 - `testdeps`:               Build test dependencies (test binaries, test certificates).
                             Test certificates: `build-certs` (clean with `clean-certs`)
 - `tests`:                  Run tests (`runtests.pl`). Customize via the `TFLAGS` environment variable, e.g. `TFLAGS=1621`.
                             Other flavors: `test-am`, `test-ci`, `test-event`, `test-full`, `test-nonflaky`, `test-quiet`, `test-torture`
+- `tt`:                     Build test binaries (servers, tools).
+                            Individual targets: `curlinfo`, `libtests`, `servers`, `tunits`, `units`
 - `curl-pytest`:            Run tests (pytest).
                             Other flavor: `curl-test-ci`
 - `curl-examples`:          Build examples
