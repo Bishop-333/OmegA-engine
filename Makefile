@@ -16,9 +16,13 @@ COMPILE_ARCH=$(shell uname -m | sed -e 's/i.86/x86/' | sed -e 's/^arm.*/arm/')
 #arm64 hack!
 ifeq ($(shell uname -m), arm64)
   COMPILE_ARCH=arm64
+else
+ifeq ($(COMPILE_ARCH),arm64)
+  LONG_BIT=$(shell [ -x /usr/bin/getconf ] && getconf LONG_BIT)
+  ifeq ($(LONG_BIT),32)
+    COMPILE_ARCH=arm
+  endif
 endif
-ifeq ($(shell uname -m), aarch64)
-  COMPILE_ARCH=arm64
 endif
 
 ifeq ($(COMPILE_PLATFORM),mingw32)
@@ -760,7 +764,11 @@ else
   endif
 
   ifeq ($(ARCH),arm)
-    OPTIMIZE += -march=armv7-a
+    ifeq ($(LONG_BIT),32)
+      OPTIMIZE += -march=armv7-a+fp
+    else
+      OPTIMIZE += -march=armv7-a
+    endif
     ARCHEXT = -arm
   endif
 

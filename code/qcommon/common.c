@@ -3497,6 +3497,9 @@ static void DetectCPUCoresConfig( void )
 static void Sys_GetProcessorId( char *vendor )
 {
 	Com_sprintf( vendor, 100, "%s", ARCH_STRING );
+#ifdef _WIN32
+	CPU_Flags |= CPU_ARMv7 | CPU_IDIVA | CPU_VFPv3;
+#endif
 }
 
 #else // __linux__
@@ -3621,7 +3624,7 @@ __asm {
 }
 #endif // id386
 
-#if arm64
+#if arm64 || arm32
 void Sys_SnapVector( float *vector )
 {
 	vector[0] = rint( vector[0] );
