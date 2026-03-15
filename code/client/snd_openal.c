@@ -582,11 +582,7 @@ typedef struct src_s
 	qboolean	local;			// Is this local (relative to the cam)
 } src_t;
 
-#ifdef __APPLE__
-	#define MAX_SRC 64
-#else
-	#define MAX_SRC 128
-#endif
+#define MAX_SRC 128
 static src_t srcList[MAX_SRC];
 static int srcCount = 0;
 static int srcActiveCnt = 0;
