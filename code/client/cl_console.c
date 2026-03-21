@@ -1086,7 +1086,7 @@ static float Con_DrawFPS( float y ) {
 		s = va( "%ifps", fps );
 		w = strlen( s ) * smallchar_width;
 
-		SCR_DrawSmallStringExt( cls.glconfig.vidWidth - w - 8, y + 2, s, g_color_table[ conColors[ activeConsoleNum ] ], qfalse, qtrue);
+		SCR_DrawSmallStringExt( cls.glconfig.vidWidth - w - 8, y + 2, s, g_color_table[ conColors[ activeConsoleNum ] ], qfalse, qtrue );
 	}
 
 	return y + smallchar_height + 4;
@@ -1118,7 +1118,7 @@ static float Con_DrawClock( float y ) {
 		time = va( "%02i:%02i:%02i", qt.tm_hour, qt.tm_min, qt.tm_sec );
 	}
 
-	SCR_DrawSmallStringExt( cls.glconfig.vidWidth - ( strlen( time ) ) * smallchar_width - 8, y, time, g_color_table[ conColors[ activeConsoleNum ] ], qfalse, qtrue);
+	SCR_DrawSmallStringExt( cls.glconfig.vidWidth - ( strlen( time ) ) * smallchar_width - 8, y, time, g_color_table[ conColors[ activeConsoleNum ] ], qfalse, qtrue );
 
 	return y + smallchar_height + 4;
 }
@@ -1203,7 +1203,7 @@ static void Con_DrawHelp( int y, float conColorValue[4] ) {
 		}
 		help[i] = '\0';
 
-		SCR_DrawSmallStringExt( x + 6, y + 4, help, g_color_table[ ColorIndex( COLOR_WHITE ) ], qfalse, qtrue );
+		SCR_DrawSmallStringExt( x + 6, y + 4, help, g_color_table[ ColorIndex( COLOR_WHITE ) ], qfalse, qfalse );
 		y += smallchar_height;
 
 		if ( *desc == '\n' ) {
