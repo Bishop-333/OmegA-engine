@@ -46,7 +46,7 @@ jobs:
       run: |
         7z a -r build/omega-engine-windows-x86_64.zip ./bin/*
 
-    - uses: actions/upload-artifact@v6
+    - uses: actions/upload-artifact@v7
       with:
         name: release-mingw64-x86_64
         path: build/omega-engine-windows-x86_64.zip
@@ -78,7 +78,7 @@ jobs:
       run: |
         tar -czf build/omega-engine-linux-x86_64.tar.gz -C bin .
 
-    - uses: actions/upload-artifact@v6
+    - uses: actions/upload-artifact@v7
       with:
         name: release-linux-x86_64
         path: build/omega-engine-linux-x86_64.tar.gz
@@ -110,7 +110,7 @@ jobs:
       run: |
         tar -czf build/omega-engine-linux-arm64.tar.gz -C bin .
 
-    - uses: actions/upload-artifact@v6
+    - uses: actions/upload-artifact@v7
       with:
         name: release-linux-arm64
         path: build/omega-engine-linux-arm64.tar.gz
@@ -136,7 +136,7 @@ jobs:
         ./make-macosx-app.sh release
         hdiutil create -format UDZO -srcfolder build/release-darwin-universal2/OmegA.app build/omega-engine-macos-universal2.dmg
 
-    - uses: actions/upload-artifact@v6
+    - uses: actions/upload-artifact@v7
       with:
         name: release-darwin-universal2
         path: build/omega-engine-macos-universal2.dmg
@@ -149,7 +149,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download Artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
 
       - name: Create binary archives
         run: |
