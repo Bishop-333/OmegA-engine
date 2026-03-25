@@ -117,6 +117,8 @@ cvar_t		*con_scale;
 cvar_t		*con_fps;
 cvar_t		*con_clock;
 cvar_t		*con_drawHelp;
+cvar_t		*con_anim;
+cvar_t		*con_fade;
 
 int			g_console_field_width;
 
@@ -586,6 +588,10 @@ void Con_Init( void )
 	Cvar_SetDescription( con_clock, "Console clock.\n 1: 24-hour clock\n 2: 12-hour clock" );
 	con_drawHelp = Cvar_Get( "con_drawHelp", "1", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( con_drawHelp, "Enable/disable automatic CVAR description display." );
+	con_anim = Cvar_Get( "con_anim", "1", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( con_anim, "Console opening/closing scroll animation." );
+	con_fade = Cvar_Get( "con_fade", "1", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( con_fade, "Console opening/closing fade animation." );
 
 	Field_Clear( &g_consoleField );
 	g_consoleField.widthInChars = g_console_field_width;
@@ -1223,6 +1229,7 @@ Draws the console with the solid background
 static void Con_DrawSolidConsole( float frac ) {
 
 	static float conColorValue[4] = { 0.0, 0.0, 0.0, 0.0 };
+	static float conFade;
 	// for cvar value change tracking
 	static char  conColorString[ MAX_CVAR_VALUE_STRING ] = { '\0' };
 
@@ -1253,6 +1260,9 @@ static void Con_DrawSolidConsole( float frac ) {
 
 	// draw the background
 	yf = frac * SCREEN_HEIGHT;
+	if ( con_fade->integer ) {
+		color_table_alpha( frac / cl_consoleHeight->value );
+	}
 
 	// on wide screens, we will center the text
 	activeCon->xadjust = 0;
@@ -1278,7 +1288,14 @@ static void Con_DrawSolidConsole( float frac ) {
 					}
 				}
 			}
-			re.SetColor( conColorValue );
+			if ( con_fade->integer ) {
+				conFade = conColorValue[3];
+				conColorValue[3] *= ( frac / cl_consoleHeight->value ) * ( 2.0f - ( frac / cl_consoleHeight->value ) );
+				re.SetColor( conColorValue );
+				conColorValue[3] = conFade;
+			} else {
+				re.SetColor( conColorValue );
+			}
 			re.DrawStretchPic( 0, 0, wf, yf, 0, 0, 1, 1, cls.whiteShader );
 		} else {
 			re.SetColor( g_color_table[ ColorIndex( COLOR_WHITE ) ] );
@@ -1401,6 +1418,9 @@ static void Con_DrawSolidConsole( float frac ) {
 	}
 
 	re.SetColor( NULL );
+	if ( con_fade->integer ) {
+		color_table_alpha( 1.0f );
+	}
 }
 
 
@@ -1462,7 +1482,11 @@ void Con_RunConsole( void )
 		}
 		else if ( con[i].finalFrac > con[i].displayFrac )
 		{
-			con[i].displayFrac += con_conspeed->value * cls.realFrametime * 0.001;
+			if ( con_anim->integer ) {
+				con[i].displayFrac += ( con[i].finalFrac - con[i].displayFrac ) * con_conspeed->value * 0.05;
+			} else {
+				con[i].displayFrac += con_conspeed->value * cls.realFrametime * 0.001;
+			}
 			if ( con[i].finalFrac < con[i].displayFrac )
 				con[i].displayFrac = con[i].finalFrac;
 		}
