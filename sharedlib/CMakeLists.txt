@@ -117,19 +117,34 @@ if(WITH_TESTS)
 
   add_executable(jcstest ../src/jcstest.c)
   target_link_libraries(jcstest jpeg)
+
+  include(CheckFunctionExists)
+  check_function_exists(fmemopen HAVE_FMEMOPEN)
+  if(HAVE_FMEMOPEN)
+    add_executable(bmpsizetest ../src/bmpsizetest.c
+      ../src/rdbmp.c ../src/wrbmp.c
+      ../src/rdgif.c ../src/wrapper/wrgif-8.c ../src/wrapper/wrgif-12.c
+      ../src/wrapper/rdppm-8.c ../src/wrapper/rdppm-12.c
+      ../src/wrapper/rdppm-16.c ../src/wrapper/wrppm-8.c
+      ../src/wrapper/wrppm-12.c ../src/wrapper/wrppm-16.c
+      ../src/rdtarga.c ../src/wrtarga.c)
+    set_property(TARGET bmpsizetest PROPERTY COMPILE_FLAGS
+      ${CDJPEG_COMPILE_FLAGS})
+    target_link_libraries(bmpsizetest jpeg)
+  endif()
 endif()
 
 install(TARGETS jpeg EXPORT ${CMAKE_PROJECT_NAME}Targets
   INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT lib
-  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT lib
-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT bin)
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR} COMPONENT lib
+  LIBRARY DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR} COMPONENT lib
+  RUNTIME DESTINATION ${CMAKE_INSTALL_FULL_BINDIR} COMPONENT bin)
 if(WITH_TOOLS)
   install(TARGETS cjpeg djpeg jpegtran
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT bin)
+    RUNTIME DESTINATION ${CMAKE_INSTALL_FULL_BINDIR} COMPONENT bin)
 endif()
 if(NOT CMAKE_VERSION VERSION_LESS "3.1" AND MSVC_LIKE AND
   CMAKE_C_LINKER_SUPPORTS_PDB)
   install(FILES "$<TARGET_PDB_FILE:jpeg>"
-    DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT bin OPTIONAL)
+    DESTINATION ${CMAKE_INSTALL_FULL_BINDIR} COMPONENT bin OPTIONAL)
 endif()
