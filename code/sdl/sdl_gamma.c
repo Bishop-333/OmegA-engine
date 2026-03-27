@@ -43,7 +43,7 @@ GLimp_SetGamma
 void GLimp_SetGamma( unsigned char red[256], unsigned char green[256], unsigned char blue[256] )
 {
 	//FIXME Ummmmm... do it with a shader maybe? What about GL1?
-	ri.Printf( PRINT_DEVELOPER, "Gamma adjustment not supported in SDL3\n" );
+	Com_DPrintf( "Gamma adjustment not supported in SDL3\n" );
 }
 
 
