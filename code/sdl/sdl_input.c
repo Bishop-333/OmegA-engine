@@ -209,7 +209,7 @@ static keyNum_t IN_TranslateSDLToQ3Key( const SDL_KeyboardEvent *keyEvent, qbool
 {
 	keyNum_t key = 0;
 
-	if( keyEvent->scancode >= SDL_SCANCODE_1 && keyEvent->scancode <= SDL_SCANCODE_0 )
+	if ( keyEvent->scancode >= SDL_SCANCODE_1 && keyEvent->scancode <= SDL_SCANCODE_0 )
 	{
 		// Always map the number keys as such even if they actually map
 		// to other characters (eg, "1" is "&" on an AZERTY keyboard).

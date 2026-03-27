@@ -183,7 +183,7 @@ qboolean SNDDMA_Init( void )
 
 	Com_Printf( "SDL_Init( SDL_INIT_AUDIO )... " );
 
-	if (!SDL_Init(SDL_INIT_AUDIO))
+	if ( !SDL_Init( SDL_INIT_AUDIO ) )
 	{
 		Com_Printf( "FAILED (%s)\n", SDL_GetError() );
 		return qfalse;

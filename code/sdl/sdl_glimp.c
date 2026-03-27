@@ -375,7 +375,7 @@ if ( !vulkan ) {
 	if ( SDL_window != NULL )
 	{
 		display = SDL_GetDisplayForWindow( SDL_window );
-		if( display < 0 )
+		if ( display < 0 )
 		{
 			Com_DPrintf( "SDL_GetWindowDisplayIndex() failed: %s\n", SDL_GetError() );
 		}
