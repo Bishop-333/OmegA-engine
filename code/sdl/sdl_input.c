@@ -356,7 +356,7 @@ static keyNum_t IN_TranslateSDLToQ3Key( const SDL_KeyboardEvent *keyEvent, qbool
 	if ( in_keyboardDebug->integer )
 		IN_PrintKey( keyEvent, key, down );
 
-	if ( keysym->scancode == SDL_SCANCODE_GRAVE )
+	if ( keyEvent->scancode == SDL_SCANCODE_GRAVE )
 	{
 		//SDL_Keycode translated = SDL_GetKeyFromScancode( SDL_SCANCODE_GRAVE );
 
@@ -416,7 +416,7 @@ static void IN_ActivateMouse( void )
 		SDL_SetWindowRelativeMouseMode( SDL_window, true );
 
 		if ( glw_state.isFullscreen )
-			SDL_ShowCursor( SDL_FALSE );
+			SDL_ShowCursor();
 
 		SDL_WarpMouseInWindow( SDL_window, glw_state.window_width / 2, glw_state.window_height / 2 );
 
@@ -477,7 +477,7 @@ static void IN_DeactivateMouse( void )
 	// Always show the cursor when the mouse is disabled,
 	// but not when fullscreen
 	if ( !glw_state.isFullscreen )
-		SDL_ShowCursor( SDL_TRUE );
+		SDL_ShowCursor();
 }
 
 
@@ -1098,9 +1098,9 @@ IN_SyncModifiers
 static void IN_SyncModifiers( void ) {
     SDL_Keymod mod = SDL_GetModState();
 
-    keys[K_CTRL].down  = (mod & KMOD_CTRL)  ? qtrue : qfalse;
-    keys[K_SHIFT].down = (mod & KMOD_SHIFT) ? qtrue : qfalse;
-    keys[K_ALT].down   = (mod & KMOD_ALT)   ? qtrue : qfalse;
+    keys[K_CTRL].down  = (mod & SDL_KMOD_CTRL)  ? qtrue : qfalse;
+    keys[K_SHIFT].down = (mod & SDL_KMOD_SHIFT) ? qtrue : qfalse;
+    keys[K_ALT].down   = (mod & SDL_KMOD_ALT)   ? qtrue : qfalse;
 }
 
 
@@ -1256,12 +1256,13 @@ void HandleEvents( void )
 #ifdef USE_JOYSTICK
 			case SDL_EVENT_GAMEPAD_ADDED:
 			case SDL_EVENT_GAMEPAD_REMOVED:
-				if (in_joystick->integer)
+				if ( in_joystick->integer )
 					IN_InitJoystick();
 				break;
+#endif
 
 			case SDL_EVENT_QUIT:
-				Cbuf_ExecuteText(EXEC_NOW, "quit Closed window\n");
+				Cbuf_ExecuteText( EXEC_NOW, "quit Closed window\n" );
 				break;
 
 			case SDL_EVENT_WINDOW_RESIZED:
@@ -1320,69 +1321,6 @@ void HandleEvents( void )
 				break;
 #endif
 
-			case SDL_QUIT:
-				Cbuf_ExecuteText( EXEC_NOW, "quit Closed window\n" );
-				break;
-
-			case SDL_WINDOWEVENT:
-#ifdef DEBUG_EVENTS
-				Com_Printf( "%4i %s\n", e.window.timestamp, eventName( e.window.event ) );
-#endif
-				switch ( e.window.event )
-				{
-					case SDL_WINDOWEVENT_RESIZED:
-					{
-						int width, height;
-
-						width = e.window.data1;
-						height = e.window.data2;
-
-						// ignore this event on fullscreen
-						if( glw_state.isFullscreen )
-						{
-							break;
-						}
-
-						// check if size actually changed
-						if( cls.glconfig.vidWidth == width && cls.glconfig.vidHeight == height )
-						{
-							break;
-						}
-
-						Cvar_SetValue( "r_customwidth", width );
-						Cvar_SetValue( "r_customheight", height );
-						Cvar_Set( "r_mode", "-1" );
-
-						// Wait until user stops dragging for 1 second, so
-						// we aren't constantly recreating the GL context while
-						// he tries to drag...
-						vidRestartTime = Sys_Milliseconds( ) + 1000;
-					}
-					break;
-					case SDL_WINDOWEVENT_MOVED:
-						if ( gw_active && !gw_minimized && !glw_state.isFullscreen ) {
-							Cvar_SetIntegerValue( "vid_xpos", e.window.data1 );
-							Cvar_SetIntegerValue( "vid_ypos", e.window.data2 );
-						}
-						break;
-					// window states:
-					case SDL_WINDOWEVENT_HIDDEN:
-					case SDL_WINDOWEVENT_MINIMIZED:		gw_active = qfalse; gw_minimized = qtrue; break;
-					case SDL_WINDOWEVENT_SHOWN:
-					case SDL_WINDOWEVENT_RESTORED:
-					case SDL_WINDOWEVENT_MAXIMIZED:		gw_minimized = qfalse; break;
-					// keyboard focus:
-					case SDL_WINDOWEVENT_FOCUS_LOST:	lastKeyDown = 0; Key_ClearStates(); IN_SyncModifiers(); gw_active = qfalse; break;
-					case SDL_WINDOWEVENT_FOCUS_GAINED:	lastKeyDown = 0; Key_ClearStates(); IN_SyncModifiers(); gw_active = qtrue; gw_minimized = qfalse;
-														if ( re.SetColorMappings ) {
-															re.SetColorMappings();
-														}
-														break;
-					// mouse focus:
-					case SDL_WINDOWEVENT_ENTER: mouse_focus = qtrue; break;
-					case SDL_WINDOWEVENT_LEAVE: if ( glw_state.isFullscreen ) mouse_focus = qfalse; break;
-				}
-				break;
 			default:
 				break;
 		}
