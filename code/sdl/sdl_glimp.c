@@ -111,7 +111,7 @@ void GLimp_LogComment( const char *comment )
 }
 
 
-static int FindNearestDisplay( int *x, int *y, int w, int h )
+static SDL_DisplayID FindNearestDisplay( int *x, int *y, int w, int h )
 {
 	const int cx = *x + w / 2;
 	const int cy = *y + h / 2;
@@ -597,7 +597,7 @@ if ( !vulkan ) {
 			SDL_SetWindowPosition( SDL_window, x, y );
 		}
 
-		if( fullscreen )
+		if ( fullscreen )
 		{
 			SDL_DisplayMode mode;
 
