@@ -120,7 +120,7 @@ static int FindNearestDisplay( int *x, int *y, int w, int h )
 
 	index = -1; // selected display index
 
-	numDisplays = SDL_GetNumVideoDisplays();
+	numDisplays = SDL_GetDisplays( &numDisplays );
 	if ( numDisplays <= 0 )
 		return -1;
 
@@ -614,7 +614,7 @@ if ( !vulkan ) {
 				continue;
 			}
 
-			if ( SDL_GetWindowDisplayMode( SDL_window, &mode ) >= 0 )
+			if ( SDL_GetWindowFullscreenMode( SDL_window ) )
 			{
 				config->displayFrequency = mode.refresh_rate;
 				config->vidWidth = mode.w;
@@ -690,13 +690,8 @@ if ( !vulkan ) {
 
 	if ( !fullscreen && r_noborder->integer )
 		SDL_SetWindowHitTest( SDL_window, SDL_HitTestFunc, NULL );
-
-#ifdef USE_VULKAN_API
-	if ( vulkan )
-		SDL_Vulkan_GetDrawableSize( SDL_window, &config->vidWidth, &config->vidHeight );
-	else
-#endif
-		SDL_GL_GetDrawableSize( SDL_window, &config->vidWidth, &config->vidHeight );
+	
+	SDL_GetWindowSizeInPixels( SDL_window, &config->vidWidth, &config->vidHeight );
 
 	// save render dimensions as renderer may change it in advance
 	glw_state.window_width = config->vidWidth;
@@ -910,7 +905,7 @@ void VKimp_Init( glconfig_t *config )
 		}
 	}
 
-	qvkGetInstanceProcAddr = SDL_Vulkan_GetVkGetInstanceProcAddr();
+	qvkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)SDL_Vulkan_GetVkGetInstanceProcAddr();
 
 	if ( qvkGetInstanceProcAddr == NULL )
 	{
