@@ -352,6 +352,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 	int display;
 	int x;
 	int y;
+	Uint64 flags;
 
 #ifdef USE_VULKAN_API
 	if ( vulkan ) {
@@ -392,10 +393,11 @@ if ( !vulkan ) {
 		//Com_Printf("Selected display: %i\n", display );
 	}
 
-	if ( display >= 0 && SDL_GetDesktopDisplayMode( display, &desktopMode ) == 0 )
-	{
-		glw_state.desktop_width = desktopMode.w;
-		glw_state.desktop_height = desktopMode.h;
+	desktopMode = SDL_GetDesktopDisplayMode( display );
+
+	if ( desktopMode && desktopMode->h > 0 )	{
+		glw_state.desktop_width = desktopMode->w;
+		glw_state.desktop_height = desktopMode->h;
 	}
 	else
 	{
@@ -448,14 +450,7 @@ if ( !vulkan ) {
 
 	if ( fullscreen )
 	{
-		if ( r_fullscreen->integer == 2 )
-		{
-			flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
-		}
-		else
-		{
-			flags |= SDL_WINDOW_FULLSCREEN;
-		}
+		flags |= SDL_WINDOW_FULLSCREEN;
 	}
 	else if ( r_noborder->integer )
 	{
@@ -465,7 +460,7 @@ if ( !vulkan ) {
 #ifdef __APPLE__
 		if ( r_fullscreen->integer == 2 || r_modeFullscreen->integer == -2 || ( !r_modeFullscreen->string[0] && r_mode->integer == -2 ) )
 		{
-			flags |= SDL_WINDOW_ALLOW_HIGHDPI;
+			flags |= SDL_WINDOW_HIGH_PIXEL_DENSITY;
 		}
 #endif
 
@@ -585,7 +580,7 @@ if ( !vulkan ) {
 			SDL_GL_SetAttribute( SDL_GL_DOUBLEBUFFER, 1 );
 
 		if( ( SDL_window = SDL_CreateWindow( CLIENT_WINDOW_TITLE,
-				glConfig.vidWidth, glConfig.vidHeight, flags ) ) == NULL )
+				config->vidWidth, config->vidHeight, flags ) ) == NULL )
 		{
 			Com_DPrintf( "SDL_CreateWindow failed: %s\n", SDL_GetError() );
 			continue;
@@ -611,7 +606,6 @@ if ( !vulkan ) {
 			mode.w = config->vidWidth;
 			mode.h = config->vidHeight;
 			mode.refresh_rate = /* config->displayFrequency = */ Cvar_VariableIntegerValue( "r_displayRefresh" );
-			mode.driverdata = NULL;
 
 			if ( !SDL_SetWindowFullscreenMode( SDL_window, &mode ) )
 			{
@@ -733,7 +727,10 @@ static rserr_t GLimp_StartDriverAndSetMode( int mode, const char *modeFS, qboole
 	if ( !SDL_WasInit( SDL_INIT_VIDEO ) )
 	{
 		const char *driverName;
-		SDL_version compiled;
+		int version = SDL_GetVersion();
+		int major = SDL_VERSIONNUM_MAJOR(version);
+		int minor = SDL_VERSIONNUM_MINOR(version);
+		int micro = SDL_VERSIONNUM_MICRO(version);
 
 		if ( !SDL_Init( SDL_INIT_VIDEO ) )
 		{
@@ -742,7 +739,6 @@ static rserr_t GLimp_StartDriverAndSetMode( int mode, const char *modeFS, qboole
 		}
 
 		driverName = SDL_GetCurrentVideoDriver();
-		SDL_VERSION( &compiled );
 
 		Com_Printf( "SDL using driver \"%s\"\n", driverName );
 		Com_Printf( "SDL version %d.%d.%d\n", compiled.major, compiled.minor, compiled.patch );
