@@ -949,7 +949,7 @@ VK_CreateSurface
 */
 qboolean VK_CreateSurface( VkInstance instance, VkSurfaceKHR *surface )
 {
-	if ( SDL_Vulkan_CreateSurface( SDL_window, instance, surface ) == SDL_TRUE )
+	if ( SDL_Vulkan_CreateSurface( SDL_window, instance, NULL, surface ) )
 		return qtrue;
 	else
 		return qfalse;
