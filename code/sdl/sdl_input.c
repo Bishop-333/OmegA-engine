@@ -1298,6 +1298,12 @@ void HandleEvents( void )
 			case SDL_EVENT_WINDOW_MAXIMIZED:    Cvar_SetValue( "com_minimized", 0 ); break;
 			case SDL_EVENT_WINDOW_FOCUS_LOST:   Cvar_SetValue( "com_unfocused", 1 ); break;
 			case SDL_EVENT_WINDOW_FOCUS_GAINED: Cvar_SetValue( "com_unfocused", 0 ); break;
+			case SDL_EVENT_WINDOW_MOUSE_ENTER:
+				mouse_focus = qtrue;
+				break;
+			case SDL_EVENT_WINDOW_MOUSE_LEAVE:
+				mouse_focus = qfalse;
+				break;
 
 #if defined(PROTOCOL_HANDLER) && defined(__APPLE__)
 			case SDL_EVENT_DROP_FILE:
