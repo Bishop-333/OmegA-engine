@@ -416,7 +416,7 @@ static void IN_ActivateMouse( void )
 		SDL_SetWindowRelativeMouseMode( SDL_window, true );
 
 		if ( glw_state.isFullscreen )
-			SDL_ShowCursor();
+			SDL_HideCursor();
 
 		SDL_WarpMouseInWindow( SDL_window, glw_state.window_width / 2, glw_state.window_height / 2 );
 
