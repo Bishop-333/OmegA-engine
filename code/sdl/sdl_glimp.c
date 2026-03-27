@@ -352,7 +352,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 	int display;
 	int x;
 	int y;
-	Uint64 flags;
+	Uint64 flags = 0;
 
 #ifdef USE_VULKAN_API
 	if ( vulkan ) {
