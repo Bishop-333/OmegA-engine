@@ -1059,29 +1059,27 @@ static void IN_JoyMove( void )
 
 
 #ifdef DEBUG_EVENTS
-static const char *eventName( SDL_WindowEventID event )
+static const char *eventName( Uint32 event )
 {
 	static char buf[32];
 
 	switch ( event )
 	{
-		case SDL_WINDOWEVENT_NONE: return "NONE";
-		case SDL_WINDOWEVENT_SHOWN: return "SHOWN";
-		case SDL_WINDOWEVENT_HIDDEN: return "HIDDEN";
-		case SDL_WINDOWEVENT_EXPOSED: return "EXPOSED";
-		case SDL_WINDOWEVENT_MOVED: return "MOVED";
-		case SDL_WINDOWEVENT_RESIZED: return "RESIZED";
-		case SDL_WINDOWEVENT_SIZE_CHANGED: return "SIZE_CHANGED";
-		case SDL_WINDOWEVENT_MINIMIZED: return "MINIMIZED";
-		case SDL_WINDOWEVENT_MAXIMIZED: return "MAXIMIZED";
-		case SDL_WINDOWEVENT_RESTORED: return "RESTORED";
-		case SDL_WINDOWEVENT_ENTER: return "ENTER";
-		case SDL_WINDOWEVENT_LEAVE: return "LEAVE";
-		case SDL_WINDOWEVENT_FOCUS_GAINED: return "FOCUS_GAINED";
-		case SDL_WINDOWEVENT_FOCUS_LOST: return "FOCUS_LOST";
-		case SDL_WINDOWEVENT_CLOSE: return "CLOSE";
-		case SDL_WINDOWEVENT_TAKE_FOCUS: return "TAKE_FOCUS";
-		case SDL_WINDOWEVENT_HIT_TEST: return "HIT_TEST"; 
+		case SDL_EVENT_WINDOW_SHOWN: return "SHOWN";
+		case SDL_EVENT_WINDOW_HIDDEN: return "HIDDEN";
+		case SDL_EVENT_WINDOW_EXPOSED: return "EXPOSED";
+		case SDL_EVENT_WINDOW_MOVED: return "MOVED";
+		case SDL_EVENT_WINDOW_RESIZED: return "RESIZED";
+		case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED: return "SIZE_CHANGED";
+		case SDL_EVENT_WINDOW_MINIMIZED: return "MINIMIZED";
+		case SDL_EVENT_WINDOW_MAXIMIZED: return "MAXIMIZED";
+		case SDL_EVENT_WINDOW_RESTORED: return "RESTORED";
+		case SDL_EVENT_WINDOW_MOUSE_ENTER: return "ENTER";
+		case SDL_EVENT_WINDOW_MOUSE_LEAVE: return "LEAVE";
+		case SDL_EVENT_WINDOW_FOCUS_GAINED: return "FOCUS_GAINED";
+		case SDL_EVENT_WINDOW_FOCUS_LOST: return "FOCUS_LOST";
+		case SDL_EVENT_WINDOW_CLOSE_REQUESTED: return "CLOSE";
+		case SDL_EVENT_WINDOW_HIT_TEST: return "HIT_TEST"; 
 		default:
 			sprintf( buf, "EVENT#%i", event );
 			return buf;
