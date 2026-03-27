@@ -669,6 +669,8 @@ if ( !vulkan ) {
 
 	if ( SDL_window )
 	{
+		gw_active = qtrue;
+		gw_minimized = qfalse;
 #ifdef USE_ICON
 		SDL_Surface *icon = SDL_CreateSurfaceFrom(
 			CLIENT_WINDOW_ICON.width,
