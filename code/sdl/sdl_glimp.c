@@ -578,6 +578,7 @@ if ( !vulkan ) {
 			}
 		
 			SDL_GL_SetAttribute( SDL_GL_DOUBLEBUFFER, 1 );
+		}
 
 		if( ( SDL_window = SDL_CreateWindow( CLIENT_WINDOW_TITLE,
 				config->vidWidth, config->vidHeight, flags ) ) == NULL )
@@ -741,7 +742,7 @@ static rserr_t GLimp_StartDriverAndSetMode( int mode, const char *modeFS, qboole
 		driverName = SDL_GetCurrentVideoDriver();
 
 		Com_Printf( "SDL using driver \"%s\"\n", driverName );
-		Com_Printf( "SDL version %d.%d.%d\n", compiled.major, compiled.minor, compiled.patch );
+		Com_Printf( "SDL version %d.%d.%d\n", major, minor, micro );
 	}
 
 	err = GLW_SetMode( mode, modeFS, fullscreen, vulkan );
@@ -970,7 +971,7 @@ void VKimp_Shutdown( qboolean unloadDLL )
 		if ( drv && strcmp( drv, "x11" ) == 0 ) {
 			SDL_WarpMouseGlobal( glw_state.desktop_width / 2, glw_state.desktop_height / 2 );
 		} else {
-			SDL_ShowCursor( SDL_TRUE );
+			SDL_ShowCursor();
 		}
 	}
 
