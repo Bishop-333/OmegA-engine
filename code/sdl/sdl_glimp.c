@@ -117,11 +117,12 @@ static int FindNearestDisplay( int *x, int *y, int w, int h )
 	const int cy = *y + h / 2;
 	int i, index, numDisplays;
 	SDL_Rect *list, *m;
+	int finalID = 0;
 
 	index = -1; // selected display index
 
 	SDL_DisplayID *display = SDL_GetDisplays( &numDisplays );
-	if ( numDisplays <= 0 || display <= 0 )
+	if ( numDisplays <= 0 || !display )
 		return -1;
 
 	glw_state.monitorCount = numDisplays;
@@ -174,12 +175,14 @@ static int FindNearestDisplay( int *x, int *y, int w, int h )
 
 		if ( *y < m->y )
 			*y = m->y;
+		
+		finalID = display[index];
 	}
 
 	Z_Free( list );
 	SDL_free( display );
 
-	return index;
+	return finalID;
 }
 
 
@@ -350,7 +353,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 	int colorBits, depthBits, stencilBits;
 	int i;
 	const SDL_DisplayMode *desktopMode = NULL;
-	int display;
+	SDL_DisplayID display;
 	int x;
 	int y;
 	Uint64 flags = 0;
@@ -379,7 +382,7 @@ if ( !vulkan ) {
 		display = SDL_GetDisplayForWindow( SDL_window );
 		if ( display < 0 )
 		{
-			Com_DPrintf( "SDL_GetWindowDisplayIndex() failed: %s\n", SDL_GetError() );
+			Com_DPrintf( "SDL_GetDisplayForWindow() failed: %s\n", SDL_GetError() );
 		}
 	}
 	else
@@ -668,7 +671,6 @@ if ( !vulkan ) {
 	{
 #ifdef USE_ICON
 		SDL_Surface *icon = SDL_CreateSurfaceFrom(
-			(void *)CLIENT_WINDOW_ICON.pixel_data,
 			CLIENT_WINDOW_ICON.width,
 			CLIENT_WINDOW_ICON.height,
 			SDL_PIXELFORMAT_RGBA32,
