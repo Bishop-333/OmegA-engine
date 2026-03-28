@@ -216,13 +216,8 @@ qboolean SNDDMA_Init( void )
 	}
 
 	sdlPlaybackDevice = SDL_GetAudioStreamDevice(sdlPlaybackStream);
-	if (!SDL_GetAudioDeviceFormat(sdlPlaybackDevice, &obtained, &sample_frames))
-	{
-		Com_Printf("SDL_GetAudioDeviceFormat() failed: %s\n", SDL_GetError());
-		// Use desired format if we can't get the actual format
-		obtained = desired;
-		sample_frames = 1024;
-	}
+	obtained = desired;
+	sample_frames = 1024;
 
 	SNDDMA_PrintAudiospec( "SDL_AudioSpec", &obtained );
 
