@@ -369,12 +369,10 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 		Com_Printf( "Initializing OpenGL display\n");
 	}
 
-if ( !vulkan ) {
 	if ( r_allowResize->integer )
 	{
 		flags |= SDL_WINDOW_RESIZABLE;
 	}
-}
 
 	// If a window exists, note its display index
 	if ( SDL_window != NULL )
