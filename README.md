@@ -29,7 +29,7 @@ Go to [Releases](../../releases) section to download latest binaries for your pl
 * improved server-side DoS protection, much reduced memory usage
 * raised filesystem limits (up to 20,000 maps can be handled in a single directory)
 * reworked Zone memory allocator, no more out-of-memory errors
-* non-intrusive support for SDL2 backend (video, audio, input), selectable at compile time
+* non-intrusive support for SDL3 backend (video, audio, input), selectable at compile time (based on [timangus](https://github.com/timangus)'s work on [ioquake3](https://github.com/ioquake/ioq3))
 * OpenAL sound API support (multiple speaker support and better sound quality)
 * Ogg Vorbis support
 * libjpeg-turbo support (JPEG image codec that uses SIMD instructions to accelerate baseline JPEG compression and decompression)
@@ -86,6 +86,7 @@ Performance is usually greater or equal to other opengl1 renderers
 
 ## Links
 
+* https://github.com/ec-/Quake3e
 * https://bitbucket.org/CPMADevs/cnq3
 * https://github.com/ioquake/ioq3
 * https://github.com/kennyalive/Quake-III-Arena-Kenny-Edition
@@ -94,6 +95,6 @@ Performance is usually greater or equal to other opengl1 renderers
 
 ## Donate
 
-I develop during my free time, if you enjoyed my engine/fork or my mod please consider supporting me by donating !
+I develop during my free time, if you enjoyed my engine or my mod please consider supporting me by donating !
 * paypal.me/fatsakura
 
