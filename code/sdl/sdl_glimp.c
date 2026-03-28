@@ -612,9 +612,9 @@ if ( !vulkan ) {
 			mode.h = config->vidHeight;
 			mode.refresh_rate = /* config->displayFrequency = */ Cvar_VariableIntegerValue( "r_displayRefresh" );
 
-			if ( !SDL_SetWindowFullscreen( SDL_window, &mode ) )
+			if ( !SDL_SetWindowFullscreen( SDL_window, true ) )
 			{
-				Com_DPrintf( "SDL_SetWindowFullscreenMode failed: %s\n", SDL_GetError( ) );
+				Com_DPrintf( "SDL_SetWindowFullscreen failed: %s\n", SDL_GetError( ) );
 				continue;
 			}
 
