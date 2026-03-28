@@ -117,13 +117,13 @@ static SDL_DisplayID FindNearestDisplay( int *x, int *y, int w, int h )
 	const int cy = *y + h / 2;
 	int i, index, numDisplays;
 	SDL_Rect *list, *m;
-	int finalID = 0;
+	SDL_DisplayID finalID = 0;
 
 	index = -1; // selected display index
 
 	SDL_DisplayID *display = SDL_GetDisplays( &numDisplays );
 	if ( numDisplays <= 0 || !display )
-		return -1;
+		return 0;
 
 	glw_state.monitorCount = numDisplays;
 
