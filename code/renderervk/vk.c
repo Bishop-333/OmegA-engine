@@ -7916,11 +7916,9 @@ qboolean vk_bloom( void )
 	}
 
 	vk_end_render_pass(); // end main
-#ifdef __APPLE__
 	VkImageMemoryBarrier barrier;
 	barrier.image = vk.color_image;
 	qvkCmdPipelineBarrier( vk.cmd->command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier );
-#endif
 
 	// bloom extraction
 	vk_begin_bloom_extract_render_pass();
