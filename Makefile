@@ -14,7 +14,7 @@ COMPILE_PLATFORM=$(shell uname | sed -e 's/_.*//' | tr '[:upper:]' '[:lower:]' |
 COMPILE_ARCH=$(shell uname -m | sed -e 's/i.86/x86/' | sed -e 's/^arm.*/arm/')
 
 #arm64 hack!
-ifeq ($(shell uname -m), arm64)
+ifeq ($(shell uname -m), aarch64)
   COMPILE_ARCH=arm64
 else
 ifeq ($(COMPILE_ARCH),arm64)
