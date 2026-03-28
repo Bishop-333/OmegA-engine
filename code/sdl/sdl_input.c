@@ -33,7 +33,7 @@ static cvar_t *in_keyboardDebug;
 static cvar_t *in_forceCharset;
 
 #ifdef USE_JOYSTICK
-static SDL_GameController *gamepad;
+static SDL_Gamepad *gamepad;
 static SDL_Joystick *stick = NULL;
 #endif
 
@@ -723,12 +723,13 @@ static void IN_GamepadMove( void )
 	// check buttons
 	for (i = 0; i < SDL_GAMEPAD_BUTTON_COUNT; i++)
 	{
+		SDL_GamepadButton sdlButton = SDL_GAMEPAD_BUTTON_SOUTH + i;
 		qboolean pressed = SDL_GetGamepadButton(gamepad, sdlButton);
 		if (pressed != stick_state.buttons[i])
 		{
 #if SDL_VERSION_ATLEAST( 2, 0, 14 )
-			if ( i >= SDL_CONTROLLER_BUTTON_MISC1 ) {
-				Com_QueueEvent(in_eventTime, SE_KEY, K_PAD0_MISC1 + i - SDL_CONTROLLER_BUTTON_MISC1, pressed, 0, NULL);
+			if ( i >= SDL_GAMEPAD_BUTTON_MISC1 ) {
+				Com_QueueEvent(in_eventTime, SE_KEY, K_PAD0_MISC1 + i - SDL_GAMEPAD_BUTTON_MISC1, pressed, 0, NULL);
 			} else
 #endif
 			{
