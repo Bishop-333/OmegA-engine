@@ -612,6 +612,21 @@ if ( !vulkan ) {
 			mode.h = config->vidHeight;
 			mode.refresh_rate = /* config->displayFrequency = */ Cvar_VariableIntegerValue( "r_displayRefresh" );
 
+			if ( r_fullscreen->integer == 2 )
+			{
+				SDL_SetWindowFullscreenMode( SDL_window, NULL );
+			}
+			else
+			{
+				SDL_DisplayMode closest;
+
+				if ( SDL_GetClosestFullscreenDisplayMode( SDL_GetDisplayForWindow( SDL_window ), 
+					mode.w, mode.h, mode.refresh_rate, true, &closest ) )
+				{
+					SDL_SetWindowFullscreenMode( SDL_window, &closest );
+				}
+			}
+
 			if ( !SDL_SetWindowFullscreen( SDL_window, true ) )
 			{
 				Com_DPrintf( "SDL_SetWindowFullscreen failed: %s\n", SDL_GetError( ) );
