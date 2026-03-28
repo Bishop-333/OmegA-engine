@@ -1293,9 +1293,15 @@ void HandleEvents( void )
 				}
 				break;
 
-			case SDL_EVENT_WINDOW_MINIMIZED:    Cvar_SetValue( "com_minimized", 1 ); break;
+			case SDL_EVENT_WINDOW_MINIMIZED:
+				gw_minimized = qtrue;
+				Cvar_SetValue( "com_minimized", 1 );
+				break;
 			case SDL_EVENT_WINDOW_RESTORED:
-			case SDL_EVENT_WINDOW_MAXIMIZED:    Cvar_SetValue( "com_minimized", 0 ); break;
+			case SDL_EVENT_WINDOW_MAXIMIZED:
+				gw_minimized = qfalse;
+				Cvar_SetValue( "com_minimized", 0 );
+				break;
 			case SDL_EVENT_WINDOW_FOCUS_LOST:   Cvar_SetValue( "com_unfocused", 1 ); break;
 			case SDL_EVENT_WINDOW_FOCUS_GAINED: Cvar_SetValue( "com_unfocused", 0 ); break;
 			case SDL_EVENT_WINDOW_MOUSE_ENTER:
