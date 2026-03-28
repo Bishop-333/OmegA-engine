@@ -1271,7 +1271,7 @@ void HandleEvents( void )
 					height = e.window.data2;
 
 					// ignore this event on fullscreen
-					if( cls.glconfig.isFullscreen )
+					if( glw_state.isFullscreen )
 					{
 						break;
 					}
