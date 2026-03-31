@@ -926,6 +926,11 @@ $(echo_cmd) "BOT_CC $<"
 $(Q)$(CC) $(CFLAGS) $(BOTCFLAGS) -DBOTLIB -o $@ -c $<
 endef
 
+define DO_VORBIS_CC
+$(echo_cmd) "CC $<"
+$(Q)$(CC) $(CFLAGS) -w -o $@ -c $<
+endef
+
 define DO_AS
 $(echo_cmd) "AS $<"
 $(Q)$(CC) $(CFLAGS) -DELF -x assembler-with-cpp -o $@ -c $<
@@ -1657,7 +1662,7 @@ $(B)/client/ogg/%.o: $(OGGDIR)/src/%.c
 	$(DO_CC)
 
 $(B)/client/vorbis/%.o: $(VORBISDIR)/lib/%.c
-	$(DO_CC)
+	$(DO_VORBIS_CC)
 
 $(B)/client/%.o: $(SDLDIR)/%.c
 	$(DO_CC)
