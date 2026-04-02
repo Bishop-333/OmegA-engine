@@ -5284,7 +5284,11 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	input_assembly_state.pNext = NULL;
 	input_assembly_state.flags = 0;
 	input_assembly_state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+#ifdef __APPLE__
+	input_assembly_state.primitiveRestartEnable = VK_TRUE;
+#else
 	input_assembly_state.primitiveRestartEnable = VK_FALSE;
+#endif
 
 	//
 	// Viewport.
@@ -5483,7 +5487,11 @@ void vk_create_blur_pipeline( uint32_t index, uint32_t width, uint32_t height, q
 	input_assembly_state.pNext = NULL;
 	input_assembly_state.flags = 0;
 	input_assembly_state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+#ifdef __APPLE__
+	input_assembly_state.primitiveRestartEnable = VK_TRUE;
+#else
 	input_assembly_state.primitiveRestartEnable = VK_FALSE;
+#endif
 
 	//
 	// Viewport.
@@ -6294,7 +6302,11 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	input_assembly_state.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
 	input_assembly_state.pNext = NULL;
 	input_assembly_state.flags = 0;
+#ifdef __APPLE__
+	input_assembly_state.primitiveRestartEnable = VK_TRUE;
+#else
 	input_assembly_state.primitiveRestartEnable = VK_FALSE;
+#endif
 
 	switch ( def->primitives ) {
 		case LINE_LIST: input_assembly_state.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST; break;
