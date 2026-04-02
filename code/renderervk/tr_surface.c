@@ -1173,6 +1173,17 @@ static void RB_SurfaceGrid( srfGridMesh_t *cv ) {
 	heightTable[lodHeight] = cv->height-1;
 	lodHeight++;
 
+	if ( r_subdivisions->integer < 2 ) {
+		for ( i = 0 ; i < cv->width ; i++ ) {
+			widthTable[i] = i;
+		}
+		for ( i = 0 ; i < cv->height ; i++ ) {
+			heightTable[i] = i;
+		}
+		lodWidth = cv->width;
+		lodHeight = cv->height;
+	}
+
 	// very large grids may have more points or indexes than can be fit
 	// in the tess structure, so we may have to issue it in multiple passes
 
