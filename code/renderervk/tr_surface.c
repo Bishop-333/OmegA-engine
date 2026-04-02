@@ -1032,6 +1032,11 @@ void RB_SurfaceGridEstimate( srfGridMesh_t *cv, int *numVertexes, int *numIndexe
 	}
 	lodHeight++;
 
+	if ( r_subdivisions->integer < 2 ) {
+		lodWidth = cv->width;
+		lodHeight = cv->height;
+	}
+
 	used = 0;
 	while ( used < lodHeight - 1 ) {
 		// see how many rows of both verts and indexes we can add without overflowing
