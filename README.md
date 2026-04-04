@@ -58,6 +58,7 @@ Based on [Quake-III-Arena-Kenny-Edition](https://github.com/kennyalive/Quake-III
 * `screenMap` texture rendering - to create realistic environment reflections
 * multisample anti-aliasing (**\r_ext_multisample**)
 * supersample anti-aliasing (**\r_ext_supersample**)
+* fast approximate anti-aliasing (beta) (**\r_ext_fxaa**)
 * per-window gamma-correction which is important for screen-capture tools like OBS
 * you can minimize game window any time during **\video**|**\video-pipe** recording
 * high dynamic range render targets (**\r_hdr 1**) to avoid color banding
