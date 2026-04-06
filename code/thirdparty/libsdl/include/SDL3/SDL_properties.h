@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -59,16 +59,16 @@ extern "C" {
 #endif
 
 /**
- * SDL properties ID
+ * An ID that represents a properties set.
  *
- * \since This datatype is available since SDL 3.1.3.
+ * \since This datatype is available since SDL 3.2.0.
  */
 typedef Uint32 SDL_PropertiesID;
 
 /**
  * SDL property type
  *
- * \since This enum is available since SDL 3.1.3.
+ * \since This enum is available since SDL 3.2.0.
  */
 typedef enum SDL_PropertyType
 {
@@ -81,12 +81,39 @@ typedef enum SDL_PropertyType
 } SDL_PropertyType;
 
 /**
+ * A generic property for naming things.
+ *
+ * This property is intended to be added to any SDL_PropertiesID that needs a
+ * generic name associated with the property set. It is not guaranteed that
+ * any property set will include this key, but it is convenient to have a
+ * standard key that any piece of code could reasonably agree to use.
+ *
+ * For example, the properties associated with an SDL_Texture might have a
+ * name string of "player sprites", or an SDL_AudioStream might have
+ * "background music", etc. This might also be useful for an SDL_IOStream to
+ * list the path to its asset.
+ *
+ * There is no format for the value set with this key; it is expected to be
+ * human-readable and informational in nature, possibly for logging or
+ * debugging purposes.
+ *
+ * SDL does not currently set this property on any objects it creates, but
+ * this may change in later versions; it is currently expected that apps and
+ * external libraries will take advantage of it, when appropriate.
+ *
+ * \since This macro is available since SDL 3.4.0.
+ */
+#define SDL_PROP_NAME_STRING "SDL.name"
+
+/**
  * Get the global SDL properties.
  *
  * \returns a valid property ID on success or 0 on failure; call
  *          SDL_GetError() for more information.
  *
- * \since This function is available since SDL 3.1.3.
+ * \threadsafety It is safe to call this function from any thread.
+ *
+ * \since This function is available since SDL 3.2.0.
  */
 extern SDL_DECLSPEC SDL_PropertiesID SDLCALL SDL_GetGlobalProperties(void);
 
@@ -100,7 +127,7 @@ extern SDL_DECLSPEC SDL_PropertiesID SDLCALL SDL_GetGlobalProperties(void);
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_DestroyProperties
  */
@@ -119,9 +146,11 @@ extern SDL_DECLSPEC SDL_PropertiesID SDLCALL SDL_CreateProperties(void);
  * \returns true on success or false on failure; call SDL_GetError() for more
  *          information.
  *
- * \threadsafety It is safe to call this function from any thread.
+ * \threadsafety It is safe to call this function from any thread. This
+ *               function acquires simultaneous mutex locks on both the source
+ *               and destination property sets.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  */
 extern SDL_DECLSPEC bool SDLCALL SDL_CopyProperties(SDL_PropertiesID src, SDL_PropertiesID dst);
 
@@ -143,7 +172,7 @@ extern SDL_DECLSPEC bool SDLCALL SDL_CopyProperties(SDL_PropertiesID src, SDL_Pr
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_UnlockProperties
  */
@@ -156,7 +185,7 @@ extern SDL_DECLSPEC bool SDLCALL SDL_LockProperties(SDL_PropertiesID props);
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_LockProperties
  */
@@ -180,7 +209,7 @@ extern SDL_DECLSPEC void SDLCALL SDL_UnlockProperties(SDL_PropertiesID props);
  * \threadsafety This callback may fire without any locks held; if this is a
  *               concern, the app should provide its own locking.
  *
- * \since This datatype is available since SDL 3.1.3.
+ * \since This datatype is available since SDL 3.2.0.
  *
  * \sa SDL_SetPointerPropertyWithCleanup
  */
@@ -209,7 +238,7 @@ typedef void (SDLCALL *SDL_CleanupPropertyCallback)(void *userdata, void *value)
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_GetPointerProperty
  * \sa SDL_SetPointerProperty
@@ -228,7 +257,7 @@ extern SDL_DECLSPEC bool SDLCALL SDL_SetPointerPropertyWithCleanup(SDL_Propertie
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_GetPointerProperty
  * \sa SDL_HasProperty
@@ -254,7 +283,7 @@ extern SDL_DECLSPEC bool SDLCALL SDL_SetPointerProperty(SDL_PropertiesID props, 
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_GetStringProperty
  */
@@ -271,7 +300,7 @@ extern SDL_DECLSPEC bool SDLCALL SDL_SetStringProperty(SDL_PropertiesID props, c
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_GetNumberProperty
  */
@@ -288,7 +317,7 @@ extern SDL_DECLSPEC bool SDLCALL SDL_SetNumberProperty(SDL_PropertiesID props, c
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_GetFloatProperty
  */
@@ -305,7 +334,7 @@ extern SDL_DECLSPEC bool SDLCALL SDL_SetFloatProperty(SDL_PropertiesID props, co
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_GetBooleanProperty
  */
@@ -320,7 +349,7 @@ extern SDL_DECLSPEC bool SDLCALL SDL_SetBooleanProperty(SDL_PropertiesID props, 
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_GetPropertyType
  */
@@ -336,7 +365,7 @@ extern SDL_DECLSPEC bool SDLCALL SDL_HasProperty(SDL_PropertiesID props, const c
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_HasProperty
  */
@@ -363,7 +392,7 @@ extern SDL_DECLSPEC SDL_PropertyType SDLCALL SDL_GetPropertyType(SDL_PropertiesI
  *               If you need to avoid this, use SDL_LockProperties() and
  *               SDL_UnlockProperties().
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_GetBooleanProperty
  * \sa SDL_GetFloatProperty
@@ -391,7 +420,7 @@ extern SDL_DECLSPEC void * SDLCALL SDL_GetPointerProperty(SDL_PropertiesID props
  *               If you need to avoid this, use SDL_LockProperties() and
  *               SDL_UnlockProperties().
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_GetPropertyType
  * \sa SDL_HasProperty
@@ -413,7 +442,7 @@ extern SDL_DECLSPEC const char * SDLCALL SDL_GetStringProperty(SDL_PropertiesID 
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_GetPropertyType
  * \sa SDL_HasProperty
@@ -435,7 +464,7 @@ extern SDL_DECLSPEC Sint64 SDLCALL SDL_GetNumberProperty(SDL_PropertiesID props,
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_GetPropertyType
  * \sa SDL_HasProperty
@@ -457,7 +486,7 @@ extern SDL_DECLSPEC float SDLCALL SDL_GetFloatProperty(SDL_PropertiesID props, c
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_GetPropertyType
  * \sa SDL_HasProperty
@@ -475,7 +504,7 @@ extern SDL_DECLSPEC bool SDLCALL SDL_GetBooleanProperty(SDL_PropertiesID props, 
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  */
 extern SDL_DECLSPEC bool SDLCALL SDL_ClearProperty(SDL_PropertiesID props, const char *name);
 
@@ -492,7 +521,7 @@ extern SDL_DECLSPEC bool SDLCALL SDL_ClearProperty(SDL_PropertiesID props, const
  * \threadsafety SDL_EnumerateProperties holds a lock on `props` during this
  *               callback.
  *
- * \since This datatype is available since SDL 3.1.3.
+ * \since This datatype is available since SDL 3.2.0.
  *
  * \sa SDL_EnumerateProperties
  */
@@ -512,7 +541,7 @@ typedef void (SDLCALL *SDL_EnumeratePropertiesCallback)(void *userdata, SDL_Prop
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  */
 extern SDL_DECLSPEC bool SDLCALL SDL_EnumerateProperties(SDL_PropertiesID props, SDL_EnumeratePropertiesCallback callback, void *userdata);
 
@@ -528,7 +557,7 @@ extern SDL_DECLSPEC bool SDLCALL SDL_EnumerateProperties(SDL_PropertiesID props,
  *               locked or other threads might be setting or getting values
  *               from these properties.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_CreateProperties
  */

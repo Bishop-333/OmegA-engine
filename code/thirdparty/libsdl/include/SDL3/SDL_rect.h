@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -41,7 +41,7 @@ extern "C" {
 /**
  * The structure that defines a point (using integers).
  *
- * \since This struct is available since SDL 3.1.3.
+ * \since This struct is available since SDL 3.2.0.
  *
  * \sa SDL_GetRectEnclosingPoints
  * \sa SDL_PointInRect
@@ -55,7 +55,7 @@ typedef struct SDL_Point
 /**
  * The structure that defines a point (using floating point values).
  *
- * \since This struct is available since SDL 3.1.3.
+ * \since This struct is available since SDL 3.2.0.
  *
  * \sa SDL_GetRectEnclosingPointsFloat
  * \sa SDL_PointInRectFloat
@@ -70,7 +70,7 @@ typedef struct SDL_FPoint
 /**
  * A rectangle, with the origin at the upper left (using integers).
  *
- * \since This struct is available since SDL 3.1.3.
+ * \since This struct is available since SDL 3.2.0.
  *
  * \sa SDL_RectEmpty
  * \sa SDL_RectsEqual
@@ -88,10 +88,13 @@ typedef struct SDL_Rect
 
 
 /**
- * A rectangle, with the origin at the upper left (using floating point
- * values).
+ * A rectangle stored using floating point values.
  *
- * \since This struct is available since SDL 3.1.3.
+ * The origin of the coordinate space is in the top-left, with increasing
+ * values moving down and right. The properties `x` and `y` represent the
+ * coordinates of the top-left corner of the rectangle.
+ *
+ * \since This struct is available since SDL 3.2.0.
  *
  * \sa SDL_RectEmptyFloat
  * \sa SDL_RectsEqualFloat
@@ -121,14 +124,14 @@ typedef struct SDL_FRect
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  */
 SDL_FORCE_INLINE void SDL_RectToFRect(const SDL_Rect *rect, SDL_FRect *frect)
 {
-    frect->x = (float)rect->x;
-    frect->y = (float)rect->y;
-    frect->w = (float)rect->w;
-    frect->h = (float)rect->h;
+    frect->x = SDL_static_cast(float, rect->x);
+    frect->y = SDL_static_cast(float, rect->y);
+    frect->w = SDL_static_cast(float, rect->w);
+    frect->h = SDL_static_cast(float, rect->h);
 }
 
 /**
@@ -150,7 +153,7 @@ SDL_FORCE_INLINE void SDL_RectToFRect(const SDL_Rect *rect, SDL_FRect *frect)
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  */
 SDL_FORCE_INLINE bool SDL_PointInRect(const SDL_Point *p, const SDL_Rect *r)
 {
@@ -174,7 +177,7 @@ SDL_FORCE_INLINE bool SDL_PointInRect(const SDL_Point *p, const SDL_Rect *r)
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  */
 SDL_FORCE_INLINE bool SDL_RectEmpty(const SDL_Rect *r)
 {
@@ -198,7 +201,7 @@ SDL_FORCE_INLINE bool SDL_RectEmpty(const SDL_Rect *r)
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  */
 SDL_FORCE_INLINE bool SDL_RectsEqual(const SDL_Rect *a, const SDL_Rect *b)
 {
@@ -217,7 +220,7 @@ SDL_FORCE_INLINE bool SDL_RectsEqual(const SDL_Rect *a, const SDL_Rect *b)
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_GetRectIntersection
  */
@@ -234,7 +237,9 @@ extern SDL_DECLSPEC bool SDLCALL SDL_HasRectIntersection(const SDL_Rect *A, cons
  *               rectangles `A` and `B`.
  * \returns true if there is an intersection, false otherwise.
  *
- * \since This function is available since SDL 3.1.3.
+ * \threadsafety It is safe to call this function from any thread.
+ *
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_HasRectIntersection
  */
@@ -250,7 +255,9 @@ extern SDL_DECLSPEC bool SDLCALL SDL_GetRectIntersection(const SDL_Rect *A, cons
  * \returns true on success or false on failure; call SDL_GetError() for more
  *          information.
  *
- * \since This function is available since SDL 3.1.3.
+ * \threadsafety It is safe to call this function from any thread.
+ *
+ * \since This function is available since SDL 3.2.0.
  */
 extern SDL_DECLSPEC bool SDLCALL SDL_GetRectUnion(const SDL_Rect *A, const SDL_Rect *B, SDL_Rect *result);
 
@@ -269,7 +276,9 @@ extern SDL_DECLSPEC bool SDLCALL SDL_GetRectUnion(const SDL_Rect *A, const SDL_R
  * \returns true if any points were enclosed or false if all the points were
  *          outside of the clipping rectangle.
  *
- * \since This function is available since SDL 3.1.3.
+ * \threadsafety It is safe to call this function from any thread.
+ *
+ * \since This function is available since SDL 3.2.0.
  */
 extern SDL_DECLSPEC bool SDLCALL SDL_GetRectEnclosingPoints(const SDL_Point *points, int count, const SDL_Rect *clip, SDL_Rect *result);
 
@@ -289,7 +298,9 @@ extern SDL_DECLSPEC bool SDLCALL SDL_GetRectEnclosingPoints(const SDL_Point *poi
  * \param Y2 a pointer to the ending Y-coordinate of the line.
  * \returns true if there is an intersection, false otherwise.
  *
- * \since This function is available since SDL 3.1.3.
+ * \threadsafety It is safe to call this function from any thread.
+ *
+ * \since This function is available since SDL 3.2.0.
  */
 extern SDL_DECLSPEC bool SDLCALL SDL_GetRectAndLineIntersection(const SDL_Rect *rect, int *X1, int *Y1, int *X2, int *Y2);
 
@@ -315,7 +326,7 @@ extern SDL_DECLSPEC bool SDLCALL SDL_GetRectAndLineIntersection(const SDL_Rect *
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  */
 SDL_FORCE_INLINE bool SDL_PointInRectFloat(const SDL_FPoint *p, const SDL_FRect *r)
 {
@@ -324,7 +335,7 @@ SDL_FORCE_INLINE bool SDL_PointInRectFloat(const SDL_FPoint *p, const SDL_FRect 
 }
 
 /**
- * Determine whether a floating point rectangle can contain any point.
+ * Determine whether a floating point rectangle takes no space.
  *
  * A rectangle is considered "empty" for this function if `r` is NULL, or if
  * `r`'s width and/or height are < 0.0f.
@@ -339,7 +350,7 @@ SDL_FORCE_INLINE bool SDL_PointInRectFloat(const SDL_FPoint *p, const SDL_FRect 
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  */
 SDL_FORCE_INLINE bool SDL_RectEmptyFloat(const SDL_FRect *r)
 {
@@ -367,11 +378,11 @@ SDL_FORCE_INLINE bool SDL_RectEmptyFloat(const SDL_FRect *r)
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_RectsEqualFloat
  */
-SDL_FORCE_INLINE bool SDL_RectsEqualEpsilon(const SDL_FRect *a, const SDL_FRect *b, const float epsilon)
+SDL_FORCE_INLINE bool SDL_RectsEqualEpsilon(const SDL_FRect *a, const SDL_FRect *b, float epsilon)
 {
     return (a && b && ((a == b) ||
             ((SDL_fabsf(a->x - b->x) <= epsilon) &&
@@ -402,7 +413,7 @@ SDL_FORCE_INLINE bool SDL_RectsEqualEpsilon(const SDL_FRect *a, const SDL_FRect 
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_RectsEqualEpsilon
  */
@@ -420,9 +431,11 @@ SDL_FORCE_INLINE bool SDL_RectsEqualFloat(const SDL_FRect *a, const SDL_FRect *b
  * \param B an SDL_FRect structure representing the second rectangle.
  * \returns true if there is an intersection, false otherwise.
  *
- * \since This function is available since SDL 3.1.3.
+ * \threadsafety It is safe to call this function from any thread.
  *
- * \sa SDL_GetRectIntersection
+ * \since This function is available since SDL 3.2.0.
+ *
+ * \sa SDL_GetRectIntersectionFloat
  */
 extern SDL_DECLSPEC bool SDLCALL SDL_HasRectIntersectionFloat(const SDL_FRect *A, const SDL_FRect *B);
 
@@ -437,7 +450,9 @@ extern SDL_DECLSPEC bool SDLCALL SDL_HasRectIntersectionFloat(const SDL_FRect *A
  *               rectangles `A` and `B`.
  * \returns true if there is an intersection, false otherwise.
  *
- * \since This function is available since SDL 3.1.3.
+ * \threadsafety It is safe to call this function from any thread.
+ *
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_HasRectIntersectionFloat
  */
@@ -453,7 +468,9 @@ extern SDL_DECLSPEC bool SDLCALL SDL_GetRectIntersectionFloat(const SDL_FRect *A
  * \returns true on success or false on failure; call SDL_GetError() for more
  *          information.
  *
- * \since This function is available since SDL 3.1.3.
+ * \threadsafety It is safe to call this function from any thread.
+ *
+ * \since This function is available since SDL 3.2.0.
  */
 extern SDL_DECLSPEC bool SDLCALL SDL_GetRectUnionFloat(const SDL_FRect *A, const SDL_FRect *B, SDL_FRect *result);
 
@@ -473,7 +490,9 @@ extern SDL_DECLSPEC bool SDLCALL SDL_GetRectUnionFloat(const SDL_FRect *A, const
  * \returns true if any points were enclosed or false if all the points were
  *          outside of the clipping rectangle.
  *
- * \since This function is available since SDL 3.1.3.
+ * \threadsafety It is safe to call this function from any thread.
+ *
+ * \since This function is available since SDL 3.2.0.
  */
 extern SDL_DECLSPEC bool SDLCALL SDL_GetRectEnclosingPointsFloat(const SDL_FPoint *points, int count, const SDL_FRect *clip, SDL_FRect *result);
 
@@ -494,7 +513,9 @@ extern SDL_DECLSPEC bool SDLCALL SDL_GetRectEnclosingPointsFloat(const SDL_FPoin
  * \param Y2 a pointer to the ending Y-coordinate of the line.
  * \returns true if there is an intersection, false otherwise.
  *
- * \since This function is available since SDL 3.1.3.
+ * \threadsafety It is safe to call this function from any thread.
+ *
+ * \since This function is available since SDL 3.2.0.
  */
 extern SDL_DECLSPEC bool SDLCALL SDL_GetRectAndLineIntersectionFloat(const SDL_FRect *rect, float *X1, float *Y1, float *X2, float *Y2);
 

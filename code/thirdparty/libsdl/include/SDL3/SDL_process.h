@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -54,6 +54,13 @@
 extern "C" {
 #endif
 
+/**
+ * An opaque handle representing a system process.
+ *
+ * \since This datatype is available since SDL 3.2.0.
+ *
+ * \sa SDL_CreateProcess
+ */
 typedef struct SDL_Process SDL_Process;
 
 /**
@@ -85,7 +92,7 @@ typedef struct SDL_Process SDL_Process;
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_CreateProcessWithProperties
  * \sa SDL_GetProcessProperties
@@ -96,14 +103,14 @@ typedef struct SDL_Process SDL_Process;
  * \sa SDL_WaitProcess
  * \sa SDL_DestroyProcess
  */
-extern SDL_DECLSPEC SDL_Process *SDLCALL SDL_CreateProcess(const char * const *args, bool pipe_stdio);
+extern SDL_DECLSPEC SDL_Process * SDLCALL SDL_CreateProcess(const char * const *args, bool pipe_stdio);
 
 /**
  * Description of where standard I/O should be directed when creating a
  * process.
  *
- * If a standard I/O stream is set to SDL_PROCESS_STDIO_INHERIT, it will go to
- * the same place as the application's I/O stream. This is the default for
+ * If a standard I/O stream is set to SDL_PROCESS_STDIO_INHERITED, it will go
+ * to the same place as the application's I/O stream. This is the default for
  * standard output and standard error.
  *
  * If a standard I/O stream is set to SDL_PROCESS_STDIO_NULL, it is connected
@@ -132,7 +139,7 @@ extern SDL_DECLSPEC SDL_Process *SDLCALL SDL_CreateProcess(const char * const *a
  * `SDL_PROP_IOSTREAM_FILE_DESCRIPTOR_NUMBER` set. This is true for streams
  * representing files and process I/O.
  *
- * \since This enum is available since SDL 3.1.3.
+ * \since This enum is available since SDL 3.2.0.
  *
  * \sa SDL_CreateProcessWithProperties
  * \sa SDL_GetProcessProperties
@@ -159,6 +166,9 @@ typedef enum SDL_ProcessIO
  * - `SDL_PROP_PROCESS_CREATE_ENVIRONMENT_POINTER`: an SDL_Environment
  *   pointer. If this property is set, it will be the entire environment for
  *   the process, otherwise the current environment is used.
+ * - `SDL_PROP_PROCESS_CREATE_WORKING_DIRECTORY_STRING`: a UTF-8 encoded
+ *   string representing the working directory for the process, defaults to
+ *   the current working directory.
  * - `SDL_PROP_PROCESS_CREATE_STDIN_NUMBER`: an SDL_ProcessIO value describing
  *   where standard input for the process comes from, defaults to
  *   `SDL_PROCESS_STDIO_NULL`.
@@ -166,13 +176,13 @@ typedef enum SDL_ProcessIO
  *   standard input when `SDL_PROP_PROCESS_CREATE_STDIN_NUMBER` is set to
  *   `SDL_PROCESS_STDIO_REDIRECT`.
  * - `SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER`: an SDL_ProcessIO value
- *   describing where standard output for the process goes go, defaults to
+ *   describing where standard output for the process goes to, defaults to
  *   `SDL_PROCESS_STDIO_INHERITED`.
  * - `SDL_PROP_PROCESS_CREATE_STDOUT_POINTER`: an SDL_IOStream pointer used
  *   for standard output when `SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER` is set
  *   to `SDL_PROCESS_STDIO_REDIRECT`.
  * - `SDL_PROP_PROCESS_CREATE_STDERR_NUMBER`: an SDL_ProcessIO value
- *   describing where standard error for the process goes go, defaults to
+ *   describing where standard error for the process goes to, defaults to
  *   `SDL_PROCESS_STDIO_INHERITED`.
  * - `SDL_PROP_PROCESS_CREATE_STDERR_POINTER`: an SDL_IOStream pointer used
  *   for standard error when `SDL_PROP_PROCESS_CREATE_STDERR_NUMBER` is set to
@@ -185,6 +195,12 @@ typedef enum SDL_ProcessIO
  *   run in the background. In this case the default input and output is
  *   `SDL_PROCESS_STDIO_NULL` and the exitcode of the process is not
  *   available, and will always be 0.
+ * - `SDL_PROP_PROCESS_CREATE_CMDLINE_STRING`: a string containing the program
+ *   to run and any parameters. This string is passed directly to
+ *   `CreateProcess` on Windows, and does nothing on other platforms. This
+ *   property is only important if you want to start programs that does
+ *   non-standard command-line processing, and in most cases using
+ *   `SDL_PROP_PROCESS_CREATE_ARGS_POINTER` is sufficient.
  *
  * On POSIX platforms, wait() and waitpid(-1, ...) should not be called, and
  * SIGCHLD should not be ignored or handled because those would prevent SDL
@@ -197,7 +213,7 @@ typedef enum SDL_ProcessIO
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_CreateProcess
  * \sa SDL_GetProcessProperties
@@ -208,10 +224,11 @@ typedef enum SDL_ProcessIO
  * \sa SDL_WaitProcess
  * \sa SDL_DestroyProcess
  */
-extern SDL_DECLSPEC SDL_Process *SDLCALL SDL_CreateProcessWithProperties(SDL_PropertiesID props);
+extern SDL_DECLSPEC SDL_Process * SDLCALL SDL_CreateProcessWithProperties(SDL_PropertiesID props);
 
 #define SDL_PROP_PROCESS_CREATE_ARGS_POINTER                "SDL.process.create.args"
 #define SDL_PROP_PROCESS_CREATE_ENVIRONMENT_POINTER         "SDL.process.create.environment"
+#define SDL_PROP_PROCESS_CREATE_WORKING_DIRECTORY_STRING    "SDL.process.create.working_directory"
 #define SDL_PROP_PROCESS_CREATE_STDIN_NUMBER                "SDL.process.create.stdin_option"
 #define SDL_PROP_PROCESS_CREATE_STDIN_POINTER               "SDL.process.create.stdin_source"
 #define SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER               "SDL.process.create.stdout_option"
@@ -220,6 +237,7 @@ extern SDL_DECLSPEC SDL_Process *SDLCALL SDL_CreateProcessWithProperties(SDL_Pro
 #define SDL_PROP_PROCESS_CREATE_STDERR_POINTER              "SDL.process.create.stderr_source"
 #define SDL_PROP_PROCESS_CREATE_STDERR_TO_STDOUT_BOOLEAN    "SDL.process.create.stderr_to_stdout"
 #define SDL_PROP_PROCESS_CREATE_BACKGROUND_BOOLEAN          "SDL.process.create.background"
+#define SDL_PROP_PROCESS_CREATE_CMDLINE_STRING              "SDL.process.create.cmdline"
 
 /**
  * Get the properties associated with a process.
@@ -245,7 +263,7 @@ extern SDL_DECLSPEC SDL_Process *SDLCALL SDL_CreateProcessWithProperties(SDL_Pro
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_CreateProcess
  * \sa SDL_CreateProcessWithProperties
@@ -281,7 +299,7 @@ extern SDL_DECLSPEC SDL_PropertiesID SDLCALL SDL_GetProcessProperties(SDL_Proces
  *
  * \threadsafety This function is not thread safe.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_CreateProcess
  * \sa SDL_CreateProcessWithProperties
@@ -298,7 +316,7 @@ extern SDL_DECLSPEC void * SDLCALL SDL_ReadProcess(SDL_Process *process, size_t 
  *
  * Writing to this stream can return less data than expected if the process
  * hasn't read its input. It may be blocked waiting for its output to be read,
- * so if you may need to call SDL_GetOutputStream() and read the output in
+ * if so you may need to call SDL_GetProcessOutput() and read the output in
  * parallel with writing input.
  *
  * \param process The process to get the input stream for.
@@ -307,13 +325,13 @@ extern SDL_DECLSPEC void * SDLCALL SDL_ReadProcess(SDL_Process *process, size_t 
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_CreateProcess
  * \sa SDL_CreateProcessWithProperties
  * \sa SDL_GetProcessOutput
  */
-extern SDL_DECLSPEC SDL_IOStream *SDLCALL SDL_GetProcessInput(SDL_Process *process);
+extern SDL_DECLSPEC SDL_IOStream * SDLCALL SDL_GetProcessInput(SDL_Process *process);
 
 /**
  * Get the SDL_IOStream associated with process standard output.
@@ -331,13 +349,13 @@ extern SDL_DECLSPEC SDL_IOStream *SDLCALL SDL_GetProcessInput(SDL_Process *proce
  *
  * \threadsafety It is safe to call this function from any thread.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_CreateProcess
  * \sa SDL_CreateProcessWithProperties
  * \sa SDL_GetProcessInput
  */
-extern SDL_DECLSPEC SDL_IOStream *SDLCALL SDL_GetProcessOutput(SDL_Process *process);
+extern SDL_DECLSPEC SDL_IOStream * SDLCALL SDL_GetProcessOutput(SDL_Process *process);
 
 /**
  * Stop a process.
@@ -353,7 +371,7 @@ extern SDL_DECLSPEC SDL_IOStream *SDLCALL SDL_GetProcessOutput(SDL_Process *proc
  *
  * \threadsafety This function is not thread safe.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_CreateProcess
  * \sa SDL_CreateProcessWithProperties
@@ -371,6 +389,12 @@ extern SDL_DECLSPEC bool SDLCALL SDL_KillProcess(SDL_Process *process, bool forc
  * normally, a negative signal if it terminated due to a signal, or -255
  * otherwise. It will not be changed if the process is still running.
  *
+ * If you create a process with standard output piped to the application
+ * (`pipe_stdio` being true) then you should read all of the process output
+ * before calling SDL_WaitProcess(). If you don't do this the process might be
+ * blocked indefinitely waiting for output to be read and SDL_WaitProcess()
+ * will never return true;
+ *
  * \param process The process to wait for.
  * \param block If true, block until the process finishes; otherwise, report
  *              on the process' status.
@@ -380,7 +404,7 @@ extern SDL_DECLSPEC bool SDLCALL SDL_KillProcess(SDL_Process *process, bool forc
  *
  * \threadsafety This function is not thread safe.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_CreateProcess
  * \sa SDL_CreateProcessWithProperties
@@ -400,7 +424,7 @@ extern SDL_DECLSPEC bool SDLCALL SDL_WaitProcess(SDL_Process *process, bool bloc
  *
  * \threadsafety This function is not thread safe.
  *
- * \since This function is available since SDL 3.1.3.
+ * \since This function is available since SDL 3.2.0.
  *
  * \sa SDL_CreateProcess
  * \sa SDL_CreateProcessWithProperties
