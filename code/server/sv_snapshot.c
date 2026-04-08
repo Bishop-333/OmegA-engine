@@ -335,6 +335,21 @@ static qboolean SV_IsTeammate( const clientSnapshot_t *frame, const sharedEntity
 	return ps->persistant[ PERS_TEAM ] == clientTeam;
 }
 
+/*
+===============
+SV_IsFlagEntity
+===============
+*/
+#define MODELINDEX_REDFLAG 34
+#define MODELINDEX_BLUEFLAG 35
+static qboolean SV_IsFlagEntity( const sharedEntity_t *ent ) {
+	if ( ent->s.eType == ET_ITEM ) {
+		return ent->s.modelindex == MODELINDEX_REDFLAG || ent->s.modelindex == MODELINDEX_BLUEFLAG;
+	}
+
+	return qfalse;
+}
+
 
 /*
 ===============
@@ -400,8 +415,8 @@ static void SV_AddEntitiesVisibleFromPoint( const vec3_t origin, clientSnapshot_
 			continue;
 		}
 
-		// broadcast entities and teammates are always sent
-		if ( ent->r.svFlags & SVF_BROADCAST || SV_IsTeammate( frame, ent ) ) {
+		// broadcast entities, teammates and flags are always sent
+		if ( ent->r.svFlags & SVF_BROADCAST || SV_IsTeammate( frame, ent ) || SV_IsFlagEntity( ent ) ) {
 			SV_AddIndexToSnapshot( svEnt, e, eNums );
 			continue;
 		}
