@@ -66,9 +66,10 @@ vec3 applyFxaa(vec2 frag_tex_coord) {
 }
 
 void main() {
-	vec3 base = texture(texture0, frag_tex_coord).rgb;
+	vec4 color = texture(texture0, frag_tex_coord);
+	vec3 base = color.rgb;
 
-	if ( fxaa == 1 )
+	if ( fxaa == 1 && color.a >= 1.0 )
 	{
 		base = applyFxaa(frag_tex_coord);
 	}
