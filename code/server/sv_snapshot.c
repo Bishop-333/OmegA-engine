@@ -309,6 +309,35 @@ static void SV_AddIndexToSnapshot( svEntity_t *svEnt, int index, snapshotEntityN
 
 /*
 ===============
+SV_IsTeammate
+===============
+*/
+static qboolean SV_IsTeammate( const clientSnapshot_t *frame, const sharedEntity_t *ent ) {
+	playerState_t *ps;
+	int clientTeam;
+	int clientNum;
+
+	if ( ent->s.eType != ET_PLAYER ) {
+		return qfalse;
+	}
+
+	clientTeam = frame->ps.persistant[ PERS_TEAM ];
+	if ( clientTeam != TEAM_RED && clientTeam != TEAM_BLUE ) {
+		return qfalse;
+	}
+
+	clientNum = ent->s.clientNum;
+	if ( clientNum < 0 || clientNum >= sv_maxclients->integer ) {
+		return qfalse;
+	}
+
+	ps = SV_GameClientNum( clientNum );
+	return ps->persistant[ PERS_TEAM ] == clientTeam;
+}
+
+
+/*
+===============
 SV_AddEntitiesVisibleFromPoint
 ===============
 */
@@ -371,8 +400,8 @@ static void SV_AddEntitiesVisibleFromPoint( const vec3_t origin, clientSnapshot_
 			continue;
 		}
 
-		// broadcast entities are always sent
-		if ( ent->r.svFlags & SVF_BROADCAST ) {
+		// broadcast entities and teammates are always sent
+		if ( ent->r.svFlags & SVF_BROADCAST || SV_IsTeammate( frame, ent ) ) {
 			SV_AddIndexToSnapshot( svEnt, e, eNums );
 			continue;
 		}
