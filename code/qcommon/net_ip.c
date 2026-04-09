@@ -1444,7 +1444,7 @@ static void NET_GetLocalAddress( void )
 	
 		freeifaddrs( ifap );
 		
-		Sys_ShowIP();
+		//Sys_ShowIP();
 	}
 }
 #else // _WIN32
@@ -1497,7 +1497,7 @@ static void NET_GetLocalAddress( void ) {
 #endif
 		}
 	
-		Sys_ShowIP();
+		//Sys_ShowIP();
 	}
 	
 	if ( res )
@@ -1787,6 +1787,7 @@ void NET_Init( void ) {
 	NET_Config( qtrue );
 	
 	Cmd_AddCommand( "net_restart", NET_Restart_f );
+	Cmd_SetDescription( "net_restart", "Restarts the network system." );
 }
 
 

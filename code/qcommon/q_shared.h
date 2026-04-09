@@ -26,7 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // q_shared.h -- included first by ALL program modules.
 // A user mod should never modify this file
 
-#define Q3_VERSION            "OMG 3.3.3"
+#define Q3_VERSION            "OMG 3.3.8"
 #ifndef SVN_VERSION
   #define SVN_VERSION Q3_VERSION
 #endif
@@ -34,15 +34,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define CONSOLE_WINDOW_TITLE  "OmegA Console"
 // 1.32 released 7-10-2002
 
-#ifndef QUAKE3
-  #ifdef OMEGA
-    #define DEFAULT_GAME			"omega"
-  #elif RATMOD
-    #define DEFAULT_GAME			"rat"
-  #elif AFTERSHOCK
-    #define DEFAULT_GAME			"aftershock"
-  #endif
-#endif
+//#define DEFAULT_GAME          omega
 
 #ifdef QUAKE3
   #define BASEGAME				"baseq3"
@@ -179,6 +171,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 short ShortSwap( short l );
 int LongSwap( int l );
 float FloatSwap( const float *f );
+void CopyShortSwap( void *dest, void *src );
+void CopyLongSwap( void *dest, void *src );
 
 #include "q_platform.h"
 
@@ -381,12 +375,12 @@ typedef enum {
 
 #ifdef HUNK_DEBUG
 #define Hunk_Alloc( size, preference )				Hunk_AllocDebug(size, preference, #size, __FILE__, __LINE__)
-void *Hunk_AllocDebug( int size, ha_pref preference, char *label, char *file, int line );
+void *Hunk_AllocDebug( size_t size, ha_pref preference, const char *label, const char *file, int line );
 #else
-void *Hunk_Alloc( int size, ha_pref preference );
+void *Hunk_Alloc( size_t size, ha_pref preference );
 #endif
 
-#if defined(__GNUC__) && !defined(__MINGW32__) && !defined(MACOS_X)
+#if defined(__GNUC__) && !defined(__MINGW32__) && !defined(__APPLE__)
 // https://zerowing.idsoftware.com/bugzilla/show_bug.cgi?id=371
 // custom Snd_Memset implementation for glibc memset bug workaround
 void Snd_Memset (void* dest, const int val, const size_t count);
@@ -500,6 +494,10 @@ extern	vec4_t		colorDkGrey;
 #define S_COLOR_CYAN	"^5"
 #define S_COLOR_MAGENTA	"^6"
 #define S_COLOR_WHITE	"^7"
+
+#define S_COLOR_DEVEL	S_COLOR_CYAN
+#define S_COLOR_WARNING	S_COLOR_YELLOW
+#define S_COLOR_ERROR	S_COLOR_RED
 
 extern vec4_t	g_color_table[ 64 ];
 extern int ColorIndexFromChar( char ccode );
@@ -716,6 +714,8 @@ void	AnglesSubtract( vec3_t v1, vec3_t v2, vec3_t v3 );
 float AngleNormalize360 ( float angle );
 float AngleNormalize180 ( float angle );
 float AngleDelta ( float angle1, float angle2 );
+
+void SetupRotationMatrix( vec3_t matrix[3], const vec3_t dir, float degrees );
 
 qboolean PlaneFromPoints( vec4_t plane, const vec3_t a, const vec3_t b, const vec3_t c );
 void ProjectPointOnPlane( vec3_t dst, const vec3_t p, const vec3_t normal );

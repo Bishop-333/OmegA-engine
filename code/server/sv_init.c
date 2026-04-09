@@ -737,8 +737,8 @@ void SV_Init( void )
 	Cvar_SetDescription( sv_minRate, "Minimum server bandwidth (in bit per second) a client can use." );
 	sv_maxRate = Cvar_Get( "sv_maxRate", "0", CVAR_ARCHIVE_ND | CVAR_SERVERINFO );
 	Cvar_SetDescription( sv_maxRate, "Maximum server bandwidth (in bit per second) a client can use." );
-	sv_dlRate = Cvar_Get( "sv_dlRate", "100", CVAR_ARCHIVE | CVAR_SERVERINFO );
-	Cvar_CheckRange( sv_dlRate, "0", "500", CV_INTEGER );
+	sv_dlRate = Cvar_Get( "sv_dlRate", "500", CVAR_ARCHIVE | CVAR_SERVERINFO );
+	Cvar_CheckRange( sv_dlRate, "0", "1000", CV_INTEGER );
 	Cvar_SetDescription( sv_dlRate, "Bandwidth allotted to PK3 file downloads via UDP, in kbyte/s." );
 	sv_floodProtect = Cvar_Get( "sv_floodProtect", "1", CVAR_ARCHIVE | CVAR_SERVERINFO );
 	Cvar_SetDescription( sv_floodProtect, "Toggle server flood protection to keep players from bringing the server down." );
@@ -759,7 +759,7 @@ void SV_Init( void )
 	Cvar_SetDescription( sv_rconPassword, "Password for remote server commands." );
 	sv_privatePassword = Cvar_Get ("sv_privatePassword", "", CVAR_TEMP );
 	Cvar_SetDescription( sv_privatePassword, "Set password for private clients to login with." );
-	sv_fps = Cvar_Get ("sv_fps", "20", CVAR_TEMP );
+	sv_fps = Cvar_Get ("sv_fps", "40", CVAR_TEMP );
 	Cvar_CheckRange( sv_fps, "10", "125", CV_INTEGER );
 	Cvar_SetDescription( sv_fps, "Set the max frames per second the server sends the client." );
 	sv_timeout = Cvar_Get( "sv_timeout", "200", CVAR_TEMP );
@@ -806,7 +806,7 @@ void SV_Init( void )
 	sv_filter = Cvar_Get( "sv_filter", "filter.txt", CVAR_ARCHIVE );
 	Cvar_SetDescription( sv_filter, "Cvar that point on filter file, if it is "" then filtering will be disabled." );
 
-	sv_antiWallhack = Cvar_Get( "sv_antiWallhack", "0", CVAR_ARCHIVE );
+	sv_antiWallhack = Cvar_Get( "sv_antiWallhack", "0", CVAR_SYSTEMINFO );
 	Cvar_SetDescription( sv_antiWallhack, "Enable server-side wallhack protection\n 0 - disabled\n 1 - players only\n 2 - all" );
 
 	// initialize bot cvars so they are listed and can be set before loading the botlib

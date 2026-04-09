@@ -143,7 +143,7 @@ fi
 
 AVAILABLE_ARCHS=""
 
-OMG_VERSION="3.3.3"
+OMG_VERSION=`grep "define.*Q3_VERSION.*\"" code/qcommon/q_shared.h | sed -e 's/.*".* \([^ ]*\)"/\1/'`
 OMG_CLIENT_ARCHS=""
 OMG_SERVER_ARCHS=""
 OMG_RENDERER_VK_ARCHS=""
@@ -264,7 +264,10 @@ if [ ! -d "${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}" ]; then
 fi
 
 # copy and generate some application bundle resources
-cp code/libsdl/macosx/*.dylib "${BUILT_PRODUCTS_DIR}/${EXECUTABLE_FOLDER_PATH}"
+cp code/thirdparty/libsdl/macosx/*.dylib "${BUILT_PRODUCTS_DIR}/${EXECUTABLE_FOLDER_PATH}"
+cp code/thirdparty/libopenal/macosx/*.dylib "${BUILT_PRODUCTS_DIR}/${EXECUTABLE_FOLDER_PATH}"
+cp code/thirdparty/libvulkan/macosx/*.dylib "${BUILT_PRODUCTS_DIR}/${EXECUTABLE_FOLDER_PATH}"
+cp code/thirdparty/libvulkan/macosx/LICENSE "${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}" || exit 1;
 cp ${ICNSDIR}/${ICNS} "${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/$ICNS" || exit 1;
 echo -n ${PKGINFO} > "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/PkgInfo" || exit 1;
 
@@ -291,18 +294,35 @@ PLIST="<?xml version=\"1.0\" encoding=\"UTF-8\"?>
     <string>public.app-category.games</string>
     <key>CFBundleShortVersionString</key>
     <string>${OMG_VERSION}</string>
-    <key>CFBundleSignature</key>
-    <string>????</string>
     <key>CFBundleVersion</key>
     <string>${OMG_VERSION}</string>
-    <key>CGDisableCoalescedUpdates</key>
-    <true/>
     <key>LSMinimumSystemVersion</key>
     <string>${MACOSX_DEPLOYMENT_TARGET}</string>"
 
+if [ -n "${MACOSX_DEPLOYMENT_TARGET_X86_64}" ] || [ -n "${MACOSX_DEPLOYMENT_TARGET_ARM64}" ]; then
+	PLIST="${PLIST}
+    <key>LSMinimumSystemVersionByArchitecture</key>
+    <dict>"
+
+	if [ -n "${MACOSX_DEPLOYMENT_TARGET_X86_64}" ]; then
+	PLIST="${PLIST}
+        <key>x86_64</key>
+        <string>${MACOSX_DEPLOYMENT_TARGET_X86_64}</string>"
+	fi
+	
+	if [ -n "${MACOSX_DEPLOYMENT_TARGET_ARM64}" ]; then
+	PLIST="${PLIST}
+        <key>arm64</key>
+        <string>${MACOSX_DEPLOYMENT_TARGET_ARM64}</string>"
+	fi
+
+	PLIST="${PLIST}
+    </dict>"
+fi
+
 PLIST="${PLIST}
     <key>NSHumanReadableCopyright</key>
-    <string>OmegA Copyright © 2021-2025 Ekip, Inc. All rights reserved.</string>
+    <string>OmegA© 2021-2026 Bishop-333</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
     <key>NSHighResolutionCapable</key>
@@ -348,7 +368,7 @@ action "${BUNDLEBINDIR}/${EXECUTABLE_NAME}"				"${OMG_CLIENT_ARCHS}"
 #action "${BUNDLEBINDIR}/${DEDICATED_NAME}"				"${OMG_SERVER_ARCHS}"
 
 # renderers
-#action "${BUNDLEBINDIR}/${RENDERER_OPENGL1_NAME}" "${OMG_RENDERER_GL1_ARCHS}"
-#action "${BUNDLEBINDIR}/${RENDERER_VULKAN_NAME}" "${OMG_RENDERER_VK_ARCHS}"
-#symlinkArch "${RENDERER_OPENGL}" "${RENDERER_OPENGL}" "_" "${BUNDLEBINDIR}"
-#symlinkArch "${RENDERER_VULKAN}" "${RENDERER_VULKAN}" "_" "${BUNDLEBINDIR}"
+action "${BUNDLEBINDIR}/${RENDERER_OPENGL1_NAME}" "${OMG_RENDERER_GL1_ARCHS}"
+action "${BUNDLEBINDIR}/${RENDERER_VULKAN_NAME}" "${OMG_RENDERER_VK_ARCHS}"
+symlinkArch "${RENDERER_OPENGL}" "${RENDERER_OPENGL}" "_" "${BUNDLEBINDIR}"
+symlinkArch "${RENDERER_VULKAN}" "${RENDERER_VULKAN}" "_" "${BUNDLEBINDIR}"

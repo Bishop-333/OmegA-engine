@@ -399,10 +399,11 @@ typedef enum {
 	VM_COUNT
 } vmIndex_t;
 
-// we don't need more than 4 arguments (counting callnum) for vmMain, at least in Vanilla Quake3
-#define MAX_VMMAIN_CALL_ARGS 4
+// Max number of arguments to pass from engine to vm's vmMain function.
+// command number + 12 arguments
+#define MAX_VMMAIN_CALL_ARGS 13
 
-typedef intptr_t (QDECL *vmMainFunc_t)( int command, int arg0, int arg1, int arg2 );
+typedef intptr_t (QDECL *vmMainFunc_t)( int command, int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7, int arg8, int arg9, int arg10, int arg11 );
 
 typedef intptr_t (*syscall_t)( intptr_t *parms );
 typedef intptr_t (QDECL *dllSyscall_t)( intptr_t callNum, ... );
@@ -422,13 +423,16 @@ intptr_t	QDECL VM_Call( vm_t *vm, int nargs, int callNum, ... );
 void	VM_Debug( int level );
 void	VM_CheckBounds( const vm_t *vm, unsigned int address, unsigned int length );
 void	VM_CheckBounds2( const vm_t *vm, unsigned int addr1, unsigned int addr2, unsigned int length );
+void	VM_CheckBounds3( const vm_t *vm, unsigned int address, unsigned int count, unsigned int size );
 
 #if 1
 #define VM_CHECKBOUNDS VM_CheckBounds
 #define VM_CHECKBOUNDS2 VM_CheckBounds2
+#define VM_CHECKBOUNDS3 VM_CheckBounds3
 #else // for performance evaluation purposes
 #define VM_CHECKBOUNDS(vm,a,b)
 #define VM_CHECKBOUNDS2(vm,a,b,c)
+#define VM_CHECKBOUNDS3(vm,a,b,c)
 #endif
 
 void	*GVM_ArgPtr( intptr_t intValue );
@@ -509,6 +513,8 @@ void	Cmd_AddCommand( const char *cmd_name, xcommand_t function );
 // The cmd_name is referenced later, so it should not be in temp memory
 // if function is NULL, the command will be forwarded to the server
 // as a clc_clientCommand instead of executed locally
+void	Cmd_SetDescription( const char *cmd_name, const char *cmd_description );
+const char	*Cmd_GetDescription( const char *cmd_name );
 
 void	Cmd_RemoveCommand( const char *cmd_name );
 void	Cmd_RemoveCgameCommands( void );
@@ -604,6 +610,7 @@ void	Cvar_SetValueSafe( const char *var_name, float value );
 
 qboolean Cvar_SetModified( const char *var_name, qboolean modified );
 
+const char	*Cvar_GetDescription( const char *var_name );
 float	Cvar_VariableValue( const char *var_name );
 int		Cvar_VariableIntegerValue( const char *var_name );
 // returns 0 if not defined or non numeric
@@ -1113,13 +1120,13 @@ temp file loading
 #define Z_TagMalloc(size, tag)			Z_TagMallocDebug(size, tag, #size, __FILE__, __LINE__)
 #define Z_Malloc(size)					Z_MallocDebug(size, #size, __FILE__, __LINE__)
 #define S_Malloc(size)					S_MallocDebug(size, #size, __FILE__, __LINE__)
-void *Z_TagMallocDebug( int size, memtag_t tag, char *label, char *file, int line );	// NOT 0 filled memory
-void *Z_MallocDebug( int size, char *label, char *file, int line );			// returns 0 filled memory
-void *S_MallocDebug( int size, char *label, char *file, int line );			// returns 0 filled memory
+void *Z_TagMallocDebug( size_t size, memtag_t tag, const char *label, const char *file, int line );	// NOT 0 filled memory
+void *Z_MallocDebug( size_t size, const char *label, const char *file, int line );			// returns 0 filled memory
+void *S_MallocDebug( size_t size, const char *label, const char *file, int line );			// returns 0 filled memory
 #else
-void *Z_TagMalloc( int size, memtag_t tag );	// NOT 0 filled memory
-void *Z_Malloc( int size );			// returns 0 filled memory
-void *S_Malloc( int size );			// NOT 0 filled memory only for small allocations
+void *Z_TagMalloc( size_t size, memtag_t tag );	// NOT 0 filled memory
+void *Z_Malloc( size_t size );			// returns 0 filled memory
+void *S_Malloc( size_t size );			// NOT 0 filled memory only for small allocations
 #endif
 void Z_Free( void *ptr );
 int Z_FreeTags( memtag_t tag );
@@ -1131,7 +1138,7 @@ void Hunk_ClearToMark( void );
 void Hunk_SetMark( void );
 qboolean Hunk_CheckMark( void );
 void Hunk_ClearTempMemory( void );
-void *Hunk_AllocateTempMemory( int size );
+void *Hunk_AllocateTempMemory( size_t size );
 void Hunk_FreeTempMemory( void *buf );
 int	Hunk_MemoryRemaining( void );
 void Hunk_Log( void);

@@ -1086,6 +1086,11 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 		else if ( !Q_stricmp( token, "depthFragment" ) && s_extendedShader )
 		{
 			stage->depthFragment = qtrue;
+			continue;
+		}
+		else if ( !Q_stricmp( token, "dlight" ) && s_extendedShader )
+		{
+			stage->bundle[0].dlight = 1;
 		}
 		else
 		{
@@ -2304,13 +2309,23 @@ Key complex shaders to validate/check:
 * textures/lun3dm5/c_crete6j -> stage #4
 [pom]
 * textures/sockter/ter_mossgravel -> stage #1
+[simpsons_q3] 
+* textures/simpsons/generic_white -> stage #0 (lightmap)
+
 ====================
 */
 static void FindLightingStage( const int stage ) {
-	int i, selected, lightmap;
+	int i, selected, lightmap, whiteImage;
 
-	shader.lightingBundle = 0;
-	shader.lightingStage = -1;
+	for ( i = 0; i < stage; i++ ) {
+		if ( stages[i].bundle[0].image[0] == NULL ) {
+			continue; // sanity check
+		}
+		if ( stages[i].bundle[0].dlight ) {
+			shader.lightingStage = i;
+			return; // already defined via 'dlight' keyword
+		}
+	}
 
 	if ( shader.isSky || (shader.surfaceFlags & (SURF_NODLIGHT | SURF_SKY)) /* || shader.sort == SS_ENVIRONMENT || shader.sort >= SS_FOG */ ) {
 		return;
@@ -2318,6 +2333,7 @@ static void FindLightingStage( const int stage ) {
 
 	selected = -2;
 	lightmap = -2;
+	whiteImage = -1;
 	for ( i = 0; i < stage; i++ ) {
 		const shaderStage_t *st = &stages[i];
 		const textureBundle_t *b = &st->bundle[0];
@@ -2332,7 +2348,13 @@ static void FindLightingStage( const int stage ) {
 			lightmap = i;
 			continue;
 		}
-		if ( b->image[0] == tr.whiteImage || b->tcGen != TCGEN_TEXTURE ) {
+		if ( b->tcGen != TCGEN_TEXTURE ) {
+			continue;
+		}
+		if ( b->image[0] == tr.whiteImage ) {
+			if ( whiteImage < 0 ) {
+				whiteImage = i;
+			}
 			continue;
 		}
 		if ( selected >= 0 ) {
@@ -2366,6 +2388,11 @@ static void FindLightingStage( const int stage ) {
 		if ( i == lightmap + 1 ) {
 			break;
 		}
+	}
+
+	// 7. special case for simpsons_q3 textures/simpsons/generic_white - use the only available lighmap
+	if ( selected < 0 /*&& whiteImage >= 0*/ && lightmap >= 0 ) {
+		selected = lightmap;
 	}
 
 	if ( selected >= 0 ) {
@@ -2728,6 +2755,11 @@ static void InitShader( const char *name, int lightmapIndex ) {
 	for ( i = 0 ; i < MAX_SHADER_STAGES ; i++ ) {
 		stages[i].bundle[0].texMods = texMods[i];
 	}
+
+#ifdef USE_PMLIGHT
+	shader.lightingBundle = 0;
+	shader.lightingStage = -1;
+#endif
 }
 
 
@@ -2944,6 +2976,35 @@ static shader_t *FinishShader( void ) {
 			pStage->alphaGen = AGEN_SKIP;
 	}
 
+	// whiteimage + "filter" texture == texture
+	if ( stage > 1 && stages[0].bundle[0].image[0] == tr.whiteImage && stages[0].bundle[0].numImageAnimations <= 1 && stages[0].rgbGen == CGEN_IDENTITY && stages[0].alphaGen == AGEN_SKIP ) {
+		if ( stages[1].stateBits == ( GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO ) ) {
+			stages[1].stateBits = stages[0].stateBits & ( GLS_DEPTHMASK_TRUE | GLS_DEPTHTEST_DISABLE | GLS_DEPTHFUNC_EQUAL );
+#ifdef USE_PMLIGHT
+			stages[1].bundle[0].dlight |= stages[0].bundle[0].dlight;
+#endif
+			memmove( &stages[0], &stages[1], sizeof( stages[0] ) * ( stage - 1 ) );
+			stages[stage - 1].active = qfalse;
+			stage--;
+		}
+	}
+
+	// identity texture + "filter" whiteimage rgbGen == texture + rgbGen
+	if ( stage > 1 ) {
+		if ( stages[0].rgbGen == CGEN_IDENTITY && stages[0].alphaGen == AGEN_SKIP && stages[1].alphaGen == AGEN_SKIP ) {
+			if ( ( stages[1].stateBits & GLS_BLEND_BITS ) == ( GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO ) ) {
+				if ( stages[1].bundle[0].image[0] == tr.whiteImage && !stages[1].bundle[0].dlight ) {
+					stages[0].rgbGen = stages[1].rgbGen;
+					if ( stage > 2 ) {
+						memmove( &stages[1], &stages[2], sizeof( stages[0] ) * ( stage - 2 ) );
+					}
+					stages[stage - 1].active = qfalse;
+					stage--;
+				}
+			}
+		}
+	}
+
 	//
 	// if we are in r_vertexLight mode, never use a lightmap texture
 	//
@@ -2951,16 +3012,6 @@ static shader_t *FinishShader( void ) {
 		VertexLightingCollapse();
 		stage = 1;
 		hasLightmapStage = qfalse;
-	}
-
-	// whiteimage + "filter" texture == texture
-	if ( stage > 1 && stages[0].bundle[0].image[0] == tr.whiteImage && stages[0].bundle[0].numImageAnimations <= 1 && stages[0].rgbGen == CGEN_IDENTITY && stages[0].alphaGen == AGEN_SKIP ) {
-		if ( stages[1].stateBits == ( GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO ) ) {
-			stages[1].stateBits = stages[0].stateBits & ( GLS_DEPTHMASK_TRUE | GLS_DEPTHTEST_DISABLE | GLS_DEPTHFUNC_EQUAL );
-			memmove( &stages[0], &stages[1], sizeof( stages[0] ) * ( stage - 1 ) );
-			stages[stage - 1].active = qfalse;
-			stage--;
-		}
 	}
 
 	for ( i = 0; i < stage; i++ ) {

@@ -401,8 +401,16 @@ Handles history and console scrollback
 ====================
 */
 static void Console_Key( int key ) {
+	int controlKey;
+
+#ifdef __APPLE__
+	controlKey = K_COMMAND;
+#else
+	controlKey = K_CTRL;
+#endif
+
 	// ctrl-L clears screen
-	if ( key == 'l' && keys[K_CTRL].down ) {
+	if ( key == 'l' && keys[controlKey].down ) {
 		Cbuf_AddText( "clear\n" );
 		return;
 	}
@@ -422,14 +430,14 @@ static void Console_Key( int key ) {
 	// command history (ctrl-p ctrl-n for unix style)
 
 	if ( (key == K_MWHEELUP && keys[K_SHIFT].down) || ( key == K_UPARROW ) || ( key == K_KP_UPARROW ) ||
-		 ( ( tolower(key) == 'p' ) && keys[K_CTRL].down ) ) {
+		 ( ( tolower(key) == 'p' ) && keys[controlKey].down ) ) {
 		Con_HistoryGetPrev( &g_consoleField );
 		g_consoleField.widthInChars = g_console_field_width;
 		return;
 	}
 
 	if ( (key == K_MWHEELDOWN && keys[K_SHIFT].down) || ( key == K_DOWNARROW ) || ( key == K_KP_DOWNARROW ) ||
-		 ( ( tolower(key) == 'n' ) && keys[K_CTRL].down ) ) {
+		 ( ( tolower(key) == 'n' ) && keys[controlKey].down ) ) {
 		Con_HistoryGetNext( &g_consoleField );
 		g_consoleField.widthInChars = g_console_field_width;
 		return;
@@ -437,7 +445,7 @@ static void Console_Key( int key ) {
 
 	// console scrolling
 	if ( key == K_PGUP || key == K_MWHEELUP ) {
-		if ( keys[K_CTRL].down ) {	// hold <ctrl> to accelerate scrolling
+		if ( keys[controlKey].down ) {	// hold <ctrl> to accelerate scrolling
 			Con_PageUp( 0 );		// by one visible page
 		} else {
 			Con_PageUp( 1 );
@@ -446,7 +454,7 @@ static void Console_Key( int key ) {
 	}
 
 	if ( key == K_PGDN || key == K_MWHEELDOWN ) {
-		if ( keys[K_CTRL].down ) {	// hold <ctrl> to accelerate scrolling
+		if ( keys[controlKey].down ) {	// hold <ctrl> to accelerate scrolling
 			Con_PageDown( 0 );		// by one visible page
 		} else {
 			Con_PageDown( 1 );
@@ -455,27 +463,27 @@ static void Console_Key( int key ) {
 	}
 
 	// ctrl-home = top of console
-	if ( key == K_HOME && keys[K_CTRL].down ) {
+	if ( key == K_HOME && keys[controlKey].down ) {
 		Con_Top();
 		return;
 	}
 
 	// ctrl-end = bottom of console
-	if ( key == K_END && keys[K_CTRL].down ) {
+	if ( key == K_END && keys[controlKey].down ) {
 		Con_Bottom();
 		return;
 	}
 
 	// console switch
-	if ( key == K_LEFTARROW && keys[K_CTRL].down ) {
+	if ( key == K_LEFTARROW && keys[controlKey].down ) {
 		Con_PrevTab();
 		return;
 	}
-	if ( key == K_RIGHTARROW && keys[K_CTRL].down ) {
+	if ( key == K_RIGHTARROW && keys[controlKey].down ) {
 		Con_NextTab();
 		return;
 	}
-	if ( ( tolower( key ) >= '1' && tolower( key ) <= '5' ) && keys[K_CTRL].down ) {
+	if ( ( tolower( key ) >= '1' && tolower( key ) <= '5' ) && keys[controlKey].down ) {
 		Con_SwitchToTab( tolower( key ) - '1' );
 	}
 

@@ -586,13 +586,13 @@ static LRESULT WINAPI InputLineWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPA
 
 	case WM_KEYDOWN:
 	{
-		if ( wParam == 'L' && ( GetAsyncKeyState( VK_LCONTROL ) & 0x8000 || GetAsyncKeyState( VK_RCONTROL ) & 0x8000 ) ) {
+		if ( wParam == 'L' && ( GetKeyState( VK_CONTROL ) & 0x8000 ) ) {
 			ConClear();
 			return 0;
 		}
 
 		if ( wParam == VK_PRIOR ) {
-			if ( GetAsyncKeyState( VK_LCONTROL ) & 0x8000 || GetAsyncKeyState( VK_RCONTROL ) & 0x8000 )
+			if ( GetKeyState( VK_CONTROL ) & 0x8000 )
 				SendMessage( s_wcd.hwndBuffer, EM_SCROLL, (WPARAM)SB_PAGEUP, 0 );
 			else
 				SendMessage( s_wcd.hwndBuffer, EM_SCROLL, (WPARAM)SB_LINEUP, 0 );
@@ -600,7 +600,7 @@ static LRESULT WINAPI InputLineWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPA
 		}
 
 		if ( wParam == VK_NEXT ) {
-			if ( GetAsyncKeyState( VK_LCONTROL ) & 0x8000 || GetAsyncKeyState( VK_RCONTROL ) & 0x8000 )
+			if ( GetKeyState( VK_CONTROL ) & 0x8000 )
 				SendMessage( s_wcd.hwndBuffer, EM_SCROLL, (WPARAM)SB_PAGEDOWN, 0 );
 			else
 				SendMessage( s_wcd.hwndBuffer, EM_SCROLL, (WPARAM)SB_LINEDOWN, 0 );
@@ -643,8 +643,8 @@ static LRESULT WINAPI InputLineWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPA
 			while ( *s == '\\' || *s == '/' ) // skip leading slashes
 				s++;
 
-			strncat( s_wcd.consoleText, s, sizeof( s_wcd.consoleText ) - strlen( s_wcd.consoleText ) - 2 );
-			strcat( s_wcd.consoleText, "\n" );
+			Q_strcat( s_wcd.consoleText, sizeof( s_wcd.consoleText ), s );
+			Q_strcat( s_wcd.consoleText, sizeof( s_wcd.consoleText ), "\n" );
 
 			SetWindowText( s_wcd.hwndInputLine, T("") );
 			Field_Clear( &console );

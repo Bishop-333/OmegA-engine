@@ -463,18 +463,26 @@ void S_Init( void )
 		S_CodecInit();
 
 		Cmd_AddCommand( "play", S_Play_f );
+		Cmd_SetDescription( "play", "Starts local sound playback." );
 		Cmd_AddCommand( "music", S_Music_f );
+		Cmd_SetDescription( "music", "Starts music playback." );
 		Cmd_AddCommand( "stopmusic", S_StopMusic_f );
+		Cmd_SetDescription( "stopmusic", "Stops music playback." );
 		Cmd_AddCommand( "s_list", S_SoundList );
+		Cmd_SetDescription( "s_list", "Lists loaded sounds." );
 		Cmd_AddCommand( "s_stop", S_StopAllSounds );
+		Cmd_SetDescription( "s_stop", "Stops all sound playbacks." );
 		Cmd_AddCommand( "s_info", S_SoundInfo );
+		Cmd_SetDescription( "s_info", "Prints sound system info." );
 
+#ifdef USE_OPENAL
 		cv = Cvar_Get( "s_useOpenAL", "1", CVAR_ARCHIVE | CVAR_LATCH );
 		if( cv->integer ) {
 			//OpenAL
 			started = S_AL_Init( &si );
 			Cvar_Set( "s_backend", "OpenAL" );
 		}
+#endif
 
 		if ( !started ) {
 			started = S_Base_Init( &si );

@@ -2715,8 +2715,10 @@ qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size )
 
 	// staging buffers
 
-	// utilize existing staging buffer
+#ifdef USE_UPLOAD_QUEUE
 	vk_flush_staging_buffer( qfalse );
+#endif
+	// utilize existing staging buffer
 	uploadDone = 0;
 	while ( uploadDone < vbo_size ) {
 		VkDeviceSize uploadSize = vk.staging_buffer.size;
@@ -3949,7 +3951,7 @@ void vk_initialize( void )
 
 	vk.cmd = vk.tess + 0;
 	vk.uniform_alignment = props.limits.minUniformBufferOffsetAlignment;
-	vk.uniform_item_size = PAD( sizeof( vkUniform_t ), vk.uniform_alignment );
+	vk.uniform_item_size = PAD( (uint32_t)sizeof( vkUniform_t ), vk.uniform_alignment );
 
 	// for flare visibility tests
 	vk.storage_alignment = MAX( props.limits.minStorageBufferOffsetAlignment, sizeof( uint32_t ) );
@@ -4098,6 +4100,21 @@ void vk_initialize( void )
 
 	Com_sprintf( glConfig.version_string, sizeof( glConfig.version_string ), "API: %i.%i.%i, Driver: %s",
 		major, minor, patch, driver_version );
+
+#ifdef _WIN32
+	// Intel iGPU drivers from 101.5333 to 101.6737 have a known bug that causes
+	// VK_ERROR_DEVICE_LOST during vkQueueSubmit, see https://github.com/ec-/Quake3e/issues/312
+	if ( props.vendorID == 0x8086 ) {
+		uint32_t drvMajor = props.driverVersion >> 14;
+		uint32_t drvMinor = props.driverVersion & 0x3FFF;
+		if ( drvMajor == 101 && drvMinor >= 5333 && drvMinor <= 6737 ) {
+			Com_sprintf( vk.driverNote, sizeof( vk.driverNote ), S_COLOR_WARNING
+				"\nWARNING: Intel driver %i.%i is known to cause Vulkan crashes.\n"
+				"Consider updating to driver >= 101.6790 or downgrading to <= 101.5186.\n",
+				drvMajor, drvMinor );
+		}
+	}
+#endif
 
 	vk.offscreenRender = qtrue;
 
@@ -4982,11 +4999,11 @@ void vk_upload_image_data( image_t *image, int x, int y, int width, int height, 
 	// final transition after upload comleted
 	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
 #else
-	if ( vk_world.staging_buffer_size < buffer_size ) {
+	if ( vk.staging_buffer.size < buffer_size ) {
 		vk_alloc_staging_buffer( buffer_size );
 	}
 
-	Com_Memcpy( vk_world.staging_buffer_ptr, buf, buffer_size );
+	Com_Memcpy( vk.staging_buffer.ptr, buf, buffer_size );
 
 	command_buffer = begin_command_buffer();
 	// record_buffer_memory_barrier( command_buffer, vk_world.staging_buffer, VK_WHOLE_SIZE, 0, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_HOST_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT );
@@ -5116,7 +5133,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	VkGraphicsPipelineCreateInfo create_info;
 	VkViewport viewport;
 	VkRect2D scissor;
-	VkSpecializationMapEntry spec_entries[11];
+	VkSpecializationMapEntry spec_entries[12];
 	VkSpecializationInfo frag_spec_info;
 	VkPipeline *pipeline;
 	VkShaderModule fsmodule;
@@ -5138,6 +5155,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 		int depth_r;
 		int depth_g;
 		int depth_b;
+		int fxaa;
 	} frag_spec_data;
 
 	switch ( program_index ) {
@@ -5205,6 +5223,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	frag_spec_data.bloom_threshold_mode = r_bloom_threshold_mode->integer;
 	frag_spec_data.bloom_modulate = r_bloom_modulate->integer;
 	frag_spec_data.dither = r_dither->integer;
+	frag_spec_data.fxaa = vk.fboActive && r_ext_fxaa->integer;
 
 	if ( !vk_surface_format_color_depth( vk.present_format.format, &frag_spec_data.depth_r, &frag_spec_data.depth_g, &frag_spec_data.depth_b ) )
 		ri.Printf( PRINT_ALL, "Format %s not recognized, dither to assume 8bpc\n", vk_format_string( vk.base_format.format ) );
@@ -5253,7 +5272,11 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	spec_entries[10].offset = offsetof(struct FragSpecData, depth_b);
 	spec_entries[10].size = sizeof(frag_spec_data.depth_b);
 
-	frag_spec_info.mapEntryCount = 11;
+	spec_entries[11].constantID = 11;
+	spec_entries[11].offset = offsetof(struct FragSpecData, fxaa);
+	spec_entries[11].size = sizeof(frag_spec_data.fxaa);
+
+	frag_spec_info.mapEntryCount = 12;
 	frag_spec_info.pMapEntries = spec_entries;
 	frag_spec_info.dataSize = sizeof( frag_spec_data );
 	frag_spec_info.pData = &frag_spec_data;
@@ -5267,7 +5290,11 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	input_assembly_state.pNext = NULL;
 	input_assembly_state.flags = 0;
 	input_assembly_state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+#ifdef __APPLE__
+	input_assembly_state.primitiveRestartEnable = VK_TRUE;
+#else
 	input_assembly_state.primitiveRestartEnable = VK_FALSE;
+#endif
 
 	//
 	// Viewport.
@@ -5466,7 +5493,11 @@ void vk_create_blur_pipeline( uint32_t index, uint32_t width, uint32_t height, q
 	input_assembly_state.pNext = NULL;
 	input_assembly_state.flags = 0;
 	input_assembly_state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+#ifdef __APPLE__
+	input_assembly_state.primitiveRestartEnable = VK_TRUE;
+#else
 	input_assembly_state.primitiveRestartEnable = VK_FALSE;
+#endif
 
 	//
 	// Viewport.
@@ -6277,7 +6308,11 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	input_assembly_state.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
 	input_assembly_state.pNext = NULL;
 	input_assembly_state.flags = 0;
+#ifdef __APPLE__
+	input_assembly_state.primitiveRestartEnable = VK_TRUE;
+#else
 	input_assembly_state.primitiveRestartEnable = VK_FALSE;
+#endif
 
 	switch ( def->primitives ) {
 		case LINE_LIST: input_assembly_state.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST; break;
@@ -7899,6 +7934,11 @@ qboolean vk_bloom( void )
 	}
 
 	vk_end_render_pass(); // end main
+#ifdef __APPLE__
+	VkImageMemoryBarrier barrier;
+	barrier.image = vk.color_image;
+	qvkCmdPipelineBarrier( vk.cmd->command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier );
+#endif
 
 	// bloom extraction
 	vk_begin_bloom_extract_render_pass();

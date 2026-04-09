@@ -21,6 +21,13 @@ ifeq ($(shell uname -m), aarch64)
   COMPILE_ARCH=arm64
 endif
 
+ifeq ($(COMPILE_ARCH),arm64)
+  LONG_BIT=$(shell [ -x /usr/bin/getconf ] && getconf LONG_BIT)
+  ifeq ($(LONG_BIT),32)
+    COMPILE_ARCH=arm
+  endif
+endif
+
 ifeq ($(COMPILE_PLATFORM),mingw32)
   ifeq ($(COMPILE_ARCH),i386)
     COMPILE_ARCH=x86
@@ -31,37 +38,52 @@ BUILD_CLIENT     = 1
 BUILD_SERVER     = 0
 
 USE_SDL          = 1
-USE_CURL         = 1
-USE_LOCAL_HEADERS= 1
+USE_JPEG_TURBO   = 1
 USE_SYSTEM_JPEG  = 0
+USE_CURL         = 1
+USE_ZLIB_NG      = 1
+USE_SYSTEM_ZLIB  = 0
+USE_LOCAL_HEADERS= 0
+
+USE_OGG_VORBIS    = 1
+USE_SYSTEM_OGG    = 0
+USE_SYSTEM_VORBIS = 0
+USE_FLAC          = 1
+
+USE_OPENAL        = 1
+USE_OPENAL_DLOPEN = 1
+USE_SYSTEM_OPENAL = 0
 
 USE_VULKAN       = 1
 USE_OPENGL       = 1
 USE_OPENGL_API   = 1
 USE_VULKAN_API   = 1
-USE_RENDERER_DLOPEN = 0
-
-# valid options: omega, ratmod, aftershock or null (no mod)
-MOD_DEFAULT      = omega
+USE_RENDERER_DLOPEN = 1
 
 # valid options: opengl, vulkan
 RENDERER_DEFAULT = opengl
 
+QUAKE3           = 0
+
+# valid options: omega, rat, aftershock, etc... or 0 (no mod)
+ifneq ($(QUAKE3),1)
+  MOD_DEFAULT    = omega
+endif
+
 ifeq ($(QUAKE3),1)
-  MOD_DEFAULT    = quake3
   ifeq ($(RENDERER_DEFAULT),vulkan)
-    CNAME            = q3-omega-vulkan
+    CNAME        = q3-omega-vulkan
   else
-    CNAME            = q3-omega
+    CNAME        = q3-omega
   endif
-  DNAME            = q3-omgded
+  DNAME          = q3-omgded
 else
   ifeq ($(RENDERER_DEFAULT),vulkan)
-    CNAME            = omega-vulkan
+    CNAME        = omega-vulkan
   else
-    CNAME            = omega
+    CNAME        = omega
   endif
-  DNAME            = omgded
+  DNAME          = omgded
 endif
 
 RENDERER_PREFIX  = renderer
@@ -84,6 +106,15 @@ endif
 #
 #############################################################################
 -include Makefile.local
+
+ifeq ($(COMPILE_PLATFORM),darwin)
+  USE_LOCAL_HEADERS=1
+  USE_SYSTEM_ZLIB=1
+endif
+
+ifeq ($(COMPILE_PLATFORM),linux)
+  USE_SYSTEM_OPENAL=1
+endif
 
 ifeq ($(COMPILE_PLATFORM),cygwin)
   PLATFORM=mingw32
@@ -154,33 +185,21 @@ ifndef GENERATE_DEPENDENCIES
 GENERATE_DEPENDENCIES=1
 endif
 
-ifndef USE_CODEC_VORBIS
-USE_CODEC_VORBIS=1
-endif
-
-ifndef USE_INTERNAL_LIBS
-USE_INTERNAL_LIBS=1
-endif
-
-ifndef USE_INTERNAL_OGG
-USE_INTERNAL_OGG=$(USE_INTERNAL_LIBS)
-endif
-
-ifndef USE_INTERNAL_VORBIS
-USE_INTERNAL_VORBIS=$(USE_INTERNAL_LIBS)
-endif
-
 ifndef USE_CCACHE
+ifneq ($(shell which ccache 2> /dev/null),)
+USE_CCACHE=1
+else
 USE_CCACHE=0
+endif
 endif
 export USE_CCACHE
 
-ifndef USE_OPENAL
-USE_OPENAL=1
+ifndef USE_LOCAL_HEADERS
+USE_LOCAL_HEADERS=1
 endif
 
-ifndef USE_OPENAL_DLOPEN
-USE_OPENAL_DLOPEN=1
+ifndef USE_JPEG_TURBO
+USE_JPEG_TURBO=1
 endif
 
 ifndef USE_CURL
@@ -193,6 +212,42 @@ ifndef USE_CURL_DLOPEN
   else
     USE_CURL_DLOPEN=1
   endif
+endif
+
+ifndef USE_OGG_VORBIS
+  USE_OGG_VORBIS=1
+endif
+
+ifndef USE_SYSTEM_OGG
+  USE_SYSTEM_OGG=1
+endif
+
+ifndef USE_SYSTEM_VORBIS
+  USE_SYSTEM_VORBIS=1
+endif
+
+ifndef USE_FLAC
+  USE_FLAC=1
+endif
+
+ifndef USE_OPENAL
+  USE_OPENAL=1
+endif
+
+ifndef USE_OPENAL_DLOPEN
+  USE_OPENAL_DLOPEN=1
+endif
+
+ifndef USE_SYSTEM_OPENAL
+  USE_SYSTEM_OPENAL=1
+endif
+
+ifndef USE_ZLIB_NG
+  USE_ZLIB_NG=1
+endif
+
+ifndef USE_SYSTEM_ZLIB
+  USE_SYSTEM_ZLIB=1
 endif
 
 ifeq ($(USE_RENDERER_DLOPEN),0)
@@ -218,6 +273,8 @@ endif
 
 BD=$(BUILD_DIR)/debug-$(PLATFORM)-$(ARCH)
 BR=$(BUILD_DIR)/release-$(PLATFORM)-$(ARCH)
+MODE=$(if $(filter debug,$(MAKECMDGOALS)),debug,release)
+TARGETDIR=$(BUILD_DIR)/$(MODE)-$(PLATFORM)-$(ARCH)
 ADIR=$(MOUNT_DIR)/asm
 CDIR=$(MOUNT_DIR)/client
 SDIR=$(MOUNT_DIR)/server
@@ -225,18 +282,29 @@ RCDIR=$(MOUNT_DIR)/renderercommon
 R1DIR=$(MOUNT_DIR)/renderer
 RVDIR=$(MOUNT_DIR)/renderervk
 SDLDIR=$(MOUNT_DIR)/sdl
-SDLHDIR=$(MOUNT_DIR)/libsdl/include/SDL2
+SDLHDIR=$(MOUNT_DIR)/thirdparty/libsdl/include
+LIBSDIR=$(MOUNT_DIR)/thirdparty/libsdl
 
 CMDIR=$(MOUNT_DIR)/qcommon
 UDIR=$(MOUNT_DIR)/unix
 W32DIR=$(MOUNT_DIR)/win32
 BLIBDIR=$(MOUNT_DIR)/botlib
-UIDIR=$(MOUNT_DIR)/ui
-JPDIR=$(MOUNT_DIR)/libjpeg
-OGGDIR=$(MOUNT_DIR)/libogg
-VORBISDIR=$(MOUNT_DIR)/libvorbis
+JPDIR=$(MOUNT_DIR)/thirdparty/libjpeg
+JPTURBODIR=$(MOUNT_DIR)/thirdparty/libjpeg-turbo
+CURLDIR=$(MOUNT_DIR)/thirdparty/libcurl
+OGGDIR=$(MOUNT_DIR)/thirdparty/libogg
+VORBISDIR=$(MOUNT_DIR)/thirdparty/libvorbis
+OPENALDIR=$(MOUNT_DIR)/thirdparty/libopenal
+ZNGDIR=$(MOUNT_DIR)/thirdparty/libz-ng
+VULKANDIR=$(MOUNT_DIR)/thirdparty/libvulkan
 
 bin_path=$(shell which $(1) 2> /dev/null)
+
+ifeq ($(NO_STRIP),1)
+  STRIP_FLAG =
+else
+  STRIP_FLAG = -s
+endif
 
 STRIP ?= strip
 PKG_CONFIG ?= pkg-config
@@ -245,8 +313,8 @@ MKDIR=mkdir -p
 
 ifneq ($(call bin_path, $(PKG_CONFIG)),)
   ifneq ($(USE_SDL),0)
-    SDL_INCLUDE ?= $(shell $(PKG_CONFIG) --silence-errors --cflags-only-I sdl2)
-    SDL_LIBS ?= $(shell $(PKG_CONFIG) --silence-errors --libs sdl2)
+    SDL_INCLUDE ?= $(shell $(PKG_CONFIG) --silence-errors --cflags-only-I sdl3)
+    SDL_LIBS ?= $(shell $(PKG_CONFIG) --silence-errors --libs sdl3)
   else
     X11_INCLUDE ?= $(shell $(PKG_CONFIG) --silence-errors --cflags-only-I x11)
     X11_LIBS ?= $(shell $(PKG_CONFIG) --silence-errors --libs x11)
@@ -259,32 +327,33 @@ ifneq ($(call bin_path, $(PKG_CONFIG)),)
     VORBIS_CFLAGS ?= $(shell $(PKG_CONFIG) --silence-errors --cflags vorbisfile || true)
     VORBIS_LIBS ?= $(shell $(PKG_CONFIG) --silence-errors --libs vorbisfile || echo -lvorbisfile)
   endif
-  ifeq ($(USE_OPENAL),1)
-    OPENAL_INCLUDE ?= $(shell $(PKG_CONFIG) --silence-errors --cflags-only-I openal)
-    OPENAL_LIBS ?= $(shell $(PKG_CONFIG) --silence-errors --libs openal)-lvorbisfile)
+  ifeq ($(USE_SYSTEM_OPENAL),1)
+    OPENAL_CFLAGS ?= $(shell $(PKG_CONFIG) --silence-errors --cflags openal || true)
+    OPENAL_LIBS ?= $(shell $(PKG_CONFIG) --silence-errors --libs openal)
   endif
-else
-  # assume they're in the system default paths (no -I or -L needed)
-  OPENAL_LIBS ?= -lopenal
+  ifeq ($(USE_SYSTEM_ZLIB),1)
+    ZLIB_CFLAGS ?= $(shell $(PKG_CONFIG) --silence-errors --cflags zlib || true)
+    ZLIB_LIBS ?= $(shell $(PKG_CONFIG) --silence-errors --libs zlib || echo -lz)
+  endif
 endif
 
-# supply some reasonable defaults for SDL/X11?
+# supply some reasonable defaults for SDL/X11
 ifeq ($(X11_INCLUDE),)
-X11_INCLUDE = -I/usr/X11R6/include
+  X11_INCLUDE = -I/usr/X11R6/include
 endif
 ifeq ($(X11_LIBS),)
-X11_LIBS = -lX11
+  X11_LIBS = -lX11
 endif
 ifeq ($(SDL_LIBS),)
-  SDL_LIBS = -lSDL2
+  SDL_LIBS = -lSDL3
 endif
 
 # supply some reasonable defaults for ogg/vorbis
-ifeq ($(OGG_FLAGS),)
-  OGG_FLAGS = -I$(OGGDIR)/include
+ifeq ($(OGG_CFLAGS),)
+  OGG_CFLAGS = -I$(OGGDIR)/include
 endif
-ifeq ($(VORBIS_FLAGS),)
-  VORBIS_FLAGS = -I$(VORBISDIR)/include -I$(VORBISDIR)/lib
+ifeq ($(VORBIS_CFLAGS),)
+  VORBIS_CFLAGS = -I$(VORBISDIR)/include -I$(VORBISDIR)/lib
 endif
 ifeq ($(USE_SYSTEM_OGG),1)
   ifeq ($(OGG_LIBS),)
@@ -297,13 +366,27 @@ ifeq ($(USE_SYSTEM_VORBIS),1)
   endif
 endif
 
-# extract version info
-ifneq ($(COMPILE_PLATFORM),darwin)
-VERSION=$(shell grep ".\+define[ \t]\+Q3_VERSION[ \t]\+\+" $(CMDIR)/q_shared.h | \
-  sed -e 's/.*".* \([^ ]*\)"/\1/')
-else
-VERSION=OMG 3.3.3
+# supply some reasonable defaults for OpenAL
+ifeq ($(OPENAL_CFLAGS),)
+  OPENAL_CFLAGS = -I$(OPENALDIR)/include
 endif
+ifeq ($(USE_SYSTEM_OPENAL),1)
+  ifeq ($(OPENAL_LIBS),)
+    OPENAL_LIBS = -lopenal
+  endif
+endif
+
+# supply some reasonable defaults for zlib
+ifeq ($(USE_SYSTEM_ZLIB),1)
+  ifeq ($(ZLIB_LIBS),)
+    ZLIB_LIBS = -lz
+  endif
+  USE_ZLIB_NG = 0
+endif
+
+# extract version info
+VERSION=$(shell grep "define.*Q3_VERSION.*\"" $(CMDIR)/q_shared.h | \
+  sed -e 's/.*".* \([^ ]*\)"/\1/')
 
 # common qvm definition
 ifeq ($(ARCH),x86_64)
@@ -322,12 +405,14 @@ endif
 ifeq ($(ARCH),arm64)
   HAVE_VM_COMPILED = true
 endif
+ifeq ($(ARCH),ppc64le)
+  HAVE_VM_COMPILED = true
+endif
+ifeq ($(ARCH),ppc64)
+  HAVE_VM_COMPILED = true
+endif
 
 BASE_CFLAGS =
-
-ifeq ($(USE_SYSTEM_JPEG),1)
-  BASE_CFLAGS += -DUSE_SYSTEM_JPEG
-endif
 
 ifneq ($(HAVE_VM_COMPILED),true)
   BASE_CFLAGS += -DNO_VM_COMPILED
@@ -336,7 +421,7 @@ endif
 ifneq ($(USE_RENDERER_DLOPEN),0)
   BASE_CFLAGS += -DUSE_RENDERER_DLOPEN
   BASE_CFLAGS += -DRENDERER_PREFIX=\\\"$(RENDERER_PREFIX)\\\"
-  BASE_CFLAGS += -DRENDERER_DEFAULT="$(RENDERER_DEFAULT)"
+  BASE_CFLAGS += -DRENDERER_DEFAULT=$(RENDERER_DEFAULT)
 endif
 
 ifdef DEFAULT_BASEDIR
@@ -347,15 +432,31 @@ ifeq ($(USE_LOCAL_HEADERS),1)
   BASE_CFLAGS += -DUSE_LOCAL_HEADERS=1
 endif
 
+ifeq ($(USE_SYSTEM_JPEG),1)
+  BASE_CFLAGS += -DUSE_SYSTEM_JPEG
+else
+ifeq ($(USE_JPEG_TURBO),1)
+  BASE_CFLAGS += -DUSE_JPEG_TURBO
+endif
+endif
+
 ifeq ($(USE_CURL),1)
   BASE_CFLAGS += -DUSE_CURL
   ifeq ($(USE_CURL_DLOPEN),1)
     BASE_CFLAGS += -DUSE_CURL_DLOPEN
   else
-    ifeq ($(MINGW),1)
+    ifdef MINGW
       BASE_CFLAGS += -DCURL_STATICLIB
     endif
   endif
+endif
+
+ifeq ($(USE_SYSTEM_ZLIB),1)
+  BASE_CFLAGS += -DUSE_SYSTEM_ZLIB
+else
+ifeq ($(USE_ZLIB_NG),1)
+  BASE_CFLAGS += -DUSE_ZLIB_NG
+endif
 endif
 
 ifeq ($(USE_VULKAN_API),1)
@@ -370,8 +471,14 @@ ifeq ($(GENERATE_DEPENDENCIES),1)
   BASE_CFLAGS += -MMD
 endif
 
+ifeq ($(QUAKE3),1)
+  BASE_CFLAGS += -DQUAKE3
+else
+  BASE_CFLAGS += -DUSE_Q3KEY -DUSE_MD5
+endif
+
 ifdef MOD_DEFAULT
-  BASE_CFLAGS += -D$(shell echo $(MOD_DEFAULT) | tr '[:lower:]' '[:upper:]')
+  BASE_CFLAGS += -DDEFAULT_GAME=\\\"$(MOD_DEFAULT)\\\"
 endif
 
 ARCHEXT=
@@ -389,24 +496,30 @@ ifdef MINGW
     # If CC is already set to something generic, we probably want to use
     # something more specific
     ifneq ($(findstring $(strip $(CC)),cc gcc),)
-      CC=
+      override CC=
+    endif
+
+    ifneq ($(findstring $(strip $(STRIP)),strip),)
+      override STRIP=
     endif
 
     # We need to figure out the correct gcc and windres
     ifeq ($(ARCH),x86_64)
       MINGW_PREFIXES=x86_64-w64-mingw32 amd64-mingw32msvc
-      STRIP=x86_64-w64-mingw32-strip
     endif
     ifeq ($(ARCH),x86)
       MINGW_PREFIXES=i686-w64-mingw32 i586-mingw32msvc i686-pc-mingw32
     endif
 
     ifndef CC
-      CC=$(firstword $(strip $(foreach MINGW_PREFIX, $(MINGW_PREFIXES), \
+      override CC=$(firstword $(strip $(foreach MINGW_PREFIX, $(MINGW_PREFIXES), \
          $(call bin_path, $(MINGW_PREFIX)-gcc))))
     endif
 
-#   STRIP=$(MINGW_PREFIX)-strip -g
+    ifndef STRIP
+      override STRIP=$(firstword $(strip $(foreach MINGW_PREFIX, $(MINGW_PREFIXES), \
+         $(call bin_path, $(MINGW_PREFIX)-strip))))
+    endif
 
     ifndef WINDRES
       WINDRES=$(firstword $(strip $(foreach MINGW_PREFIX, $(MINGW_PREFIXES), \
@@ -416,7 +529,7 @@ ifdef MINGW
     # Some MinGW installations define CC to cc, but don't actually provide cc,
     # so check that CC points to a real binary and use gcc if it doesn't
     ifeq ($(call bin_path, $(CC)),)
-      CC=gcc
+      override CC=gcc
     endif
 
   endif
@@ -433,14 +546,7 @@ ifdef MINGW
   BASE_CFLAGS += -Wall -Wimplicit -Wstrict-prototypes -DUSE_ICON -DMINGW=1
 
   BASE_CFLAGS += -Wno-unused-result -fvisibility=hidden
-  BASE_CFLAGS += -ffunction-sections -flto
-
-  ifeq ($(USE_OPENAL),1)
-    BASE_CFLAGS += $(OPENAL_INCLUDE)
-    ifneq ($(USE_OPENAL_DLOPEN),1)
-      CLIENT_LDFLAGS += $(OPENAL_LIBS)
-    endif
-  endif
+  BASE_CFLAGS += -ffunction-sections -flto=auto
 
   ifeq ($(ARCH),x86_64)
     BASE_CFLAGS += -m64
@@ -461,40 +567,69 @@ ifdef MINGW
   LDFLAGS += -mwindows -Wl,--dynamicbase -Wl,--nxcompat
   LDFLAGS += -Wl,--gc-sections -fvisibility=hidden
   LDFLAGS += -lwsock32 -lgdi32 -lwinmm -lole32 -lws2_32 -lpsapi -lcomctl32
-  LDFLAGS += -flto
+  LDFLAGS += -flto=auto
+  LDFLAGS += $(STRIP_FLAG)
 
   CLIENT_LDFLAGS=$(LDFLAGS)
 
   ifeq ($(USE_SDL),1)
     BASE_CFLAGS += -DUSE_LOCAL_HEADERS=1 -I$(SDLHDIR)
-    #CLIENT_CFLAGS += -DUSE_LOCAL_HEADERS=1
     ifeq ($(ARCH),x86)
-      CLIENT_LDFLAGS += -L$(MOUNT_DIR)/libsdl/windows/mingw/lib32
-      CLIENT_LDFLAGS += -lSDL2
-      CLIENT_EXTRA_FILES += $(MOUNT_DIR)/libsdl/windows/mingw/lib32/SDL2.dll
+      CLIENT_LDFLAGS += -L$(LIBSDIR)/windows/mingw/lib32
+      CLIENT_LDFLAGS += -lSDL3
+      CLIENT_EXTRA_FILES += $(LIBSDIR)/windows/mingw/lib32/SDL3.dll
     else
-      CLIENT_LDFLAGS += -L$(MOUNT_DIR)/libsdl/windows/mingw/lib64
-      CLIENT_LDFLAGS += -lSDL264
-      CLIENT_EXTRA_FILES += $(MOUNT_DIR)/libsdl/windows/mingw/lib64/SDL264.dll
+      CLIENT_LDFLAGS += -L$(LIBSDIR)/windows/mingw/lib64
+      CLIENT_LDFLAGS += -lSDL3
+      CLIENT_EXTRA_FILES += $(LIBSDIR)/windows/mingw/lib64/SDL3.dll
     endif
   endif
 
-  ifeq ($(USE_OPENAL),1)
-    ifeq ($(ARCH),x86)
-      CLIENT_EXTRA_FILES += $(MOUNT_DIR)/libopenal/windows/mingw/lib32/OpenAL32.dll
-    else
-      CLIENT_EXTRA_FILES += $(MOUNT_DIR)/libopenal/windows/mingw/lib64/OpenAL64.dll
-    endif
+  ifeq ($(USE_JPEG_TURBO),1)
+    BASE_CFLAGS += -I$(TARGETDIR)/libjpeg-turbo/include
+    CLIENT_LDFLAGS += -L$(TARGETDIR)/libjpeg-turbo/lib
+    CLIENT_LDFLAGS += -ljpeg
+  else
+    BASE_CFLAGS += -I$(JPDIR)
   endif
 
   ifeq ($(USE_CURL),1)
-    BASE_CFLAGS += -I$(MOUNT_DIR)/libcurl/windows/include
-    ifeq ($(ARCH),x86)
-      CLIENT_LDFLAGS += -L$(MOUNT_DIR)/libcurl/windows/mingw/lib32
-    else
-      CLIENT_LDFLAGS += -L$(MOUNT_DIR)/libcurl/windows/mingw/lib64
+    BASE_CFLAGS += -I$(TARGETDIR)/libcurl/include
+    CLIENT_LDFLAGS += -L$(TARGETDIR)/libcurl/lib
+    CLIENT_LDFLAGS += -lcurl -lcrypt32
+    ifeq ($(ARCH),x86_64)
+        CLIENT_LDFLAGS += -liphlpapi -lbcrypt
     endif
-    CLIENT_LDFLAGS += -lcurl -lwldap32 -lcrypt32
+  endif
+
+  ifeq ($(USE_OGG_VORBIS),1)
+    BASE_CFLAGS += -DUSE_OGG_VORBIS $(OGG_CFLAGS) $(VORBIS_CFLAGS)
+    CLIENT_LDFLAGS += $(OGG_LIBS) $(VORBIS_LIBS)
+  endif
+
+  ifeq ($(USE_FLAC),1)
+    BASE_CFLAGS += -DUSE_FLAC
+  endif
+
+  ifeq ($(USE_OPENAL),1)
+    BASE_CFLAGS += -DUSE_OPENAL $(OPENAL_CFLAGS)
+    ifeq ($(USE_OPENAL_DLOPEN),1)
+      BASE_CFLAGS += -DUSE_OPENAL_DLOPEN
+      ifeq ($(ARCH),x86)
+        CLIENT_EXTRA_FILES += $(OPENALDIR)/windows/mingw/lib32/OpenAL32.dll
+      else
+        CLIENT_EXTRA_FILES += $(OPENALDIR)/windows/mingw/lib64/OpenAL64.dll
+      endif
+    endif
+  endif
+
+  ifeq ($(USE_ZLIB_NG),1)
+    BASE_CFLAGS += -I$(TARGETDIR)/libz-ng/include
+    LDFLAGS += -L$(TARGETDIR)/libz-ng/lib
+    LDFLAGS += -lz
+  else
+    BASE_CFLAGS += $(ZLIB_CFLAGS)
+    LDFLAGS += $(ZLIB_LIBS)
   endif
 
   DEBUG_CFLAGS = $(BASE_CFLAGS) -DDEBUG -D_DEBUG -g -O0
@@ -512,9 +647,9 @@ ifeq ($(COMPILE_PLATFORM),darwin)
 
   BASE_CFLAGS += -Wno-unused-result
 
-  BASE_CFLAGS += -DMACOS_X
+  BASE_CFLAGS += -ffunction-sections -flto=thin
 
-  OPTIMIZE = -O2 -fvisibility=hidden
+  OPTIMIZE = -O2 -fvisibility=hidden -ffast-math
 
   SHLIBEXT = dylib
   SHLIBCFLAGS = -fPIC -fvisibility=hidden
@@ -522,7 +657,27 @@ ifeq ($(COMPILE_PLATFORM),darwin)
 
   ARCHEXT = -osx-$(ARCH)
 
-  LDFLAGS +=
+  LDFLAGS += -Wl,-dead_strip
+  LDFLAGS += -flto=thin
+
+  # Default minimum Mac OS X version
+  ifeq ($(MACOSX_VERSION_MIN),)
+    MACOSX_VERSION_MIN=11.0
+  endif
+
+  MACOSX_MAJOR=$(shell echo $(MACOSX_VERSION_MIN) | cut -d. -f1)
+  MACOSX_MINOR=$(shell echo $(MACOSX_VERSION_MIN) | cut -d. -f2)
+  ifeq ($(shell test $(MACOSX_MINOR) -gt 9; echo $$?),0)
+    # Multiply and then remove decimal. 10.10 -> 101000.0 -> 101000
+    MAC_OS_X_VERSION_MIN_REQUIRED=$(shell echo "$(MACOSX_MAJOR) * 10000 + $(MACOSX_MINOR) * 100" | bc | cut -d. -f1)
+  else
+    # Multiply by 100 and then remove decimal. 10.7 -> 1070.0 -> 1070
+    MAC_OS_X_VERSION_MIN_REQUIRED=$(shell echo "$(MACOSX_VERSION_MIN) * 100" | bc | cut -d. -f1)
+  endif
+
+  LDFLAGS += -mmacosx-version-min=$(MACOSX_VERSION_MIN)
+  BASE_CFLAGS += -mmacosx-version-min=$(MACOSX_VERSION_MIN) \
+                 -DMAC_OS_X_VERSION_MIN_REQUIRED=$(MAC_OS_X_VERSION_MIN_REQUIRED)
 
   ifeq ($(ARCH),x86_64)
     BASE_CFLAGS += -arch x86_64
@@ -533,32 +688,66 @@ ifeq ($(COMPILE_PLATFORM),darwin)
     LDFLAGS += -arch arm64
   endif
 
-  ifeq ($(USE_OPENAL),1)
-    ifneq ($(USE_LOCAL_HEADERS),1)
-      BASE_CFLAGS += -I/System/Library/Frameworks/OpenAL.framework/Headers
-    endif
-    ifneq ($(USE_OPENAL_DLOPEN),1)
-      CLIENT_LDFLAGS += -F/Library/Frameworks -framework OpenAL
-    endif
-  endif
-
   ifeq ($(USE_LOCAL_HEADERS),1)
-    MACLIBSDIR=$(MOUNT_DIR)/libsdl/macosx
     BASE_CFLAGS += -I$(SDLHDIR)
-    CLIENT_LDFLAGS += $(MACLIBSDIR)/libSDL2-2.32.8.dylib
-    CLIENT_EXTRA_FILES += $(MACLIBSDIR)/libSDL2-2.32.8.dylib
+    CLIENT_LDFLAGS += $(LIBSDIR)/macosx/libSDL3.0.dylib
+    CLIENT_EXTRA_FILES += $(LIBSDIR)/macosx/libSDL3.0.dylib
   else
   ifneq ($(SDL_INCLUDE),)
     BASE_CFLAGS += $(SDL_INCLUDE)
     CLIENT_LDFLAGS = $(SDL_LIBS)
   else
-    BASE_CFLAGS += -I/Library/Frameworks/SDL2.framework/Headers
-    CLIENT_LDFLAGS += -F/Library/Frameworks -framework SDL2
+    BASE_CFLAGS += -I/Library/Frameworks/SDL3.framework/Headers
+    CLIENT_LDFLAGS += -F/Library/Frameworks -framework SDL3
   endif
   endif
 
   ifeq ($(USE_SYSTEM_JPEG),1)
     CLIENT_LDFLAGS += -ljpeg
+  else
+  ifeq ($(USE_JPEG_TURBO),1)
+    BASE_CFLAGS += -I$(TARGETDIR)/libjpeg-turbo/include
+    CLIENT_LDFLAGS += -L$(TARGETDIR)/libjpeg-turbo/lib
+    CLIENT_LDFLAGS += -ljpeg
+  else
+    BASE_CFLAGS += -I$(JPDIR)
+  endif
+  endif
+
+  ifeq ($(USE_OGG_VORBIS),1)
+    BASE_CFLAGS += -DUSE_OGG_VORBIS $(OGG_CFLAGS) $(VORBIS_CFLAGS)
+    CLIENT_LDFLAGS += $(OGG_LIBS) $(VORBIS_LIBS)
+  endif
+
+  ifeq ($(USE_FLAC),1)
+    BASE_CFLAGS += -DUSE_FLAC
+  endif
+
+  ifeq ($(USE_OPENAL),1)
+    BASE_CFLAGS += -DUSE_OPENAL $(OPENAL_CFLAGS)
+    ifeq ($(USE_OPENAL_DLOPEN),1)
+      BASE_CFLAGS += -DUSE_OPENAL_DLOPEN
+      CLIENT_LDFLAGS += $(OPENALDIR)/macosx/libopenal.dylib
+      CLIENT_EXTRA_FILES += $(OPENALDIR)/macosx/libopenal.dylib
+    else 
+    ifeq ($(USE_SYSTEM_OPENAL),1)
+      BASE_CFLAGS += -I/System/Library/Frameworks/OpenAL.framework/Headers
+      CLIENT_LDFLAGS += -F/Library/Frameworks -framework OpenAL
+    endif
+    endif
+  endif
+
+  ifeq ($(USE_ZLIB_NG),1)
+    BASE_CFLAGS += -I$(TARGETDIR)/libz-ng/include
+    LDFLAGS += -L$(TARGETDIR)/libz-ng/lib
+    LDFLAGS += -lz
+  else
+    LDFLAGS += -lz
+  endif
+
+  ifeq ($(USE_VULKAN),1)
+    CLIENT_LDFLAGS += $(VULKANDIR)/macosx/libMoltenVK.dylib
+    CLIENT_EXTRA_FILES += $(VULKANDIR)/macosx/libMoltenVK.dylib
   endif
 
   DEBUG_CFLAGS = $(BASE_CFLAGS) -DDEBUG -D_DEBUG -g -O0
@@ -578,7 +767,9 @@ else
 
   BASE_CFLAGS += -I/usr/include -I/usr/local/include
 
-  OPTIMIZE = -O2 -fvisibility=hidden
+  BASE_CFLAGS += -ffunction-sections -flto=auto
+
+  OPTIMIZE = -O2 -fvisibility=hidden -ffast-math
 
   ifeq ($(ARCH),x86_64)
     ARCHEXT = -x64
@@ -589,12 +780,24 @@ else
   endif
 
   ifeq ($(ARCH),arm)
-    OPTIMIZE += -march=armv7-a
+    ifeq ($(LONG_BIT),32)
+      OPTIMIZE += -march=armv7-a+fp
+    else
+      OPTIMIZE += -march=armv7-a
+    endif
     ARCHEXT = -arm
   endif
 
   ifeq ($(ARCH),arm64)
     ARCHEXT = -arm64
+  endif
+
+  ifeq ($(ARCH),ppc64le)
+    ARCHEXT = .ppc64le
+  endif
+
+  ifeq ($(ARCH),ppc64)
+    ARCHEXT = .ppc64
   endif
 
   SHLIBEXT = so
@@ -603,6 +806,8 @@ else
 
   LDFLAGS += -lm
   LDFLAGS += -Wl,--gc-sections -fvisibility=hidden
+  LDFLAGS += -flto=auto
+  LDFLAGS += $(STRIP_FLAG)
 
   ifeq ($(USE_SDL),1)
     BASE_CFLAGS += $(SDL_INCLUDE)
@@ -614,12 +819,47 @@ else
 
   ifeq ($(USE_SYSTEM_JPEG),1)
     CLIENT_LDFLAGS += -ljpeg
+  else
+  ifeq ($(USE_JPEG_TURBO),1)
+    BASE_CFLAGS += -I$(TARGETDIR)/libjpeg-turbo/include
+    CLIENT_LDFLAGS += -L$(TARGETDIR)/libjpeg-turbo/lib
+    CLIENT_LDFLAGS += -ljpeg
+  else
+    BASE_CFLAGS += -I$(JPDIR)
+  endif
   endif
 
   ifeq ($(USE_CURL),1)
     ifeq ($(USE_CURL_DLOPEN),0)
       CLIENT_LDFLAGS += -lcurl
     endif
+  endif
+
+  ifeq ($(USE_OGG_VORBIS),1)
+    BASE_CFLAGS += -DUSE_OGG_VORBIS $(OGG_CFLAGS) $(VORBIS_CFLAGS)
+    CLIENT_LDFLAGS += $(OGG_LIBS) $(VORBIS_LIBS)
+  endif
+
+  ifeq ($(USE_FLAC),1)
+    BASE_CFLAGS += -DUSE_FLAC
+  endif
+
+  ifeq ($(USE_OPENAL),1)
+    BASE_CFLAGS += -DUSE_OPENAL $(OPENAL_CFLAGS)
+    ifeq ($(USE_OPENAL_DLOPEN),1)
+      BASE_CFLAGS += -DUSE_OPENAL_DLOPEN
+    else
+      CLIENT_LDFLAGS += $(OPENAL_LIBS)
+    endif
+  endif
+
+  ifeq ($(USE_ZLIB_NG),1)
+    BASE_CFLAGS += -I$(TARGETDIR)/libz-ng/include
+    LDFLAGS += -L$(TARGETDIR)/libz-ng/lib
+    LDFLAGS += -lz
+  else
+    BASE_CFLAGS += $(ZLIB_CFLAGS)
+    LDFLAGS += $(ZLIB_LIBS)
   endif
 
   ifeq ($(PLATFORM),linux)
@@ -666,8 +906,9 @@ ifneq ($(BUILD_CLIENT),0)
   endif
 endif
 
+CC_REAL := $(CC)
 ifeq ($(USE_CCACHE),1)
-  CC := ccache $(CC)
+  CC := ccache $(CC_REAL)
 endif
 
 ifneq ($(USE_RENDERER_DLOPEN),0)
@@ -678,12 +919,17 @@ endif
 
 define DO_CC
 $(echo_cmd) "CC $<"
-$(Q)$(CC) $(NOTSHLIBCFLAGS) $(CFLAGS) -o $@ -c $<
+$(Q)$(CC) $(CFLAGS) -o $@ -c $<
+endef
+
+define DO_CC_QVM
+$(echo_cmd) "CC_QVM $<"
+$(Q)$(CC) $(CFLAGS) -fno-fast-math -o $@ -c $<
 endef
 
 define DO_REND_CC
 $(echo_cmd) "REND_CC $<"
-$(Q)$(CC) $(RENDCFLAGS) $(CFLAGS) -o $@ -c $<
+$(Q)$(CC) $(CFLAGS) $(RENDCFLAGS) -o $@ -c $<
 endef
 
 define DO_REF_STR
@@ -694,12 +940,12 @@ endef
 
 define DO_BOT_CC
 $(echo_cmd) "BOT_CC $<"
-$(Q)$(CC) $(NOTSHLIBCFLAGS) $(CFLAGS) $(BOTCFLAGS) -DBOTLIB -o $@ -c $<
+$(Q)$(CC) $(CFLAGS) $(BOTCFLAGS) -DBOTLIB -o $@ -c $<
 endef
 
-define DO_SHLIB_CC
-$(echo_cmd) "SHLIB_CC $<"
-$(Q)$(CC) $(CFLAGS) $(SHLIBCFLAGS) -o $@ -c $<
+define DO_VORBIS_CC
+$(echo_cmd) "CC $<"
+$(Q)$(CC) $(CFLAGS) -w -o $@ -c $<
 endef
 
 define DO_AS
@@ -709,7 +955,12 @@ endef
 
 define DO_DED_CC
 $(echo_cmd) "DED_CC $<"
-$(Q)$(CC) $(NOTSHLIBCFLAGS) -DDEDICATED $(CFLAGS) -o $@ -c $<
+$(Q)$(CC) $(CFLAGS) -DDEDICATED -o $@ -c $<
+endef
+
+define DO_DED_CC_QVM
+$(echo_cmd) "DED_CC_QVM $<"
+$(Q)$(CC) $(CFLAGS) -fno-fast-math -DDEDICATED -o $@ -c $<
 endef
 
 define DO_WINDRES
@@ -721,35 +972,50 @@ ifndef SHLIBNAME
   SHLIBNAME=$(ARCH).$(SHLIBEXT)
 endif
 
-ifeq ($(USE_OPENAL),1)
-  BASE_CFLAGS += -DUSE_OPENAL
-  ifeq ($(USE_OPENAL_DLOPEN),1)
-    BASE_CFLAGS += -DUSE_OPENAL_DLOPEN
-  endif
+#############################################################################
+# THIRDPARTY LIBRARIES CONFIGURATION
+#############################################################################
+
+CMAKE_ARGS = -DCMAKE_C_COMPILER=$(CC_REAL) -DCMAKE_SYSTEM_PROCESSOR=$(ARCH) -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_LIBDIR=lib
+ifeq ($(USE_CCACHE),1)
+  CMAKE_ARGS += -DCMAKE_C_COMPILER_LAUNCHER=ccache
+endif
+ifdef MINGW
+  CMAKE_ARGS += -DCMAKE_SYSTEM_NAME=Windows
+endif
+ifeq ($(COMPILE_PLATFORM),darwin)
+  CMAKE_ARGS += -DCMAKE_OSX_ARCHITECTURES=$(ARCH) -DCMAKE_OSX_DEPLOYMENT_TARGET=$(MACOSX_VERSION_MIN)
 endif
 
-ifeq ($(USE_CODEC_VORBIS),1)
-  BASE_CFLAGS += -DUSE_CODEC_VORBIS
-  ifeq ($(USE_INTERNAL_VORBIS),1)
-    BASE_CFLAGS += -I$(VORBISDIR)/include -I$(VORBISDIR)/lib
-  else
-    VORBIS_CFLAGS ?= $(shell $(PKG_CONFIG) --silence-errors --cflags vorbisfile vorbis || true)
-    VORBIS_LIBS ?= $(shell $(PKG_CONFIG) --silence-errors --libs vorbisfile vorbis || echo -lvorbisfile -lvorbis)
+ifneq ($(USE_SYSTEM_JPEG),1)
+ifeq ($(USE_JPEG_TURBO),1)
+  JPTURBO_CMAKE_ARGS += $(CMAKE_ARGS) -DENABLE_SHARED=OFF -DWITH_TOOLS=OFF -DWITH_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$(CURDIR)/$(TARGETDIR)/libjpeg-turbo
+  ifeq ($(COMPILE_PLATFORM),darwin)
+    ifeq ($(ARCH),x86_64)
+      JPTURBO_CMAKE_ARGS += -DWITH_SIMD=FALSE
+    endif
   endif
-  BASE_CFLAGS += $(VORBIS_CFLAGS)
-  CLIENT_LDFLAGS += $(VORBIS_LIBS)
-  NEED_OGG=1
+endif
 endif
 
-ifeq ($(NEED_OGG),1)
-  ifeq ($(USE_INTERNAL_OGG),1)
-    OGG_CFLAGS = -I$(OGGDIR)/include
-  else
-    OGG_CFLAGS ?= $(shell $(PKG_CONFIG) --silence-errors --cflags ogg || true)
-    OGG_LIBS ?= $(shell $(PKG_CONFIG) --silence-errors --libs ogg || echo -logg)
+ifneq ($(USE_SYSTEM_ZLIB),1)
+ifeq ($(USE_ZLIB_NG),1)
+  ZLIBNG_CMAKE_ARGS += $(CMAKE_ARGS) -DBUILD_TESTING=OFF -DZLIB_COMPAT=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=$(CURDIR)/$(TARGETDIR)/libz-ng
+endif
+endif
+
+ifeq ($(USE_CURL),1)
+  ifneq ($(USE_CURL_DLOPEN),1)
+    ifdef MINGW
+      CURL_CMAKE_ARGS += $(CMAKE_ARGS) -DBUILD_CURL_EXE=OFF -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DCURL_DISABLE_LDAP=ON -DCURL_USE_LIBPSL=OFF -DCMAKE_INSTALL_PREFIX=$(CURDIR)/$(TARGETDIR)/libcurl
+      ifeq ($(ARCH),x86)
+        CURL_CMAKE_ARGS += -DENABLE_IPV6=OFF -DCURL_ENABLE_SSL=OFF
+      endif
+      ifeq ($(USE_ZLIB_NG),1)
+        CURL_CMAKE_ARGS += -DZLIB_LIBRARY=$(CURDIR)/$(TARGETDIR)/libz-ng/lib/libz.a -DZLIB_INCLUDE_DIR=$(CURDIR)/$(TARGETDIR)/libz-ng/include
+      endif
+    endif
   endif
-  BASE_CFLAGS += $(OGG_CFLAGS)
-  CLIENT_LDFLAGS += $(OGG_LIBS)
 endif
 
 #############################################################################
@@ -760,10 +1026,10 @@ default: release
 all: debug release
 
 debug:
-	@$(MAKE) targets B=$(BD) CFLAGS="$(CFLAGS) $(DEBUG_CFLAGS)" LDFLAGS="$(LDFLAGS) $(DEBUG_LDFLAGS)" V=$(V)
+	@$(MAKE) targets B=$(BD) MODE=debug CFLAGS="$(CFLAGS) $(DEBUG_CFLAGS)" LDFLAGS="$(LDFLAGS) $(DEBUG_LDFLAGS)" V=$(V) NO_STRIP=1
 
 release:
-	@$(MAKE) targets B=$(BR) CFLAGS="$(CFLAGS) $(RELEASE_CFLAGS)" V=$(V)
+	@$(MAKE) targets B=$(BR) MODE=release CFLAGS="$(CFLAGS) $(RELEASE_CFLAGS)" V=$(V)
 
 define ADD_COPY_TARGET
 TARGETS += $2
@@ -788,7 +1054,7 @@ endif
 
 # Create the build directories and tools, print out
 # an informational message, then start building
-targets: makedirs tools
+targets: makedirs tools thirdparty
 	@echo ""
 	@echo "Building omega in $(B):"
 	@echo ""
@@ -799,6 +1065,7 @@ targets: makedirs tools
 	@echo "  COMPILE_ARCH: $(COMPILE_ARCH)"
 ifdef MINGW
 	@echo "  WINDRES: $(WINDRES)"
+	@echo "  STRIP: $(STRIP)"
 endif
 	@echo "  CC: $(CC)"
 	@echo ""
@@ -817,18 +1084,54 @@ endif
 ifneq ($(TARGETS),)
 	@$(MAKE) $(TARGETS) V=$(V)
 endif
-	@echo "  Cleanup:"
-	rm -rf $(B)/*/
-	@if [ $(PLATFORM) = "linux" ];then strip $(TARGETS);fi
 
 makedirs:
 	@if [ ! -d $(BUILD_DIR) ];then $(MKDIR) $(BUILD_DIR);fi
 	@if [ ! -d $(B) ];then $(MKDIR) $(B);fi
-	@if [ ! -d $(B)/client ];then $(MKDIR) $(B)/client;fi
+	@if [ ! -d $(B)/client ];then $(MKDIR) $(B)/client/qvm;fi
+	@if [ ! -d $(B)/client/jpeg ];then $(MKDIR) $(B)/client/jpeg;fi
+ifeq ($(USE_SYSTEM_OGG),0)
+	@if [ ! -d $(B)/client/ogg ];then $(MKDIR) $(B)/client/ogg;fi
+endif
+ifeq ($(USE_SYSTEM_VORBIS),0)
 	@if [ ! -d $(B)/client/vorbis ];then $(MKDIR) $(B)/client/vorbis;fi
+endif
 	@if [ ! -d $(B)/rend1 ];then $(MKDIR) $(B)/rend1;fi
 	@if [ ! -d $(B)/rendv ];then $(MKDIR) $(B)/rendv;fi
-	@if [ ! -d $(B)/ded ];then $(MKDIR) $(B)/ded;fi
+ifneq ($(BUILD_SERVER),0)
+	@if [ ! -d $(B)/ded ];then $(MKDIR) $(B)/ded/qvm;fi
+endif
+
+thirdparty:
+ifeq ($(USE_JPEG_TURBO),1)
+	@echo ""
+	@echo "Building libjpeg-turbo in $(TARGETDIR)/libjpeg-turbo:"
+	@echo ""
+	$(MKDIR) $(TARGETDIR)/libjpeg-turbo/build
+	cd $(TARGETDIR)/libjpeg-turbo/build && CFLAGS="" cmake $(CURDIR)/$(JPTURBODIR) $(JPTURBO_CMAKE_ARGS)
+	@$(MAKE) -C $(TARGETDIR)/libjpeg-turbo/build
+	@$(MAKE) -C $(TARGETDIR)/libjpeg-turbo/build install DESTDIR=""
+endif
+ifeq ($(USE_ZLIB_NG),1)
+	@echo ""
+	@echo "Building zlib-ng in $(TARGETDIR)/libz-ng:"
+	@echo ""
+	@$(MKDIR) $(TARGETDIR)/libz-ng/build
+	@cd $(TARGETDIR)/libz-ng/build && CFLAGS="" cmake $(CURDIR)/$(ZNGDIR) $(ZLIBNG_CMAKE_ARGS)
+	@$(MAKE) -C $(TARGETDIR)/libz-ng/build
+	@$(MAKE) -C $(TARGETDIR)/libz-ng/build install DESTDIR=""
+endif
+ifeq ($(USE_CURL),1)
+ifdef MINGW
+	@echo ""
+	@echo "Building curl in $(TARGETDIR)/libcurl:"
+	@echo ""
+	$(MKDIR) $(TARGETDIR)/libcurl/build
+	cd $(TARGETDIR)/libcurl/build && CFLAGS="" cmake $(CURDIR)/$(CURLDIR) $(CURL_CMAKE_ARGS)
+	@$(MAKE) -C $(TARGETDIR)/libcurl/build
+	@$(MAKE) -C $(TARGETDIR)/libcurl/build install DESTDIR=""
+endif
+endif
 
 #############################################################################
 # CLIENT/SERVER
@@ -849,6 +1152,7 @@ Q3REND1OBJ = \
   $(B)/rend1/tr_image_bmp.o \
   $(B)/rend1/tr_image_tga.o \
   $(B)/rend1/tr_image_pcx.o \
+  $(B)/rend1/tr_image_pvr.o \
   $(B)/rend1/tr_init.o \
   $(B)/rend1/tr_light.o \
   $(B)/rend1/tr_main.o \
@@ -887,6 +1191,7 @@ Q3RENDVOBJ = \
   $(B)/rendv/tr_image_bmp.o \
   $(B)/rendv/tr_image_tga.o \
   $(B)/rendv/tr_image_pcx.o \
+  $(B)/rendv/tr_image_pvr.o \
   $(B)/rendv/tr_init.o \
   $(B)/rendv/tr_light.o \
   $(B)/rendv/tr_main.o \
@@ -915,52 +1220,85 @@ ifneq ($(USE_RENDERER_DLOPEN), 0)
 endif
 
 JPGOBJ = \
-  $(B)/client/jaricom.o \
-  $(B)/client/jcapimin.o \
-  $(B)/client/jcapistd.o \
-  $(B)/client/jcarith.o \
-  $(B)/client/jccoefct.o  \
-  $(B)/client/jccolor.o \
-  $(B)/client/jcdctmgr.o \
-  $(B)/client/jchuff.o   \
-  $(B)/client/jcinit.o \
-  $(B)/client/jcmainct.o \
-  $(B)/client/jcmarker.o \
-  $(B)/client/jcmaster.o \
-  $(B)/client/jcomapi.o \
-  $(B)/client/jcparam.o \
-  $(B)/client/jcprepct.o \
-  $(B)/client/jcsample.o \
-  $(B)/client/jctrans.o \
-  $(B)/client/jdapimin.o \
-  $(B)/client/jdapistd.o \
-  $(B)/client/jdarith.o \
-  $(B)/client/jdatadst.o \
-  $(B)/client/jdatasrc.o \
-  $(B)/client/jdcoefct.o \
-  $(B)/client/jdcolor.o \
-  $(B)/client/jddctmgr.o \
-  $(B)/client/jdhuff.o \
-  $(B)/client/jdinput.o \
-  $(B)/client/jdmainct.o \
-  $(B)/client/jdmarker.o \
-  $(B)/client/jdmaster.o \
-  $(B)/client/jdmerge.o \
-  $(B)/client/jdpostct.o \
-  $(B)/client/jdsample.o \
-  $(B)/client/jdtrans.o \
-  $(B)/client/jerror.o \
-  $(B)/client/jfdctflt.o \
-  $(B)/client/jfdctfst.o \
-  $(B)/client/jfdctint.o \
-  $(B)/client/jidctflt.o \
-  $(B)/client/jidctfst.o \
-  $(B)/client/jidctint.o \
-  $(B)/client/jmemmgr.o \
-  $(B)/client/jmemnobs.o \
-  $(B)/client/jquant1.o \
-  $(B)/client/jquant2.o \
-  $(B)/client/jutils.o
+  $(B)/client/jpeg/jaricom.o \
+  $(B)/client/jpeg/jcapimin.o \
+  $(B)/client/jpeg/jcapistd.o \
+  $(B)/client/jpeg/jcarith.o \
+  $(B)/client/jpeg/jccoefct.o  \
+  $(B)/client/jpeg/jccolor.o \
+  $(B)/client/jpeg/jcdctmgr.o \
+  $(B)/client/jpeg/jchuff.o   \
+  $(B)/client/jpeg/jcinit.o \
+  $(B)/client/jpeg/jcmainct.o \
+  $(B)/client/jpeg/jcmarker.o \
+  $(B)/client/jpeg/jcmaster.o \
+  $(B)/client/jpeg/jcomapi.o \
+  $(B)/client/jpeg/jcparam.o \
+  $(B)/client/jpeg/jcprepct.o \
+  $(B)/client/jpeg/jcsample.o \
+  $(B)/client/jpeg/jctrans.o \
+  $(B)/client/jpeg/jdapimin.o \
+  $(B)/client/jpeg/jdapistd.o \
+  $(B)/client/jpeg/jdarith.o \
+  $(B)/client/jpeg/jdatadst.o \
+  $(B)/client/jpeg/jdatasrc.o \
+  $(B)/client/jpeg/jdcoefct.o \
+  $(B)/client/jpeg/jdcolor.o \
+  $(B)/client/jpeg/jddctmgr.o \
+  $(B)/client/jpeg/jdhuff.o \
+  $(B)/client/jpeg/jdinput.o \
+  $(B)/client/jpeg/jdmainct.o \
+  $(B)/client/jpeg/jdmarker.o \
+  $(B)/client/jpeg/jdmaster.o \
+  $(B)/client/jpeg/jdmerge.o \
+  $(B)/client/jpeg/jdpostct.o \
+  $(B)/client/jpeg/jdsample.o \
+  $(B)/client/jpeg/jdtrans.o \
+  $(B)/client/jpeg/jerror.o \
+  $(B)/client/jpeg/jfdctflt.o \
+  $(B)/client/jpeg/jfdctfst.o \
+  $(B)/client/jpeg/jfdctint.o \
+  $(B)/client/jpeg/jidctflt.o \
+  $(B)/client/jpeg/jidctfst.o \
+  $(B)/client/jpeg/jidctint.o \
+  $(B)/client/jpeg/jmemmgr.o \
+  $(B)/client/jpeg/jmemnobs.o \
+  $(B)/client/jpeg/jquant1.o \
+  $(B)/client/jpeg/jquant2.o \
+  $(B)/client/jpeg/jutils.o
+
+ifeq ($(USE_OGG_VORBIS),1)
+ifeq ($(USE_SYSTEM_OGG),0)
+OGGOBJ = \
+  $(B)/client/ogg/bitwise.o \
+  $(B)/client/ogg/framing.o
+endif
+
+ifeq ($(USE_SYSTEM_VORBIS),0)
+VORBISOBJ = \
+  $(B)/client/vorbis/analysis.o \
+  $(B)/client/vorbis/bitrate.o \
+  $(B)/client/vorbis/block.o \
+  $(B)/client/vorbis/codebook.o \
+  $(B)/client/vorbis/envelope.o \
+  $(B)/client/vorbis/floor0.o \
+  $(B)/client/vorbis/floor1.o \
+  $(B)/client/vorbis/info.o \
+  $(B)/client/vorbis/lookup.o \
+  $(B)/client/vorbis/lpc.o \
+  $(B)/client/vorbis/lsp.o \
+  $(B)/client/vorbis/mapping0.o \
+  $(B)/client/vorbis/mdct.o \
+  $(B)/client/vorbis/psy.o \
+  $(B)/client/vorbis/registry.o \
+  $(B)/client/vorbis/res0.o \
+  $(B)/client/vorbis/smallft.o \
+  $(B)/client/vorbis/sharedbook.o \
+  $(B)/client/vorbis/synthesis.o \
+  $(B)/client/vorbis/vorbisfile.o \
+  $(B)/client/vorbis/window.o
+endif
+endif
 
 Q3OBJ = \
   $(B)/client/cl_cgame.o \
@@ -1005,10 +1343,6 @@ Q3OBJ = \
   $(B)/client/snd_main.o \
   $(B)/client/snd_codec.o \
   $(B)/client/snd_codec_wav.o \
-  $(B)/client/snd_codec_ogg.o \
-  \
-  $(B)/client/qal.o \
-  $(B)/client/snd_openal.o \
   \
   $(B)/client/sv_bot.o \
   $(B)/client/sv_ccmds.o \
@@ -1026,8 +1360,6 @@ Q3OBJ = \
   \
   $(B)/client/unzip.o \
   $(B)/client/puff.o \
-  $(B)/client/vm.o \
-  $(B)/client/vm_interpreted.o \
   \
   $(B)/client/be_aas_bspq3.o \
   $(B)/client/be_aas_cluster.o \
@@ -1058,8 +1390,25 @@ Q3OBJ = \
   $(B)/client/l_script.o \
   $(B)/client/l_struct.o
 
-ifneq ($(USE_SYSTEM_JPEG),1)
-  Q3OBJ += $(JPGOBJ)
+ifneq ($(USE_JPEG_TURBO),1)
+  ifneq ($(USE_SYSTEM_JPEG),1)
+    Q3OBJ += $(JPGOBJ)
+  endif
+endif
+
+ifeq ($(USE_OGG_VORBIS),1)
+  Q3OBJ += $(OGGOBJ) $(VORBISOBJ) \
+    $(B)/client/snd_codec_ogg.o
+endif
+
+ifeq ($(USE_FLAC),1)
+  Q3OBJ += $(B)/client/snd_codec_flac.o
+endif
+
+ifeq ($(USE_OPENAL),1)
+  Q3OBJ += \
+    $(B)/client/qal.o \
+    $(B)/client/snd_openal.o
 endif
 
 ifneq ($(USE_RENDERER_DLOPEN),1)
@@ -1078,58 +1427,33 @@ ifndef MINGW
 endif
 endif
 
-ifeq ($(NEED_OGG),1)
-ifeq ($(USE_INTERNAL_OGG),1)
-Q3OBJ += \
-  $(B)/client/bitwise.o \
-  $(B)/client/framing.o
-endif
-endif
-
-ifeq ($(USE_CODEC_VORBIS),1)
-ifeq ($(USE_INTERNAL_VORBIS),1)
-Q3OBJ += \
-  $(B)/client/vorbis/analysis.o \
-  $(B)/client/vorbis/bitrate.o \
-  $(B)/client/vorbis/block.o \
-  $(B)/client/vorbis/codebook.o \
-  $(B)/client/vorbis/envelope.o \
-  $(B)/client/vorbis/floor0.o \
-  $(B)/client/vorbis/floor1.o \
-  $(B)/client/vorbis/info.o \
-  $(B)/client/vorbis/lookup.o \
-  $(B)/client/vorbis/lpc.o \
-  $(B)/client/vorbis/lsp.o \
-  $(B)/client/vorbis/mapping0.o \
-  $(B)/client/vorbis/mdct.o \
-  $(B)/client/vorbis/psy.o \
-  $(B)/client/vorbis/registry.o \
-  $(B)/client/vorbis/res0.o \
-  $(B)/client/vorbis/smallft.o \
-  $(B)/client/vorbis/sharedbook.o \
-  $(B)/client/vorbis/synthesis.o \
-  $(B)/client/vorbis/vorbisfile.o \
-  $(B)/client/vorbis/window.o
-endif
-endif
-
 ifeq ($(ARCH),x86_64)
   Q3OBJ += \
     $(B)/client/snd_mix_x86_64.o
 endif
 
+Q3OBJ += \
+  $(B)/client/qvm/vm.o \
+  $(B)/client/qvm/vm_interpreted.o
+
 ifeq ($(HAVE_VM_COMPILED),true)
   ifeq ($(ARCH),x86)
-    Q3OBJ += $(B)/client/vm_x86.o
+    Q3OBJ += $(B)/client/qvm/vm_x86.o
   endif
   ifeq ($(ARCH),x86_64)
-    Q3OBJ += $(B)/client/vm_x86.o
+    Q3OBJ += $(B)/client/qvm/vm_x86.o
   endif
   ifeq ($(ARCH),arm)
-    Q3OBJ += $(B)/client/vm_armv7l.o
+    Q3OBJ += $(B)/client/qvm/vm_armv7l.o
   endif
   ifeq ($(ARCH),arm64)
-    Q3OBJ += $(B)/client/vm_aarch64.o
+    Q3OBJ += $(B)/client/qvm/vm_aarch64.o
+  endif
+  ifeq ($(ARCH),ppc64le)
+    Q3OBJ += $(B)/client/qvm/vm_powerpc.o
+  endif
+  ifeq ($(ARCH),ppc64)
+    Q3OBJ += $(B)/client/qvm/vm_powerpc.o
   endif
 endif
 
@@ -1207,8 +1531,7 @@ endif # !MINGW
 
 $(B)/$(TARGET_CLIENT): $(Q3OBJ)
 	$(echo_cmd) "LD $@"
-	$(Q)$(CC) -o $@ $(Q3OBJ) $(CLIENT_LDFLAGS) \
-		$(LDFLAGS)
+	$(Q)$(CC) -o $@ $(Q3OBJ) $(CLIENT_LDFLAGS) $(LDFLAGS)
 
 # modular renderers
 
@@ -1259,8 +1582,6 @@ Q3DOBJ = \
   $(B)/ded/q_shared.o \
   \
   $(B)/ded/unzip.o \
-  $(B)/ded/vm.o \
-  $(B)/ded/vm_interpreted.o \
   \
   $(B)/ded/be_aas_bspq3.o \
   $(B)/ded/be_aas_cluster.o \
@@ -1304,18 +1625,28 @@ else
   $(B)/ded/unix_shared.o
 endif
 
+  Q3DOBJ += \
+  $(B)/ded/qvm/vm.o \
+  $(B)/ded/qvm/vm_interpreted.o
+
 ifeq ($(HAVE_VM_COMPILED),true)
   ifeq ($(ARCH),x86)
-    Q3DOBJ += $(B)/ded/vm_x86.o
+    Q3DOBJ += $(B)/ded/qvm/vm_x86.o
   endif
   ifeq ($(ARCH),x86_64)
-    Q3DOBJ += $(B)/ded/vm_x86.o
+    Q3DOBJ += $(B)/ded/qvm/vm_x86.o
   endif
   ifeq ($(ARCH),arm)
-    Q3DOBJ += $(B)/ded/vm_armv7l.o
+    Q3DOBJ += $(B)/ded/qvm/vm_armv7l.o
   endif
   ifeq ($(ARCH),arm64)
-    Q3DOBJ += $(B)/ded/vm_aarch64.o
+    Q3DOBJ += $(B)/ded/qvm/vm_aarch64.o
+  endif
+  ifeq ($(ARCH),ppc64le)
+    Q3DOBJ += $(B)/ded/qvm/vm_powerpc.o
+  endif
+  ifeq ($(ARCH),ppc64)
+    Q3DOBJ += $(B)/ded/qvm/vm_powerpc.o
   endif
 endif
 
@@ -1339,17 +1670,20 @@ $(B)/client/%.o: $(SDIR)/%.c
 $(B)/client/%.o: $(CMDIR)/%.c
 	$(DO_CC)
 
+$(B)/client/qvm/%.o: $(CMDIR)/%.c
+	$(DO_CC_QVM)
+
 $(B)/client/%.o: $(BLIBDIR)/%.c
 	$(DO_BOT_CC)
 
-$(B)/client/%.o: $(OGGDIR)/src/%.c
+$(B)/client/jpeg/%.o: $(JPDIR)/%.c
+	$(DO_CC)
+
+$(B)/client/ogg/%.o: $(OGGDIR)/src/%.c
 	$(DO_CC)
 
 $(B)/client/vorbis/%.o: $(VORBISDIR)/lib/%.c
-	$(DO_CC)
-
-$(B)/client/%.o: $(JPDIR)/%.c
-	$(DO_CC)
+	$(DO_VORBIS_CC)
 
 $(B)/client/%.o: $(SDLDIR)/%.c
 	$(DO_CC)
@@ -1390,6 +1724,9 @@ $(B)/ded/%.o: $(SDIR)/%.c
 $(B)/ded/%.o: $(CMDIR)/%.c
 	$(DO_DED_CC)
 
+$(B)/ded/qvm/%.o: $(CMDIR)/%.c
+	$(DO_DED_CC_QVM)
+
 $(B)/ded/%.o: $(BLIBDIR)/%.c
 	$(DO_BOT_CC)
 
@@ -1410,7 +1747,6 @@ install: release
 	@for i in $(TARGETS); do \
 		if [ -f $(BR)$$i ]; then \
 			$(INSTALL) -D -m 0755 "$(BR)/$$i" "$(DESTDIR)$$i"; \
-			$(STRIP) "$(DESTDIR)$$i"; \
 		fi \
 	done
 

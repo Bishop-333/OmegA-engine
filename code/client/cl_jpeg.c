@@ -38,8 +38,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #		error Need system libjpeg >= 80 or jpeg_mem_ support
 #	endif
 #else
+#ifndef USE_JPEG_TURBO
 #	define JPEG_INTERNALS
-#	include "../libjpeg/jpeglib.h"
+#endif
+#	include "jpeglib.h"
 #endif
 
 /* Catching errors, as done in libjpeg's example.c */

@@ -1584,7 +1584,9 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 	// The searchpaths do guarantee that something will always
 	// be prepended, so we don't need to worry about "c:" or "//limbo"
 	if ( FS_CheckDirTraversal( filename ) ) {
-		*file = FS_INVALID_HANDLE;
+		if (file) {
+			*file = FS_INVALID_HANDLE;
+		}
 		return -1;
 	}
 
@@ -1802,6 +1804,10 @@ int FS_Read( void *buffer, int len, fileHandle_t f ) {
 		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
 	}
 
+	if ( len < 0 ) {
+		Com_Error( ERR_FATAL, "FS_Read: len < 0");
+	}
+
 	if ( f <= 0 || f >= MAX_FILE_HANDLES ) {
 		return 0;
 	}
@@ -1855,6 +1861,10 @@ int FS_Write( const void *buffer, int len, fileHandle_t h ) {
 
 	if ( !fs_searchpaths ) {
 		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
+	}
+
+	if ( len < 0 ) {
+		Com_Error( ERR_FATAL, "FS_Write: len < 0");
 	}
 
 	//if ( h <= 0 || h >= MAX_FILE_HANDLES ) {
@@ -2093,7 +2103,7 @@ int FS_ReadFile( const char *qpath, void **buffer ) {
 		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
 	}
 
-	if ( !qpath || !qpath[0] ) {
+	if ( qpath == NULL || qpath[0] == '\0' ) {
 		Com_Error( ERR_FATAL, "FS_ReadFile with empty name" );
 	}
 
@@ -2171,9 +2181,14 @@ int FS_ReadFile( const char *qpath, void **buffer ) {
 	}
 
 	buf = Hunk_AllocateTempMemory( len + 1 );
-	*buffer = buf;
 
-	FS_Read( buf, len, h );
+	if ( FS_Read( buf, len, h ) != len ) {
+		Hunk_FreeTempMemory( buf );
+		FS_FCloseFile( h );
+		return -1;
+	}
+
+	*buffer = buf;
 
 	fs_loadCount++;
 	fs_loadStack++;
@@ -4767,7 +4782,7 @@ static void FS_Startup( void ) {
 		// handle multiple basegames:
 		for ( i = 0; i < basegame_cnt; i++ ) {
 			FS_AddGameDirectory( fs_apppath->string, basegames[i] );
-#ifndef QUAKE3
+#ifdef DEFAULT_GAME
 			FS_AddGameDirectory( fs_apppath->string, DEFAULT_GAME );
 #endif
 		}
@@ -4817,16 +4832,20 @@ static void FS_Startup( void ) {
 
 	// add our commands
 	Cmd_AddCommand( "path", FS_Path_f );
+	Cmd_SetDescription( "path", "Prints info about the current search path.");
 	Cmd_AddCommand( "dir", FS_Dir_f );
+	Cmd_SetDescription( "dir", "Prints an extension-filtered file list.");
 	Cmd_AddCommand( "fdir", FS_NewDir_f );
+	Cmd_SetDescription( "fdir", "Prints an pattern-filtered file list.");
 	Cmd_AddCommand( "touchFile", FS_TouchFile_f );
 	Cmd_AddCommand( "lsof", FS_ListOpenFiles_f );
  	Cmd_AddCommand( "which", FS_Which_f );
 	Cmd_SetCommandCompletionFunc( "which", FS_CompleteFileName );
 	Cmd_AddCommand( "fs_restart", FS_Reload );
+	Cmd_SetDescription( "fs_restart", "Restarts the file system.");
 
 	// print the current search paths
-	FS_Path_f();
+	//FS_Path_f();
 	Com_Printf( "...loaded in %i milliseconds\n", end - start );
 
 	Com_Printf( "----------------------\n" );
@@ -5685,11 +5704,6 @@ void *FS_LoadLibrary( const char *name, qboolean useSystemLib )
 	void *libHandle = NULL;
 	char *fn;
 
-#ifdef DEBUG
-	fn = FS_BuildOSPath( Sys_Pwd(), name, NULL );
-	libHandle = Sys_LoadLibrary( fn );
-#endif
-
 	if(useSystemLib)
 	{
 		Com_Printf("Trying to load \"%s\"...\n", name);
@@ -5716,14 +5730,16 @@ void *FS_LoadLibrary( const char *name, qboolean useSystemLib )
 			sp = sp->next;
 		}
 		if ( sp ) {
-			fn = FS_BuildOSPath( sp->dir->path, name, NULL );
+			fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, name );
 			libHandle = Sys_LoadLibrary( fn );
+
+			if ( !libHandle ) {
+				fn = FS_BuildOSPath( sp->dir->path, name, NULL );
+				libHandle = Sys_LoadLibrary( fn );
+			}
+			
 			sp = sp->next;
 		}
-	}
-
-	if ( !libHandle ) {
-		return NULL;
 	}
 
 	return libHandle;

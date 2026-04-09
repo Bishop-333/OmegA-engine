@@ -48,7 +48,7 @@ static int SV_CreateChallenge( int timestamp, const netadr_t *from )
 	// The most-significant bit stores whether the timestamp is odd or even. This lets later verification code handle the
 	// case where the engine timestamp has incremented between the time this challenge is sent and the client replies.
 	challenge = Com_MD5Addr( from, timestamp );
-	challenge &= 0x7FFFFFFF;
+	challenge &= (1U << 31) - 1;
 	challenge |= (unsigned int)(timestamp & 0x1) << 31;
 
 	return challenge;
@@ -254,7 +254,7 @@ static qboolean SV_LoadIP4DB( const char *filename )
 	fileHandle_t fh = FS_INVALID_HANDLE;
 	uint32_t last_ip;
 	void *buf;
-	int len, i;
+	int len, res, i;
 
 	len = FS_SV_FOpenFileRead( filename, &fh );
 
@@ -277,8 +277,13 @@ static qboolean SV_LoadIP4DB( const char *filename )
 
 	buf = Z_Malloc( len );
 
-	FS_Read( buf, len, fh );
+	res = FS_Read( buf, len, fh );
 	FS_FCloseFile( fh );
+
+	if ( res != len ) {
+		Z_Free( buf );
+		return qfalse;
+	}
 
 	// check integrity of loaded database
 	last_ip = 0;
@@ -1444,7 +1449,7 @@ static int SV_WriteDownloadToClient( client_t *cl )
 
 		cl->downloadBlockSize[curindex] = FS_Read( cl->downloadBlocks[curindex], MAX_DOWNLOAD_BLKSIZE, cl->download );
 
-		if (cl->downloadBlockSize[curindex] < 0) {
+		if (cl->downloadBlockSize[curindex] <= 0) {
 			// EOF right now
 			cl->downloadCount = cl->downloadSize;
 			break;
@@ -2321,7 +2326,7 @@ void SV_ExecuteClientMessage( client_t *cl, msg_t *msg ) {
 	if ( cl->state == CS_CONNECTED ) {
 		if ( !cl->downloading ) {
 			// send initial gamestate, client may not acknowledge it in next command but start downloading after SV_ClientCommand()
-			if ( !SVC_RateLimit( &cl->gamestate_rate, 1, 1000 ) ) {
+			if ( cl->netchan.remoteAddress.type == NA_LOOPBACK || !SVC_RateLimit( &cl->gamestate_rate, 1, 1000 ) ) {
 				SV_SendClientGameState( cl );
 			}
 			return;

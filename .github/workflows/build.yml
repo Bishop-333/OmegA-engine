@@ -22,137 +22,125 @@ on:
 
 jobs:
   windows:
-    name: Release Windows ${{ matrix.arch }}
-    runs-on: windows-2022
-    strategy:
-      fail-fast: false
-      matrix:
-        arch: [x86_64]
-        include:
-          - arch: x86_64
-            msystem: mingw64
-            prefix: mingw-w64-x86_64
-
-    defaults:
-      run:
-        shell: msys2 {0}
-
-    steps:
-
-    - uses: msys2/setup-msys2@v2
-      with:
-        install: base-devel ${{ matrix.prefix }}-binutils ${{ matrix.prefix }}-make ${{ matrix.prefix }}-gcc
-        msystem: ${{ matrix.msystem }}
-        path-type: minimal
-        release: false
-        update: false
-
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
-
-    - name: Build
-      run: |
-        make clean ARCH=${{ matrix.arch }}
-        make install -j$(nproc) ARCH=${{ matrix.arch }} DESTDIR=bin RENDERER_DEFAULT=opengl
-        make clean ARCH=${{ matrix.arch }}
-        make install -j$(nproc) ARCH=${{ matrix.arch }} DESTDIR=bin RENDERER_DEFAULT=vulkan
-
-    - uses: actions/upload-artifact@v4
-      with:
-        name: release-mingw64-${{ matrix.arch }}
-        path: bin
-        if-no-files-found: error
-        retention-days: 5
-        
-  ubuntu:
-    name: Release Unix ${{ matrix.arch }}
+    name: Release Windows x86_64
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
-      matrix:
-        arch: [x86_64]
 
     steps:
 
     - name: Install tools
       run: |
         sudo apt-get -qq update
-        sudo apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev libjpeg-dev
+        sudo apt-get -y install gcc-mingw-w64-x86-64 nasm
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         submodules: recursive
 
     - name: Build
       run: |
-        make install -j$(nproc) ARCH=${{ matrix.arch }} DESTDIR=bin RENDERER_DEFAULT=opengl
-        make clean ARCH=${{ matrix.arch }} 
-        make install -j$(nproc) ARCH=${{ matrix.arch }} DESTDIR=bin RENDERER_DEFAULT=vulkan
+        make install -j$(nproc) PLATFORM=mingw64 DESTDIR=bin
 
-    - uses: actions/upload-artifact@v4
+    - name: Create archive
+      run: |
+        7z a -r build/omega-engine-windows-x86_64.zip ./bin/*
+
+    - uses: actions/upload-artifact@v7
       with:
-        name: release-linux-${{ matrix.arch }}
-        path: bin
+        name: release-mingw64-x86_64
+        path: build/omega-engine-windows-x86_64.zip
+        if-no-files-found: error
+        retention-days: 5
+        
+  linux:
+    name: Release Linux x86_64
+    runs-on: ubuntu-24.04
+    container: debian:trixie
+    strategy:
+      fail-fast: false
+
+    steps:
+
+    - name: Install tools
+      run: |
+        apt-get -qq update
+        apt-get install -y make gcc git cmake
+        apt-get -y install libcurl4-openssl-dev libsdl3-dev libopenal-dev nasm
+
+    - uses: actions/checkout@v6
+      with:
+        submodules: recursive
+
+    - name: Build
+      run: |
+        make install -j$(nproc) BUILD_SERVER=1 DESTDIR=bin
+
+    - name: Create archive
+      run: |
+        tar -czf build/omega-engine-linux-x86_64.tar.gz -C bin .
+
+    - uses: actions/upload-artifact@v7
+      with:
+        name: release-linux-x86_64
+        path: build/omega-engine-linux-x86_64.tar.gz
         if-no-files-found: error
         retention-days: 5
 
-  ubuntu-arm:
-    name: Release Unix ${{ matrix.arch }}
-    runs-on: ubuntu-22.04-arm
+  linux-arm:
+    name: Release Linux arm64
+    runs-on: ubuntu-24.04-arm
+    container: debian:trixie
     strategy:
       fail-fast: false
-      matrix:
-        arch: [arm64]
 
     steps:
 
     - name: Install tools
       run: |
-        sudo apt-get -qq update
-        sudo apt-get install -y make gcc g++
-        sudo apt-get -y install libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev
+        apt-get -qq update
+        apt-get install -y make gcc git cmake
+        apt-get -y install libcurl4-openssl-dev libsdl3-dev libopenal-dev
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         submodules: recursive
 
     - name: Build
       run: |
-        make install -j$(nproc) ARCH=${{ matrix.arch }} DESTDIR=bin RENDERER_DEFAULT=opengl
-        make clean ARCH=${{ matrix.arch }}
-        make install -j$(nproc) ARCH=${{ matrix.arch }} DESTDIR=bin RENDERER_DEFAULT=vulkan
+        make install -j$(nproc) BUILD_SERVER=1 DESTDIR=bin
 
-    - uses: actions/upload-artifact@v4
+    - name: Create archive
+      run: |
+        tar -czf build/omega-engine-linux-arm64.tar.gz -C bin .
+
+    - uses: actions/upload-artifact@v7
       with:
-        name: release-linux-${{ matrix.arch }}
-        path: bin
+        name: release-linux-arm64
+        path: build/omega-engine-linux-arm64.tar.gz
         if-no-files-found: error
         retention-days: 5
 
   macos:
     name: Release macOS universal2
-    runs-on: macos-14
+    runs-on: macos-15
     strategy:
       fail-fast: false
 
     steps:
 
-    - name: Install tools
-      run: brew install coreutils sdl2 # pkg-config
-
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         submodules: recursive
 
     - name: Build
       run: |
-        make install -j$(sysctl -n hw.logicalcpu) ARCH=x86_64 DESTDIR=bin INSTALL=ginstall STRIP=echo
-        make install -j$(sysctl -n hw.logicalcpu) ARCH=arm64 DESTDIR=bin INSTALL=ginstall STRIP=echo
+        make release -j$(sysctl -n hw.logicalcpu) ARCH=x86_64
+        make release -j$(sysctl -n hw.logicalcpu) ARCH=arm64
         ./make-macosx-app.sh release
         hdiutil create -format UDZO -srcfolder build/release-darwin-universal2/OmegA.app build/omega-engine-macos-universal2.dmg
 
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: release-darwin-universal2
         path: build/omega-engine-macos-universal2.dmg
@@ -160,19 +148,18 @@ jobs:
         retention-days: 5
 
   create-testing:
-    if: github.ref == 'refs/heads/master' && github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    needs: [windows, ubuntu, ubuntu-arm, macos]
-    runs-on: ubuntu-24.04
+    if: github.event_name == 'workflow_dispatch'
+    needs: [windows, linux, linux-arm, macos]
+    runs-on: ubuntu-latest
     steps:
       - name: Download Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
 
       - name: Create binary archives
         run: |
-          chmod -R +x *
-          7z a -r omega-engine-linux-x86_64.zip      ./release-linux-x86_64
-          7z a -r omega-engine-linux-arm64.zip       ./release-linux-arm64
-          7z a -r omega-engine-windows-x86_64.zip    ./release-mingw64-x86_64
+          cp ./release-linux-x86_64/omega-engine-linux-x86_64.tar.gz .
+          cp ./release-linux-arm64/omega-engine-linux-arm64.tar.gz .
+          cp ./release-mingw64-x86_64/omega-engine-windows-x86_64.zip .
           cp ./release-darwin-universal2/omega-engine-macos-universal2.dmg .
       - name: Create latest build
         uses: czietz/action-automatic-releases@latest
@@ -182,5 +169,6 @@ jobs:
           prerelease: true
           title: Development Build
           files: |
+            *.tar.gz
             *.zip
             *.dmg

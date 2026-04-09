@@ -129,6 +129,7 @@ cvar_t	*r_ignoreGLErrors;
 cvar_t	*r_texturebits;
 cvar_t	*r_ext_multisample;
 cvar_t	*r_ext_alpha_to_coverage;
+cvar_t	*r_ext_fxaa;
 
 cvar_t	*r_drawBuffer;
 cvar_t	*r_lightmap;
@@ -147,6 +148,7 @@ cvar_t	*r_showsky;
 cvar_t	*r_shownormals;
 cvar_t	*r_finish;
 cvar_t	*r_clear;
+cvar_t	*r_clearColor;
 cvar_t	*r_textureMode;
 cvar_t	*r_offsetFactor;
 cvar_t	*r_offsetUnits;
@@ -1329,6 +1331,11 @@ static void GfxInfo( void )
 	ri.Printf( PRINT_ALL, "VK_RENDERER: %s\n", glConfig.renderer_string );
 	ri.Printf( PRINT_ALL, "VK_VERSION: %s\n", glConfig.version_string );
 
+	if ( vk.driverNote[0] != '\0' )
+	{
+		ri.Printf( PRINT_ALL, "%s", vk.driverNote );
+	}
+
 	ri.Printf( PRINT_DEVELOPER, "VK_EXTENSIONS: " );
 	R_PrintLongString( glConfig.extensions_string );
 
@@ -1489,15 +1496,24 @@ static void R_Register( void )
 {
 	// make sure all the commands added here are also removed in R_Shutdown
 	ri.Cmd_AddCommand( "imagelist", R_ImageList_f );
+	ri.Cmd_SetDescription( "imagelist", "Prints loaded images." );
 	ri.Cmd_AddCommand( "shaderlist", R_ShaderList_f );
+	ri.Cmd_SetDescription( "shaderlist", "Prints loaded shaders." );
 	ri.Cmd_AddCommand( "skinlist", R_SkinList_f );
+	ri.Cmd_SetDescription( "skinlist", "Prints loaded skins." );
 	ri.Cmd_AddCommand( "modellist", R_Modellist_f );
+	ri.Cmd_SetDescription( "modellist", "Prints loaded models." );
 	ri.Cmd_AddCommand( "screenshot", R_ScreenShot_f );
+	ri.Cmd_SetDescription( "screenshot", "Takes a TARGA (.tga) screenshot." );
 	ri.Cmd_AddCommand( "screenshotJPEG", R_ScreenShot_f );
+	ri.Cmd_SetDescription( "screenshotJPEG", "Takes a JPEG (.jpg) screenshot." );
 	ri.Cmd_AddCommand( "screenshotBMP", R_ScreenShot_f );
+	ri.Cmd_SetDescription( "screenshotBMP", "Takes a BMP (.bmp) screenshot." );
 	ri.Cmd_AddCommand( "gfxinfo", GfxInfo_f );
+	ri.Cmd_SetDescription( "gfxinfo", "Prints display mode info." );
 #ifdef USE_VULKAN
 	ri.Cmd_AddCommand( "vkinfo", VkInfo_f );
+	ri.Cmd_SetDescription( "vkinfo", "Prints vulkan renderer info." );
 #endif
 
 	//
@@ -1517,7 +1533,7 @@ static void R_Register( void )
 	r_defaultImage = ri.Cvar_Get( "r_defaultImage", "", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_defaultImage, "Replace default (missing) image texture by either exact file or solid #rgb|#rrggbb background color." );
 
-	r_simpleMipMaps = ri.Cvar_Get( "r_simpleMipMaps", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_simpleMipMaps = ri.Cvar_Get( "r_simpleMipMaps", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_simpleMipMaps, "Whether or not to use a simple mipmapping algorithm or a more correct one:\n 0: off (proper linear filter)\n 1: on (for slower machines)" );
 	r_vertexLight = ri.Cvar_Get( "r_vertexLight", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_vertexLight, "Set to 1 to use vertex light instead of lightmaps, collapse all multi-stage shaders into single-stage ones, might cause rendering artifacts." );
@@ -1566,7 +1582,7 @@ static void R_Register( void )
 	r_lodCurveError = ri.Cvar_Get( "r_lodCurveError", "250", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_lodCurveError, "-1", "8192", CV_FLOAT );
 	ri.Cvar_SetDescription( r_lodCurveError, "Level of detail error on curved surface grids. Higher values result in better quality at a distance." );
-	r_lodbias = ri.Cvar_Get( "r_lodbias", "-2", CVAR_ARCHIVE_ND );
+	r_lodbias = ri.Cvar_Get( "r_lodbias", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_lodbias, "Sets the level of detail of in-game models:\n -2: Ultra (further delays LOD transition in the distance)\n -1: Very High (delays LOD transition in the distance)\n 0: High\n 1: Medium\n 2: Low" );
 	r_flares = ri.Cvar_Get ("r_flares", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_flares, "Enables corona effects on light sources." );
@@ -1588,7 +1604,7 @@ static void R_Register( void )
 	r_dynamiclight = ri.Cvar_Get( "r_dynamiclight", "1", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_dynamiclight, "Enables dynamic lighting." );
 #ifdef USE_PMLIGHT
-#if arm32 || arm64 && !MACOS_X // RPi4 Vulkan driver have very poor GLSL shaders performance...
+#if arm32 || arm64 && !__APPLE__ // RPi4 Vulkan driver have very poor GLSL shaders performance...
 	r_dlightMode = ri.Cvar_Get( "r_dlightMode", "0", CVAR_ARCHIVE );
 #else
 	r_dlightMode = ri.Cvar_Get( "r_dlightMode", "1", CVAR_ARCHIVE );
@@ -1677,8 +1693,10 @@ static void R_Register( void )
 	r_portalOnly = ri.Cvar_Get ("r_portalOnly", "0", CVAR_CHEAT );
 	ri.Cvar_SetDescription( r_portalOnly, "Set to 1 to render only first portal view if it is present on the scene." );
 
-	r_flareSize = ri.Cvar_Get( "r_flareSize", "40", CVAR_CHEAT );
+	r_flareSize = ri.Cvar_Get( "r_flareSize", "40", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_flareSize, "Radius of light flares. Requires \\r_flares 1." );
+	ri.Cvar_CheckRange( r_flareSize, "1", "40", CV_FLOAT );
+
 	r_flareFade = ri.Cvar_Get( "r_flareFade", "10", CVAR_CHEAT );
 	ri.Cvar_SetDescription( r_flareFade, "Distance to fade out light flares. Requires \\r_flares 1." );
 	r_flareCoeff = ri.Cvar_Get( "r_flareCoeff", "150", CVAR_CHEAT );
@@ -1688,7 +1706,8 @@ static void R_Register( void )
 	r_skipBackEnd = ri.Cvar_Get ("r_skipBackEnd", "0", CVAR_CHEAT);
 	ri.Cvar_SetDescription( r_skipBackEnd, "Skips loading rendering backend." );
 
-	r_lodscale = ri.Cvar_Get( "r_lodscale", "5", CVAR_CHEAT );
+	r_lodscale = ri.Cvar_Get( "r_lodscale", "30", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_lodscale, "0", "40", CV_INTEGER );
 	ri.Cvar_SetDescription( r_lodscale, "Set scale for level of detail adjustment." );
 	r_norefresh = ri.Cvar_Get ("r_norefresh", "0", CVAR_CHEAT);
 	ri.Cvar_SetDescription( r_norefresh, "Bypasses refreshing of the rendered scene." );
@@ -1712,6 +1731,8 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_shownormals, "Debugging tool: Show wireframe surface normals." );
 	r_clear = ri.Cvar_Get( "r_clear", "0", 0 );
 	ri.Cvar_SetDescription( r_clear, "Forces screen buffer clearing every frame, removing any hall of mirrors effect in void.\n Use \\r_clearColor to set color." );
+	r_clearColor = ri.Cvar_Get( "r_clearColor", "255 0 128", 0 );
+	ri.Cvar_SetDescription( r_clearColor, "Clear screen color, set as R G B values from 0-255, use with \\seta to save in config." );
 	r_offsetFactor = ri.Cvar_Get( "r_offsetFactor", "-2", CVAR_CHEAT | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_offsetFactor, "Offset factor for shaders with polygonOffset stages." );
 	r_offsetUnits = ri.Cvar_Get( "r_offsetunits", "-1", CVAR_CHEAT | CVAR_LATCH );
@@ -1769,7 +1790,7 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_ext_texture_filter_anisotropic, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ext_texture_filter_anisotropic, "Allow anisotropic filtering." );
 
-	r_ext_max_anisotropy = ri.Cvar_Get( "r_ext_max_anisotropy", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_ext_max_anisotropy = ri.Cvar_Get( "r_ext_max_anisotropy", "16", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_max_anisotropy, "1", NULL, CV_INTEGER );
 	ri.Cvar_SetDescription( r_ext_max_anisotropy, "Sets maximum anisotropic level for your graphics driver. Requires \\r_ext_texture_filter_anisotropic." );
 
@@ -1798,7 +1819,7 @@ static void R_Register( void )
 	ri.Cvar_SetDescription(r_bloom, "Enables bloom post-processing effect. Requires \\r_fbo 1.");
 
 	r_ext_multisample = ri.Cvar_Get( "r_ext_multisample", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
-#ifdef MACOS_X
+#ifdef __APPLE__
 	ri.Cvar_CheckRange( r_ext_multisample, "0", "16", CV_INTEGER );
 #else
 	ri.Cvar_CheckRange( r_ext_multisample, "0", "64", CV_INTEGER );
@@ -1813,6 +1834,11 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_ext_alpha_to_coverage, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ext_alpha_to_coverage, "Enables alpha-to-coverage multisampling, requires \\r_fbo 1." );
 #endif
+
+	r_ext_fxaa = ri.Cvar_Get( "r_ext_fxaa", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_ext_fxaa, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_ext_fxaa, "Fast approximate anti-aliasing, requires \\r_fbo 1." );
+	ri.Cvar_SetGroup( r_ext_fxaa, CVG_RENDERER );
 
 	r_renderWidth = ri.Cvar_Get( "r_renderWidth", "800", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_renderWidth, "96", NULL, CV_INTEGER );
@@ -1986,7 +2012,9 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 		Com_Memset( &glState, 0, sizeof( glState ) );
 
 		if ( code != REF_KEEP_WINDOW ) {
-			ri.VKimp_Shutdown( code == REF_UNLOAD_DLL ? qtrue : qfalse );
+			if ( ri.VKimp_Shutdown ) {
+				ri.VKimp_Shutdown( code == REF_UNLOAD_DLL ? qtrue : qfalse );
+			}
 			Com_Memset( &glConfig, 0, sizeof( glConfig ) );
 		}
 #else
@@ -1994,7 +2022,9 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 		Com_Memset( &glState, 0, sizeof( glState ) );
 
 		if ( code != REF_KEEP_WINDOW ) {
-			ri.GLimp_Shutdown( code == REF_UNLOAD_DLL ? qtrue : qfalse );
+			if ( ri.GLimp_Shutdown ) {
+				ri.GLimp_Shutdown( code == REF_UNLOAD_DLL ? qtrue : qfalse );
+			}
 			Com_Memset( &glConfig, 0, sizeof( glConfig ) );
 		}
 #endif

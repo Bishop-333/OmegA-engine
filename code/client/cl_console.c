@@ -114,7 +114,11 @@ cvar_t		*con_conspeed;
 cvar_t		*con_autoclear;
 cvar_t		*con_notifytime;
 cvar_t		*con_scale;
+cvar_t		*con_fps;
 cvar_t		*con_clock;
+cvar_t		*con_drawHelp;
+cvar_t		*con_anim;
+cvar_t		*con_fade;
 
 int			g_console_field_width;
 
@@ -399,7 +403,7 @@ void Con_CheckResize( console_t *con )
 	{
 		scale = con_scale->value;
 	}
-	else if ( Cvar_VariableIntegerValue( "r_ext_supersample" ) )
+	else if ( Cvar_VariableIntegerValue( "r_ext_supersample" ) && Cvar_VariableIntegerValue( "r_fbo" ) )
 	{
 		scale = con_scale->value * ((cls.glconfig.vidWidth / 1920.0f) + (cls.glconfig.vidHeight / 1080.0f)) / 2.0f;
 	}
@@ -578,14 +582,23 @@ void Con_Init( void )
 	con_scale = Cvar_Get( "con_scale", "0.8", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( con_scale, "0.5", "8", CV_FLOAT );
 	Cvar_SetDescription( con_scale, "Console font size scale." );
+	con_fps = Cvar_Get( "con_fps", "1", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( con_fps, "Enable/disable console fps display." );
 	con_clock = Cvar_Get( "con_clock", "1", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( con_clock, "Console clock.\n 1: 24-hour clock\n 2: 12-hour clock" );
+	con_drawHelp = Cvar_Get( "con_drawHelp", "1", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( con_drawHelp, "Enable/disable automatic CVAR description display." );
+	con_anim = Cvar_Get( "con_anim", "1", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( con_anim, "Console opening/closing scroll animation." );
+	con_fade = Cvar_Get( "con_fade", "1", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( con_fade, "Console opening/closing fade animation." );
 
 	Field_Clear( &g_consoleField );
 	g_consoleField.widthInChars = g_console_field_width;
 
 	Cmd_AddCommand( "clear", Con_Clear_f );
 	Cmd_AddCommand( "condump", Con_Dump_f );
+	Cmd_SetDescription( "condump", "Save the console contents out to a file." );
 	Cmd_SetCommandCompletionFunc( "condump", Cmd_CompleteTxtName );
 	Cmd_AddCommand( "toggleconsole", Con_ToggleConsole_f );
 	Cmd_AddCommand( "messagemode", Con_MessageMode_f );
@@ -958,7 +971,7 @@ static void Con_DrawNotify( void )
 	int		skip;
 	int		currentColorIndex;
 	int		colorIndex;
-	int notifytime = con_notifytime->value * 1000 + 2 * (int)NOTIFY_FADE_TIME;
+	int		notifytime = con_notifytime->value * 1000 + 2 * (int)NOTIFY_FADE_TIME;
 
 	currentColorIndex = ColorIndex( COLOR_WHITE );
 	re.SetColor( g_color_table[ currentColorIndex ] );
@@ -1051,6 +1064,163 @@ static void Con_DrawNotify( void )
 
 /*
 ================
+Con_DrawFPS
+================
+*/
+#define FPS_FRAMES 4
+static float Con_DrawFPS( float y ) {
+	const char	*s;
+	int		w;
+	static int	previousTimes[FPS_FRAMES];
+	static int	index;
+	int		i, total;
+	int		fps;
+
+	previousTimes[index % FPS_FRAMES] = cls.realFrametime;
+	index++;
+	if ( index > FPS_FRAMES ) {
+		// average multiple frames together to smooth changes out a bit
+		total = 0;
+		for ( i = 0 ; i < FPS_FRAMES ; i++ ) {
+			total += previousTimes[i];
+		}
+		if ( !total ) {
+			total = 1;
+		}
+		fps = 1000 * FPS_FRAMES / total;
+
+		s = va( "%ifps", fps );
+		w = strlen( s ) * smallchar_width;
+
+		SCR_DrawSmallStringExt( cls.glconfig.vidWidth - w - 8, y + 2, s, g_color_table[ conColors[ activeConsoleNum ] ], qfalse, qtrue );
+	}
+
+	return y + smallchar_height + 4;
+}
+
+
+/*
+================
+Con_DrawClock
+================
+*/
+static float Con_DrawClock( float y ) {
+	qtime_t		qt;
+	const char	*time;
+	char		*meridiem;
+	int			hour;
+
+	Com_RealTime( &qt );
+	if ( con_clock->integer == 2 ) {
+		if ( qt.tm_hour < 13 ) {
+			meridiem = "AM";
+			hour = qt.tm_hour;
+		} else {
+			meridiem = "PM";
+			hour = qt.tm_hour - 12;
+		}
+		time = va( "%02i:%02i%s", hour, qt.tm_min, meridiem );
+	} else {
+		time = va( "%02i:%02i:%02i", qt.tm_hour, qt.tm_min, qt.tm_sec );
+	}
+
+	SCR_DrawSmallStringExt( cls.glconfig.vidWidth - ( strlen( time ) ) * smallchar_width - 8, y, time, g_color_table[ conColors[ activeConsoleNum ] ], qfalse, qtrue );
+
+	return y + smallchar_height + 4;
+}
+
+
+/*
+================
+Con_DrawHelp
+================
+*/
+static void Con_DrawHelp( int y, float conColorValue[4] ) {
+	int		i;
+	char	help[ MAX_CVAR_VALUE_STRING ];
+
+	if ( *g_consoleField.buffer == '\0' )
+		return;
+	
+	if ( activeCon->displayFrac == 0.0f || activeCon->displayFrac < activeCon->finalFrac )
+		return;
+
+	Cmd_TokenizeString( g_consoleField.buffer );
+	if ( Cmd_Argc() < 1 )
+		return;
+
+	const char* name = Cmd_Argv(0);
+	if ( *name == '/' || *name == '\\' )
+		name++;
+
+	if ( *name == '\0' )
+		return;
+
+	const char *desc = Cvar_GetDescription( name );
+	if ( !desc ) {
+		desc = Cmd_GetDescription( name );
+	}
+
+	if ( !desc ) {
+		return;
+	}
+
+	const char *s = desc;
+	int lines = 1;
+	int len = 0;
+	int maxLen = 0;
+
+	while ( *s ) {
+		if ( *s == '\n' ) {
+			lines++;
+			len = 0;
+		} else {
+			len++;
+			if ( len > maxLen ) {
+				maxLen = len;
+			}
+		}
+		s++;
+	}
+
+	int x = activeCon->xadjust + smallchar_width;
+	int w = maxLen * smallchar_width + 16;
+	int h = lines * smallchar_height + 8;
+
+	if ( cl_conColor->string[0] ) {
+		re.SetColor( conColorValue );
+		re.DrawStretchPic( x, y, w, h, 0, 0, 1, 1, cls.whiteShader );
+	} else {
+		re.SetColor( g_color_table[ ColorIndex( COLOR_WHITE ) ] );
+		re.DrawStretchPic( x, y, w, h, 0, 0, 1, 1, cls.consoleShader );
+	}
+	re.SetColor( NULL );
+
+	re.SetColor( g_color_table[ conColors[ activeConsoleNum ] ] );
+	re.DrawStretchPic( x + 1, y + h + 0, w - 1, 1, 0, 0, 0, 0, cls.whiteShader );
+	re.DrawStretchPic( x + 2, y + h + 1, w - 2, 1, 0, 0, 0, 0, cls.whiteShader );
+	re.DrawStretchPic( x + w + 0, y + 1, 1, h + 1, 0, 0, 0, 0, cls.whiteShader );
+	re.DrawStretchPic( x + w + 1, y + 2, 1, h + 0, 0, 0, 0, 0, cls.whiteShader );
+	re.SetColor( NULL );
+
+	while ( *desc ) {
+		for ( i = 0; *desc && *desc != '\n' && i < sizeof( help ) - 1; i++ ) {
+			help[i] = *desc++;
+		}
+		help[i] = '\0';
+
+		SCR_DrawSmallStringExt( x + 6, y + 4, help, g_color_table[ ColorIndex( COLOR_WHITE ) ], qfalse, qfalse );
+		y += smallchar_height;
+
+		if ( *desc == '\n' ) {
+			desc++;
+		}
+	}
+}
+
+
+/*
+================
 Con_DrawSolidConsole
 
 Draws the console with the solid background
@@ -1059,6 +1229,7 @@ Draws the console with the solid background
 static void Con_DrawSolidConsole( float frac ) {
 
 	static float conColorValue[4] = { 0.0, 0.0, 0.0, 0.0 };
+	static float conFade;
 	// for cvar value change tracking
 	static char  conColorString[ MAX_CVAR_VALUE_STRING ] = { '\0' };
 
@@ -1069,12 +1240,8 @@ static void Con_DrawSolidConsole( float frac ) {
 	int				lines;
 	int				currentColorIndex;
 	int				colorIndex;
-	float			yf, wf;
+	float			yf, wf, yy;
 	char			buf[ MAX_CVAR_VALUE_STRING ], *v[4];
-	qtime_t			qt;
-	const char		*time;
-	char			*meridiem;
-	int			hour;
 	int			j;
 	int			margin;
 	vec4_t			darkTextColor;
@@ -1093,6 +1260,9 @@ static void Con_DrawSolidConsole( float frac ) {
 
 	// draw the background
 	yf = frac * SCREEN_HEIGHT;
+	if ( con_fade->integer ) {
+		color_table_alpha( frac / cl_consoleHeight->value );
+	}
 
 	// on wide screens, we will center the text
 	activeCon->xadjust = 0;
@@ -1118,7 +1288,14 @@ static void Con_DrawSolidConsole( float frac ) {
 					}
 				}
 			}
-			re.SetColor( conColorValue );
+			if ( con_fade->integer ) {
+				conFade = conColorValue[3];
+				conColorValue[3] *= ( frac / cl_consoleHeight->value ) * ( 2.0f - ( frac / cl_consoleHeight->value ) );
+				re.SetColor( conColorValue );
+				conColorValue[3] = conFade;
+			} else {
+				re.SetColor( conColorValue );
+			}
 			re.DrawStretchPic( 0, 0, wf, yf, 0, 0, 1, 1, cls.whiteShader );
 		} else {
 			re.SetColor( g_color_table[ ColorIndex( COLOR_WHITE ) ] );
@@ -1127,7 +1304,7 @@ static void Con_DrawSolidConsole( float frac ) {
 
 	}
 
-	re.SetColor( g_color_table[ ColorIndex( COLOR_RED ) ] );
+	re.SetColor( g_color_table[ conColors[ activeConsoleNum ] ] );
 	re.DrawStretchPic( 0, yf, wf, 2, 0, 0, 1, 1, cls.whiteShader );
 
 	//y = yf;
@@ -1148,30 +1325,23 @@ static void Con_DrawSolidConsole( float frac ) {
 	if ( activeCon->display != activeCon->current )
 	{
 		// draw arrows to show the buffer is backscrolled
-		re.SetColor( g_color_table[ ColorIndex( COLOR_RED ) ] );
+		re.SetColor( g_color_table[ conColors[ activeConsoleNum ] ] );
 		for ( x = 0 ; x < activeCon->linewidth ; x += 4 )
 			SCR_DrawSmallChar( activeCon->xadjust + (x+1)*smallchar_width, y, '^' );
 		y -= smallchar_height;
 		row--;
 	}
 
+	yy = 2;
+
+	// draw console fps frames
+	if ( con_fps->integer ) {
+		yy = Con_DrawFPS( yy );
+	}
+
 	// draw console clock (fx3)
 	if ( con_clock->integer ) {
-		Com_RealTime( &qt );
-		if ( con_clock->integer == 2 ) {
-			if ( qt.tm_hour < 13 ) {
-				meridiem = "AM";
-				hour = qt.tm_hour;
-			} else {
-				meridiem = "PM";
-				hour = qt.tm_hour - 12;
-			}
-			time = va( "%02i:%02i%s", hour, qt.tm_min, meridiem );
-		} else {
-			time = va( "%02i:%02i:%02i", qt.tm_hour, qt.tm_min, qt.tm_sec );
-		}
-
-		SCR_DrawSmallStringExt( cls.glconfig.vidWidth - ( strlen( time ) ) * smallchar_width - 8, 2, time, g_color_table[1], qfalse, qtrue);
+		yy = Con_DrawClock( yy );
 	}
 
 	// draw console tabs (fX3)
@@ -1243,7 +1413,14 @@ static void Con_DrawSolidConsole( float frac ) {
 	// draw the input prompt, user text, and cursor if desired
 	Con_DrawInput();
 
+	if ( con_drawHelp->integer ) {
+		Con_DrawHelp( lines + smallchar_height, conColorValue );
+	}
+
 	re.SetColor( NULL );
+	if ( con_fade->integer ) {
+		color_table_alpha( 1.0f );
+	}
 }
 
 
@@ -1291,7 +1468,7 @@ void Con_RunConsole( void )
 	for ( i = 0; i < MAX_CONSOLES; i++ ){
 		// decide on the destination height of the console
 		if ( Key_GetCatcher( ) & KEYCATCH_CONSOLE )
-			con[i].finalFrac = 0.5;
+			con[i].finalFrac = cl_consoleHeight->value;
 		else
 			con[i].finalFrac = 0.0;	// none visible
 	
@@ -1305,7 +1482,11 @@ void Con_RunConsole( void )
 		}
 		else if ( con[i].finalFrac > con[i].displayFrac )
 		{
-			con[i].displayFrac += con_conspeed->value * cls.realFrametime * 0.001;
+			if ( con_anim->integer ) {
+				con[i].displayFrac += ( con[i].finalFrac - con[i].displayFrac ) * con_conspeed->value * 0.05;
+			} else {
+				con[i].displayFrac += con_conspeed->value * cls.realFrametime * 0.001;
+			}
 			if ( con[i].finalFrac < con[i].displayFrac )
 				con[i].displayFrac = con[i].finalFrac;
 		}

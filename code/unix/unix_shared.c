@@ -419,7 +419,7 @@ const char *Sys_DefaultHomePath( void )
 	if ( (p = getenv("HOME")) != NULL ) 
 	{
 		Com_sprintf( homePath, sizeof( homePath ), "%s%c", p, PATH_SEP );
-#ifdef MACOS_X
+#ifdef __APPLE__
 		Q_strcat( homePath, sizeof( homePath ), HOMEPATH_NAME_MACOSX );
 #else
 		Q_strcat( homePath, sizeof( homePath ), HOMEPATH_NAME_UNIX );
@@ -450,7 +450,7 @@ const char *Sys_SteamPath( void )
 
 	if( ( p = getenv( "HOME" ) ) != NULL )
 	{
-#ifdef MACOS_X
+#ifdef __APPLE__
 		char *steamPathEnd = "/Library/Application Support/Steam/SteamApps/common/" STEAMPATH_NAME;
 #else
 		char *steamPathEnd = "/.steam/steam/SteamApps/common/" STEAMPATH_NAME;

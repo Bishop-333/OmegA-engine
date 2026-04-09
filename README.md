@@ -1,6 +1,14 @@
-# OmegA-engine
+<p align="center">
+  <img src="code/unix/quake3.png" alt="OmegA Logo">
+</p>
 
+# OmegA-engine
 [![build](../../workflows/build/badge.svg)](../../actions?query=workflow%3Abuild)
+![License](https://img.shields.io/badge/License-GPLv2-blue.svg)
+&nbsp;&nbsp;&nbsp;
+![Linux](https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black)
+![Windows](https://img.shields.io/badge/Windows-0078D6?&logo=windows&logoColor=white)
+![macOS](https://img.shields.io/badge/mac%20os-000000?&logo=apple&logoColor=F0F0F0)
 
 This is a modern OpenArena engine aimed to be fast, secure and compatible with all existing OA mods.
 It is based on [quake3e](https://github.com/ec-/Quake3e) with latest upstream fixes applied.
@@ -21,9 +29,12 @@ Go to [Releases](../../releases) section to download latest binaries for your pl
 * improved server-side DoS protection, much reduced memory usage
 * raised filesystem limits (up to 20,000 maps can be handled in a single directory)
 * reworked Zone memory allocator, no more out-of-memory errors
-* non-intrusive support for SDL2 backend (video, audio, input), selectable at compile time
+* non-intrusive support for SDL3 backend (video, audio, input), selectable at compile time (based on [timangus](https://github.com/timangus)'s work on [ioquake3](https://github.com/ioquake/ioq3))
 * OpenAL sound API support (multiple speaker support and better sound quality)
 * Optional Ogg Vorbis support
+* Optional FLAC support
+* libjpeg-turbo support (JPEG image codec that uses SIMD instructions to accelerate baseline JPEG compression and decompression)
+* zlib-ng support (zlib replacement with optimizations for "next generation" systems)
 * [QWFWD](https://www.quakeworld.nu/wiki/QWfwd) proxy support from [fX3](https://codeberg.org/ChannelZ/fX3), [list of servers](https://www.quakeservers.net//quakeworld/servers/t=proxy/)
 * console tabs from [fX3](https://codeberg.org/ChannelZ/fX3)
 * tons of bug fixes and other improvements
@@ -48,6 +59,7 @@ Based on [Quake-III-Arena-Kenny-Edition](https://github.com/kennyalive/Quake-III
 * `screenMap` texture rendering - to create realistic environment reflections
 * multisample anti-aliasing (**\r_ext_multisample**)
 * supersample anti-aliasing (**\r_ext_supersample**)
+* fast approximate anti-aliasing (beta) (**\r_ext_fxaa**)
 * per-window gamma-correction which is important for screen-capture tools like OBS
 * you can minimize game window any time during **\video**|**\video-pipe** recording
 * high dynamic range render targets (**\r_hdr 1**) to avoid color banding
@@ -76,6 +88,7 @@ Performance is usually greater or equal to other opengl1 renderers
 
 ## Links
 
+* https://github.com/ec-/Quake3e
 * https://bitbucket.org/CPMADevs/cnq3
 * https://github.com/ioquake/ioq3
 * https://github.com/kennyalive/Quake-III-Arena-Kenny-Edition
@@ -84,5 +97,6 @@ Performance is usually greater or equal to other opengl1 renderers
 
 ## Donate
 
-I develop during my freetime, if you enjoyed my engine/fork or my mod please consider supporting me by donating !
+I develop during my free time, if you enjoyed my engine or my mod please consider supporting me by donating !
 * paypal.me/fatsakura
+

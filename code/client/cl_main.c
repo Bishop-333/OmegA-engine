@@ -29,7 +29,7 @@ cvar_t	*cl_debugMove;
 cvar_t	*cl_motd;
 
 #ifdef USE_RENDERER_DLOPEN
-cvar_t	*cl_renderer;
+static cvar_t *cl_renderer;
 #endif
 
 cvar_t	*rcon_client_password;
@@ -97,7 +97,7 @@ cvar_t *cl_drawBuffer;
 
 //OmegA
 cvar_t *cl_consoleHeight;
-cvar_t *cl_omegaEngine;
+static cvar_t *cl_omegaEngine;
 cvar_t *fwd_use;
 cvar_t *fwd_addr;
 cvar_t *r_displaywidth;
@@ -265,7 +265,7 @@ void CL_StopRecord_f( void ) {
 		clc.recordfile = FS_INVALID_HANDLE;
 
 		// select proper extension
-		if ( clc.dm68compat || clc.demoplaying ) {
+		if ( clc.compat || clc.demoplaying ) {
 			protocol = OLD_PROTOCOL_VERSION;
 		} else {
 			protocol = NEW_PROTOCOL_VERSION;
@@ -739,7 +739,7 @@ void CL_ReadDemoMessage( void ) {
 		return;
 	}
 	buf.cursize = LittleLong( buf.cursize );
-	if ( buf.cursize == -1 ) {
+	if ( buf.cursize < 0 ) {
 		CL_DemoCompleted();
 		return;
 	}
@@ -1146,17 +1146,21 @@ update cl_guid using QKEY_FILE and optional prefix
 */
 static void CL_UpdateGUID( const char *prefix, int prefix_len )
 {
+#ifdef USE_Q3KEY
 	fileHandle_t f;
 	int len;
 
 	len = FS_SV_FOpenFileRead( QKEY_FILE, &f );
 	FS_FCloseFile( f );
 
-	if( len != QKEY_SIZE ) 
+	if( len != QKEY_SIZE )
 		Cvar_Set( "cl_guid", "" );
 	else
 		Cvar_Set( "cl_guid", Com_MD5File( QKEY_FILE, QKEY_SIZE,
 			prefix, prefix_len ) );
+#else
+	Cvar_Set( "cl_guid", Com_MD5Buf( &cl_cdkey[0], sizeof(cl_cdkey), prefix, prefix_len));
+#endif
 }
 
 
@@ -1285,6 +1289,9 @@ qboolean CL_Disconnect( qboolean showMainMenu ) {
 
 	// allow cheats locally
 	Cvar_Set( "sv_cheats", "1" );
+
+	// force unpause after disconnect
+	Cvar_Set( "cl_paused", "0" );
 
 	// not connected to a pure server anymore
 	cl_connectedToPureServer = 0;
@@ -1548,6 +1555,27 @@ void CL_FWDInfo( void ) {
 
 /*
 ================
+CL_Performance_f
+================
+*/
+void CL_Performance_f( void ) {
+#if defined (USE_RENDERER_DLOPEN) && defined(USE_VULKAN_API)
+	Cvar_Set( "cl_renderer", "vulkan" );
+#endif
+	Cvar_Set( "r_fbo", "0" );
+	Cvar_Set( "r_flares", "0" );
+	Cvar_Set( "r_bloom", "0" );
+	Cvar_Set( "r_dynamiclight", "0" );
+	Cvar_Set( "r_ext_multisample", "0" );
+	Cvar_Set( "r_ext_supersample", "0" );
+	Cvar_Set( "r_hdr", "0" );
+	Cvar_Set( "r_vbo", "1" );
+	Cbuf_ExecuteText( EXEC_APPEND, "vid_restart\n" );
+}
+
+
+/*
+================
 CL_Reconnect_f
 ================
 */
@@ -1659,7 +1687,7 @@ static void CL_Connect_f( void ) {
 
 	Com_Printf( "%s resolved to %s\n", cls.servername, serverString );
 
-	if( cl_guidServerUniq->integer && strstr( cls.servername, "165.227.171.108" ) == 0 )
+	if( cl_guidServerUniq->integer )
 		CL_UpdateGUID( serverString, strlen( serverString ) );
 	else
 		CL_UpdateGUID( NULL, 0 );
@@ -3171,7 +3199,7 @@ static void FORMAT_PRINTF(2, 3) QDECL CL_RefPrintf( printParm_t level, const cha
 		default: Com_Printf( "%s", msg ); break;
 		case PRINT_DEVELOPER: Com_DPrintf( "%s", msg ); break;
 		case PRINT_WARNING: Com_WPrintf( "%s", msg ); break;
-		case PRINT_ERROR: Com_Printf( S_COLOR_RED "%s", msg ); break;
+		case PRINT_ERROR: Com_Printf( S_COLOR_ERROR "%s", msg ); break;
 	}
 }
 
@@ -3319,7 +3347,7 @@ void CL_StartHunkUsers( void ) {
 CL_RefMalloc
 ============
 */
-static void *CL_RefMalloc( int size ) {
+static void *CL_RefMalloc( size_t size ) {
 	return Z_TagMalloc( size, TAG_RENDERER );
 }
 
@@ -3387,6 +3415,9 @@ static void CL_InitRef( void ) {
 #ifdef USE_RENDERER_DLOPEN
 	GetRefAPI_t		GetRefAPI;
 	char			dllName[ MAX_OSPATH ];
+#ifndef __APPLE__
+	char			*ospath;
+#endif
 #endif
 
 	CL_InitGLimp_Cvars();
@@ -3402,19 +3433,29 @@ static void CL_InitRef( void ) {
 #endif
 
 	Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_%s_" REND_ARCH_STRING DLL_EXT, cl_renderer->string );
+#ifdef __APPLE__
 	rendererLib = FS_LoadLibrary( dllName, qfalse );
+#else
+	ospath = FS_BuildOSPath( Sys_DefaultBasePath(), dllName, NULL );
+	rendererLib = Sys_LoadLibrary( ospath );
+#endif
 	if ( !rendererLib )
 	{
 		Cvar_ForceReset( "cl_renderer" );
 		Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_%s_" REND_ARCH_STRING DLL_EXT, cl_renderer->string );
+#ifdef __APPLE__
 		rendererLib = FS_LoadLibrary( dllName, qfalse );
+#else
+		ospath = FS_BuildOSPath( Sys_DefaultBasePath(), dllName, NULL );
+		rendererLib = Sys_LoadLibrary( ospath );
+#endif
 		if ( !rendererLib )
 		{
 			Com_Error( ERR_FATAL, "Failed to load renderer %s", dllName );
 		}
 	}
 
-	GetRefAPI = Sys_LoadFunction( rendererLib, "GetRefAPI" );
+	GetRefAPI = (GetRefAPI_t)Sys_LoadFunction( rendererLib, "GetRefAPI" );
 	if( !GetRefAPI )
 	{
 		Com_Error( ERR_FATAL, "Can't load symbol GetRefAPI" );
@@ -3427,6 +3468,7 @@ static void CL_InitRef( void ) {
 	Com_Memset( &rimp, 0, sizeof( rimp ) );
 
 	rimp.Cmd_AddCommand = Cmd_AddCommand;
+	rimp.Cmd_SetDescription = Cmd_SetDescription;
 	rimp.Cmd_RemoveCommand = Cmd_RemoveCommand;
 	rimp.Cmd_Argc = Cmd_Argc;
 	rimp.Cmd_Argv = Cmd_Argv;
@@ -3652,6 +3694,7 @@ test to see if a valid QKEY_FILE exists.  If one does not, try to generate
 it by filling it with 2048 bytes of random data.
 ===============
 */
+#ifdef USE_Q3KEY
 static void CL_GenerateQKey(void)
 {
 	int len = 0;
@@ -3684,6 +3727,7 @@ static void CL_GenerateQKey(void)
 		Com_Printf( "QKEY generated\n" );
 	}
 }
+#endif
 
 
 /*
@@ -3804,7 +3848,8 @@ static void CL_InitGLimp_Cvars( void )
 	// shared with GLimp
 	r_allowSoftwareGL = Cvar_Get( "r_allowSoftwareGL", "0", CVAR_LATCH );
 	Cvar_SetDescription( r_allowSoftwareGL, "Toggle the use of the default software OpenGL driver supplied by the Operating System." );
-	r_allowResize = Cvar_Get( "r_allowResize", "0", CVAR_LATCH );
+	r_allowResize = Cvar_Get( "r_allowResize", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	Cvar_SetDescription( r_allowResize, "Setting to 1 will allow window to be resized in windowed mode." );
 	r_swapInterval = Cvar_Get( "r_swapInterval", "0", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( r_swapInterval, "V-blanks to wait before swapping buffers.\n 0: No V-Sync\n 1: Synced to the monitor's refresh rate." );
 	r_glDriver = Cvar_Get( "r_glDriver", OPENGL_DRIVER_NAME, CVAR_ARCHIVE_ND | CVAR_LATCH );
@@ -3834,8 +3879,9 @@ static void CL_InitGLimp_Cvars( void )
 	r_modeFullscreen = Cvar_Get( "r_modeFullscreen", "-2", CVAR_ARCHIVE | CVAR_LATCH );
 #endif
 	Cvar_SetDescription( r_modeFullscreen, "Dedicated fullscreen mode, set to \"\" to use \\r_mode in all cases." );
-	r_fullscreen = Cvar_Get( "r_fullscreen", "0", CVAR_ARCHIVE | CVAR_LATCH );
-	Cvar_SetDescription( r_fullscreen, "Fullscreen mode. Set to 0 for windowed mode." );
+	r_fullscreen = Cvar_Get( "r_fullscreen", "2", CVAR_ARCHIVE | CVAR_LATCH );
+	Cvar_CheckRange( r_fullscreen, "0", "2", CV_INTEGER );
+	Cvar_SetDescription( r_fullscreen, "Set fullscreen mode:\n 0 - windowed\n 1 - fullscreen\n 2 - borderless fullscreen" );
 	r_customPixelAspect = Cvar_Get( "r_customPixelAspect", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	Cvar_SetDescription( r_customPixelAspect, "Enables custom aspect of the screen, with \\r_mode -1." );
 	r_customwidth = Cvar_Get( "r_customWidth", "1024", CVAR_ARCHIVE | CVAR_LATCH );
@@ -3962,7 +4008,7 @@ void CL_Init( void ) {
 	cl_conColor = Cvar_Get( "cl_conColor", "0 0 0 204", 0 );
 	Cvar_SetDescription( cl_conColor, "Console background color, set as R G B A values from 0-255, use with \\seta to save in config." );
 
-#ifdef MACOS_X
+#ifdef __APPLE__
 	// In game video is REALLY slow in Mac OS X right now due to driver slowness
 	cl_inGameVideo = Cvar_Get( "r_inGameVideo", "0", CVAR_ARCHIVE_ND );
 #else
@@ -3975,7 +4021,7 @@ void CL_Init( void ) {
 
 	// init cg_autoswitch so the ui will have it correctly even
 	// if the cgame hasn't been started
-	Cvar_Get ("cg_autoswitch", "1", CVAR_ARCHIVE);
+	Cvar_Get ("cg_autoswitch", "0", CVAR_ARCHIVE);
 
 	cl_motdString = Cvar_Get( "cl_motdString", "", CVAR_ROM );
 	Cvar_SetDescription( cl_motdString, "Message of the day string from id's master server, it is a read only variable." );
@@ -4013,15 +4059,15 @@ void CL_Init( void ) {
 	Cvar_SetDescription( r_displaywidth, "Width currently displayed to your screen." );
 	r_displayheight = Cvar_Get( "r_displayheight", "0", CVAR_PROTECTED );
 	Cvar_SetDescription( r_displayheight, "Height currently displayed to your screen." );
-        fwd_use = Cvar_Get( "fwd_use", "0", CVAR_ARCHIVE );
+    fwd_use = Cvar_Get( "fwd_use", "0", CVAR_ARCHIVE );
 	Cvar_CheckRange( fwd_use, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( fwd_use, "QWFWD proxy support from fX3." );
-        fwd_addr = Cvar_Get( "fwd_addr", "", CVAR_ARCHIVE );
+    fwd_addr = Cvar_Get( "fwd_addr", "", CVAR_ARCHIVE );
 	Cvar_SetDescription( fwd_addr, "The IP address of the proxy you wish to connect to." );
 
 	// userinfo
 	Cvar_Get ("name", "UnnamedPlayer", CVAR_USERINFO | CVAR_ARCHIVE_ND );
-	Cvar_Get ("rate", "25000", CVAR_USERINFO | CVAR_ARCHIVE );
+	Cvar_Get ("rate", "50000", CVAR_USERINFO | CVAR_ARCHIVE );
 	Cvar_Get ("snaps", "40", CVAR_USERINFO | CVAR_ARCHIVE );
 	Cvar_Get ("model", "sarge", CVAR_USERINFO | CVAR_ARCHIVE_ND );
 	Cvar_Get ("headmodel", "sarge", CVAR_USERINFO | CVAR_ARCHIVE_ND );
@@ -4049,46 +4095,78 @@ void CL_Init( void ) {
 	// register client commands
 	//
 	Cmd_AddCommand ("cmd", CL_ForwardToServer_f);
+	Cmd_SetDescription( "cmd", "Forwards all arguments as a command to the server.");
 	Cmd_AddCommand ("configstrings", CL_Configstrings_f);
+	Cmd_SetDescription( "configstrings", "Prints all non-empty config strings.");
 	Cmd_AddCommand ("clientinfo", CL_Clientinfo_f);
+	Cmd_SetDescription( "clientinfo", "Prints some client settings.");
 	Cmd_AddCommand ("snd_restart", CL_Snd_Restart_f);
+	Cmd_SetDescription( "snd_restart", "Restarts the sound system.");
 	Cmd_AddCommand ("vid_restart", CL_Vid_Restart_f);
+	Cmd_SetDescription( "vid_restart", "Restarts the video system.");
 	Cmd_AddCommand ("disconnect", CL_Disconnect_f);
+	Cmd_SetDescription( "disconnect", "Disconnects from the current server.");
 	Cmd_AddCommand ("record", CL_Record_f);
+	Cmd_SetDescription( "record", "Starts recording a demo.");
 	Cmd_SetCommandCompletionFunc( "record", CL_CompleteRecordName );
 	Cmd_AddCommand ("demo", CL_PlayDemo_f);
+	Cmd_SetDescription( "demo", "Starts demo playback.");
 	Cmd_SetCommandCompletionFunc( "demo", CL_CompleteDemoName );
 	Cmd_AddCommand ("cinematic", CL_PlayCinematic_f);
+	Cmd_SetDescription( "cinematic", "Starts playback of a .roq video file.");
 	Cmd_AddCommand ("stoprecord", CL_StopRecord_f);
+	Cmd_SetDescription( "stoprecord", "Stops demo recording.");
 	Cmd_AddCommand ("connect", CL_Connect_f);
+	Cmd_SetDescription( "connect", "Connects to a server.");
 	Cmd_AddCommand ("reconnect", CL_Reconnect_f);
+	Cmd_SetDescription( "reconnect", "Reconnects to the current or last server.");
 	Cmd_AddCommand ("localservers", CL_LocalServers_f);
+	Cmd_SetDescription( "localservers", "Finds and prints local LAN servers.");
 	Cmd_AddCommand ("globalservers", CL_GlobalServers_f);
+	Cmd_SetDescription( "globalservers", "Requests server lists from master servers.");
 	Cmd_AddCommand ("rcon", CL_Rcon_f);
+	Cmd_SetDescription( "rcon", "Executes the arguments as a command on the server.");
 	Cmd_SetCommandCompletionFunc( "rcon", CL_CompleteRcon );
 	Cmd_AddCommand ("ping", CL_Ping_f );
+	Cmd_SetDescription( "ping", "Pings a server.");
 	Cmd_AddCommand ("serverstatus", CL_ServerStatus_f );
+	Cmd_SetDescription( "serverstatus", "Prints server status and player list.");
 	Cmd_AddCommand ("showip", CL_ShowIP_f );
+	Cmd_SetDescription( "showip", "Shows your open IP address(es).");
 	Cmd_AddCommand ("fs_openedList", CL_OpenedPK3List_f );
+	Cmd_SetDescription( "fs_openedList", "Prints the names of opened pak files.");
 	Cmd_AddCommand ("fs_referencedList", CL_ReferencedPK3List_f );
+	Cmd_SetDescription( "fs_referencedList", "Prints the names of referenced pak files.");
 	Cmd_AddCommand ("model", CL_SetModel_f );
+	Cmd_SetDescription( "model", "Sets your own player model.");
 	Cmd_AddCommand ("video", CL_Video_f );
+	Cmd_SetDescription( "video", "Starts writing a .avi file.");
 	Cmd_AddCommand ("video-pipe", CL_Video_f );
+	Cmd_SetDescription( "video-pipe", "Starts writing a .mp4 file.");
 	Cmd_SetCommandCompletionFunc( "video", CL_CompleteVideoName );
 	Cmd_AddCommand ("stopvideo", CL_StopVideo_f );
+	Cmd_SetDescription( "stopvideo", "Stops writing the video file.");
 	Cmd_AddCommand ("serverinfo", CL_Serverinfo_f );
+	Cmd_SetDescription( "serverinfo", "Prints all server info cvars.");
 	Cmd_AddCommand ("systeminfo", CL_Systeminfo_f );
+	Cmd_SetDescription( "systeminfo", "Prints all system info cvars.");
 	Cmd_AddCommand ("fwdinfo", CL_FWDInfo );
+	Cmd_SetDescription( "fwdinfo", "Prints all forwarder info.");
+	Cmd_AddCommand ("performancepanic", CL_Performance_f );
+	Cmd_SetDescription( "performancepanic", "Disables resource-heavy effects and enables GPU optimizations.");
 
 #ifdef USE_CURL
 	Cmd_AddCommand( "download", CL_Download_f );
+	Cmd_SetDescription( "download", "Downloads a map." );
 	Cmd_AddCommand( "dlmap", CL_Download_f );
+	Cmd_SetDescription( "dlmap", "Downloads a map." );
 #endif
 	Cmd_AddCommand( "modelist", CL_ModeList_f );
 
 	Cvar_Set( "cl_running", "1" );
-
+#ifdef USE_MD5
 	CL_GenerateQKey();
+#endif
 	Cvar_Get( "cl_guid", "", CVAR_USERINFO | CVAR_ROM | CVAR_PROTECTED );
 	CL_UpdateGUID( NULL, 0 );
 
@@ -4159,7 +4237,7 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 	Cmd_RemoveCommand ("stopvideo");
 	Cmd_RemoveCommand ("serverinfo");
 	Cmd_RemoveCommand ("systeminfo");
-        Cmd_RemoveCommand ("fwdinfo");
+	Cmd_RemoveCommand ("fwdinfo");
 	Cmd_RemoveCommand ("modelist");
 
 #ifdef USE_CURL
@@ -4305,6 +4383,19 @@ static void CL_ServerInfoPacket( const netadr_t *from, msg_t *msg ) {
 		if ( NET_CompareAdr( from, &cls.localServers[i].adr ) ) {
 			return;
 		}
+
+		if ( !Q_stricmp( Info_ValueForKey( infoString, "hostname" ), cls.localServers[i].hostName ) ) {
+			if ( Cvar_VariableIntegerValue("net_enabled") & NET_PRIOV6 ) {
+				if ( from->type == NA_IP6 ) {
+					cls.localServers[i].adr = *from;
+				}
+			} else {
+				if ( from->type == NA_IP ) {
+					cls.localServers[i].adr = *from;
+				}
+			}
+			return;
+		}
 	}
 
 	if ( i == MAX_OTHER_SERVERS ) {
@@ -4315,6 +4406,7 @@ static void CL_ServerInfoPacket( const netadr_t *from, msg_t *msg ) {
 	// add this to the list
 	cls.numlocalservers = i+1;
 	CL_InitServerInfo( &cls.localServers[i], from );
+	Q_strncpyz(cls.localServers[i].hostName,Info_ValueForKey(infoString, "hostname"), MAX_NAME_LENGTH);
 
 	Q_strncpyz( info, MSG_ReadString( msg ), sizeof( info ) );
 	len = (int) strlen( info );

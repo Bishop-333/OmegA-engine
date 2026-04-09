@@ -10,6 +10,13 @@
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
 #include "unzip.h"
+#ifdef USE_SYSTEM_ZLIB
+#include <zlib.h>
+#else
+#ifdef USE_ZLIB_NG
+#include "zlib.h"
+#endif
+#endif
 
 /* unzip.h -- IO for uncompress .zip files using zlib 
    Version 0.15 beta, Mar 19th, 1998,
@@ -51,6 +58,7 @@
    PkWare has also a specification at :
       ftp://ftp.pkware.com/probdesc.zip */
 
+#if !defined(USE_ZLIB_NG) && !defined(USE_SYSTEM_ZLIB)
 /* zlib.h -- interface of the 'zlib' general purpose compression library
   version 1.1.3, July 9th, 1998
 
@@ -1002,11 +1010,13 @@ typedef unsigned long  ulg;
 #ifndef OS_CODE
 #  define OS_CODE  0x03  /* assume Unix */
 #endif
+#endif
 
 #ifndef F_OPEN
 #  define F_OPEN(name, mode) Sys_FOpen((name), (mode))
 #endif
 
+#if !defined(USE_ZLIB_NG) && !defined(USE_SYSTEM_ZLIB)
          /* functions */
 
 #ifdef HAVE_STRERROR
@@ -1047,6 +1057,7 @@ static void   zcfree  OF((voidp opaque, voidp ptr));
 #define ZALLOC(strm, items, size) \
            (*((strm)->zalloc))((strm)->opaque, (items), (size))
 #define ZFREE(strm, addr)  (*((strm)->zfree))((strm)->opaque, (voidp)(addr))
+#endif
 #define TRY_FREE(s, p) {if (p) ZFREE(s, p);}
 
 
@@ -2293,6 +2304,7 @@ extern int unzGetGlobalComment (unzFile file, char *szComment, uLong uSizeBuf)
 	return (int)uReadThis;
 }
 
+#if !defined(USE_ZLIB_NG) && !defined(USE_SYSTEM_ZLIB)
 /* infblock.h -- header to use infblock.c
  * Copyright (C) 1995-1998 Mark Adler
  * For conditions of distribution and use, see copyright notice in zlib.h 
@@ -4332,6 +4344,7 @@ int inflateSyncPoint(z_streamp z)
     return Z_STREAM_ERROR;
   return inflate_blocks_sync_point(z->state->blocks);
 }
+#endif
 #endif
 
 voidp zcalloc (voidp opaque, unsigned items, unsigned size)

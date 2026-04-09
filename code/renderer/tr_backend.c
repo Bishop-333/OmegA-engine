@@ -445,6 +445,7 @@ static void RB_Hyperspace( void ) {
 
 	if ( tess.shader != tr.whiteShader ) {
 		RB_EndSurface();
+		RB_SetGL2D();
 		RB_BeginSurface( tr.whiteShader, 0 );
 	}
 
@@ -602,7 +603,7 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 		// change the tess parameters if needed
 		// a "entityMergable" shader is a shader that can have surfaces from separate
 		// entities merged into a single batch, like smoke and blood puff sprites
-		if ( ( (oldSort ^ drawSurfs->sort ) & ~QSORT_REFENTITYNUM_MASK ) || !shader->entityMergable ) {
+		if ( ( (oldSort ^ drawSurf->sort ) & ~QSORT_REFENTITYNUM_MASK ) || !shader->entityMergable ) {
 			if ( oldShader != NULL ) {
 				RB_EndSurface();
 			}
@@ -645,7 +646,7 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 				// set up the dynamic lighting if needed
 #ifdef USE_LEGACY_DLIGHTS
 #ifdef USE_PMLIGHT
-				if ( !r_dlightMode->integer )
+				if ( !R_GetDlightMode() )
 #endif
 				if ( backEnd.currentEntity->needDlights ) {
 					R_TransformDlights( backEnd.refdef.num_dlights, backEnd.refdef.dlights, &backEnd.or );
@@ -664,7 +665,7 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 				backEnd.or = backEnd.viewParms.world;
 #ifdef USE_LEGACY_DLIGHTS
 #ifdef USE_PMLIGHT
-				if ( !r_dlightMode->integer )
+				if ( !R_GetDlightMode() )
 #endif
 				R_TransformDlights( backEnd.refdef.num_dlights, backEnd.refdef.dlights, &backEnd.or );
 #endif // USE_LEGACY_DLIGHTS
@@ -959,6 +960,11 @@ RB_SetGL2D
 ================
 */
 void RB_SetGL2D( void ) {
+
+	if ( backEnd.projection2D ) {
+		return;
+	}
+
 	backEnd.projection2D = qtrue;
 
 	// set 2D virtual screen size
@@ -1087,9 +1093,8 @@ static const void *RB_StretchPic( const void *data ) {
 
 	shader = cmd->shader;
 	if ( shader != tess.shader ) {
-		if ( tess.numIndexes ) {
-			RB_EndSurface();
-		}
+		RB_EndSurface();
+		RB_SetGL2D(); // set correct shader time before RB_BeginSurface() on 3D->2D transition
 		backEnd.currentEntity = &backEnd.entity2D;
 		RB_BeginSurface( shader, 0 );
 	}
@@ -1098,9 +1103,7 @@ static const void *RB_StretchPic( const void *data ) {
 	VBO_UnBind();
 #endif
 
-	if ( !backEnd.projection2D ) {
-		RB_SetGL2D();
-	}
+	RB_SetGL2D();
 
 #ifdef USE_FBO
 	//Check if it's time for BLOOM!
@@ -1299,6 +1302,10 @@ RB_DrawBuffer
 =============
 */
 static const void *RB_DrawBuffer( const void *data ) {
+	static float clearColorValue[3] = { 0.0, 0.0, 0.0 };
+	static char clearColorString[ MAX_CVAR_VALUE_STRING ] = { '\0' };
+	int i;
+	char buf[ MAX_CVAR_VALUE_STRING ], *v[3];
 	const drawBufferCommand_t	*cmd;
 
 	cmd = (const drawBufferCommand_t *)data;
@@ -1316,7 +1323,20 @@ static const void *RB_DrawBuffer( const void *data ) {
 
 	// clear screen for debugging
 	if ( r_clear->integer ) {
-		qglClearColor( 1, 0, 0.5, 1 );
+		if ( strcmp( r_clearColor->string, clearColorString ) ) {
+			Q_strncpyz( clearColorString, r_clearColor->string, sizeof( clearColorString ) );
+			Q_strncpyz( buf, r_clearColor->string, sizeof( buf ) );
+			Com_Split( buf, v, 3, ' ' );
+			for ( i = 0; i < 3 ; i++ ) {
+				clearColorValue[ i ] = Q_atof( v[ i ] ) / 255.0f;
+				if ( clearColorValue[ i ] > 1.0f ) {
+					clearColorValue[ i ] = 1.0f;
+				} else if ( clearColorValue[ i ] < 0.0f ) {
+					clearColorValue[ i ] = 0.0f;
+				}
+			}
+		}
+		qglClearColor( clearColorValue[0], clearColorValue[1], clearColorValue[2], 1 );
 		qglClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 	}
 
@@ -1342,9 +1362,7 @@ void RB_ShowImages( void ) {
 	const vec2_t t[4] = { {0,0}, {1,0}, {0,1}, {1,1} };
 	vec3_t v[4];
 
-	if ( !backEnd.projection2D ) {
-		RB_SetGL2D();
-	}
+	RB_SetGL2D();
 
 	qglClear( GL_COLOR_BUFFER_BIT );
 
@@ -1479,8 +1497,7 @@ static const void *RB_FinishBloom( const void *data )
 		{
 			if ( !backEnd.doneBloom && backEnd.doneSurfaces )
 			{
-				if ( !backEnd.projection2D )
-					RB_SetGL2D();
+				RB_SetGL2D();
 				qglColor4f( 1, 1, 1, 1 );
 				FBO_Bloom( 0, 0, qfalse );
 			}

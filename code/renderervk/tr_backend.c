@@ -455,6 +455,7 @@ static void RB_Hyperspace( void ) {
 
 	if ( tess.shader != tr.whiteShader ) {
 		RB_EndSurface();
+		RB_SetGL2D();
 		RB_BeginSurface( tr.whiteShader, 0 );
 	}
 
@@ -638,7 +639,7 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 		// change the tess parameters if needed
 		// a "entityMergable" shader is a shader that can have surfaces from separate
 		// entities merged into a single batch, like smoke and blood puff sprites
-		if ( ( (oldSort ^ drawSurfs->sort ) & ~QSORT_REFENTITYNUM_MASK ) || !shader->entityMergable ) {
+		if ( ( (oldSort ^ drawSurf->sort ) & ~QSORT_REFENTITYNUM_MASK ) || !shader->entityMergable ) {
 			//if ( oldShader != NULL ) {
 				RB_EndSurface();
 			//}
@@ -1033,6 +1034,11 @@ RB_SetGL2D
 ================
 */
 static void RB_SetGL2D( void ) {
+
+	if ( backEnd.projection2D ) {
+		return;
+	}
+
 	backEnd.projection2D = qtrue;
 
 #ifdef USE_VULKAN
@@ -1180,10 +1186,9 @@ static const void *RB_StretchPic( const void *data ) {
 
 	shader = cmd->shader;
 	if ( shader != tess.shader ) {
-		if ( tess.numIndexes ) {
-			RB_EndSurface();
-		}
+		RB_EndSurface();
 		backEnd.currentEntity = &backEnd.entity2D;
+		RB_SetGL2D(); // set correct shader time before RB_BeginSurface() on 3D->2D transition
 		RB_BeginSurface( shader, 0 );
 	}
 
@@ -1191,9 +1196,7 @@ static const void *RB_StretchPic( const void *data ) {
 	VBO_UnBind();
 #endif
 
-	if ( !backEnd.projection2D ) {
-		RB_SetGL2D();
-	}
+	RB_SetGL2D();
 
 #ifdef USE_VULKAN
 	if ( r_bloom->integer ) {
@@ -1202,7 +1205,6 @@ static const void *RB_StretchPic( const void *data ) {
 #endif
 
 	RB_AddQuadStamp2( cmd->x, cmd->y, cmd->w, cmd->h, cmd->s1, cmd->t1, cmd->s2, cmd->t2, backEnd.color2D );
-
 	return (const void *)(cmd + 1);
 }
 
@@ -1435,9 +1437,29 @@ RB_DrawBuffer
 =============
 */
 static const void *RB_DrawBuffer( const void *data ) {
+	static float clearColorValue[3] = { 0.0, 0.0, 0.0 };
+	static char clearColorString[ MAX_CVAR_VALUE_STRING ] = { '\0' };
+	int i;
+	char buf[ MAX_CVAR_VALUE_STRING ], *v[3];
 	const drawBufferCommand_t	*cmd;
 
 	cmd = (const drawBufferCommand_t *)data;
+
+	if ( r_clear->integer ) {
+		if ( strcmp( r_clearColor->string, clearColorString ) ) {
+			Q_strncpyz( clearColorString, r_clearColor->string, sizeof( clearColorString ) );
+			Q_strncpyz( buf, r_clearColor->string, sizeof( buf ) );
+			Com_Split( buf, v, 3, ' ' );
+			for ( i = 0; i < 3 ; i++ ) {
+				clearColorValue[ i ] = Q_atof( v[ i ] ) / 255.0f;
+				if ( clearColorValue[ i ] > 1.0f ) {
+					clearColorValue[ i ] = 1.0f;
+				} else if ( clearColorValue[ i ] < 0.0f ) {
+					clearColorValue[ i ] = 0.0f;
+				}
+			}
+		}
+	}
 
 #ifdef USE_VULKAN
 	vk_begin_frame();
@@ -1448,7 +1470,7 @@ static const void *RB_DrawBuffer( const void *data ) {
 	vk.cmd->depth_range = DEPTH_RANGE_COUNT;
 
 	if ( r_clear->integer && vk.clearAttachment ) {
-		const vec4_t color = {1, 0, 0.5, 1};
+		const vec4_t color = {clearColorValue[0], clearColorValue[1], clearColorValue[2], 1};
 		backEnd.projection2D = qtrue; // to ensure we have viewport that occupies entire window
 		vk_clear_color( color );
 		backEnd.projection2D = qfalse;
@@ -1458,7 +1480,7 @@ static const void *RB_DrawBuffer( const void *data ) {
 
 	// clear screen for debugging
 	if ( r_clear->integer ) {
-		qglClearColor( 1, 0, 0.5, 1 );
+		qglClearColor( clearColorValue[0], clearColorValue[1], clearColorValue[2], 1 );
 		qglClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 	}
 #endif
@@ -1482,9 +1504,7 @@ void RB_ShowImages( void )
 {
 	int i;
 
-	if ( !backEnd.projection2D ) {
-		RB_SetGL2D();
-	}
+	RB_SetGL2D();
 
 	// draw full-screen quad
 	tess.numVertexes = 4;
@@ -1568,9 +1588,7 @@ void RB_ShowImages( void ) {
 	const vec2_t t[4] = { {0,0}, {1,0}, {0,1}, {1,1} };
 	vec3_t v[4];
 
-	if ( !backEnd.projection2D ) {
-		RB_SetGL2D();
-	}
+	RB_SetGL2D();
 
 	qglClear( GL_COLOR_BUFFER_BIT );
 

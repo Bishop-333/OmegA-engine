@@ -204,7 +204,6 @@ int R_ComputeLOD( trRefEntity_t *ent ) {
 		if ( ( projectedRadius = ProjectRadius( radius, ent->e.origin ) ) != 0 )
 		{
 			lodscale = r_lodscale->value;
-			if (lodscale > 20) lodscale = 20;
 			flod = 1.0f - projectedRadius * lodscale;
 		}
 		else
@@ -347,7 +346,7 @@ void R_AddMD3Surfaces( trRefEntity_t *ent ) {
 
 #ifdef USE_PMLIGHT
 	numDlights = 0;
-	if ( r_dlightMode->integer >= 2 && ( !personalModel || tr.viewParms.portalView != PV_NONE ) ) {
+	if ( R_GetDlightMode() >= 2 && ( !personalModel || tr.viewParms.portalView != PV_NONE ) ) {
 		R_TransformDlights( tr.viewParms.num_dlights, tr.viewParms.dlights, &tr.or );
 		for ( n = 0; n < tr.viewParms.num_dlights; n++ ) {
 			dl = &tr.viewParms.dlights[ n ];

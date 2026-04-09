@@ -35,6 +35,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //#define USE_TESS_NEEDS_ST2
 #define USE_FBO
 
+#ifdef USE_VBO
+#define USE_VBO_GRID		/* put SF_GRID to VBO */
+#endif
+
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qfiles.h"
 #include "../qcommon/qcommon.h"
@@ -625,7 +629,7 @@ typedef struct litSurf_s {
 #define	MAX_FACE_POINTS		64
 
 #define	MAX_PATCH_SIZE		32			// max dimensions of a patch mesh in map file
-#define	MAX_GRID_SIZE		65			// max dimensions of a grid mesh in memory
+#define	MAX_GRID_SIZE		(128+1)		// max dimensions of a grid mesh in memory
 
 // when cgame directly specifies a polygon, it becomes a srfPoly_t
 // as soon as it is called
@@ -1292,6 +1296,7 @@ extern	cvar_t	*r_showtris;					// enables wireframe rendering of the world
 extern	cvar_t	*r_showsky;						// forces sky in front of all surfaces
 extern	cvar_t	*r_shownormals;					// draws wireframe normals
 extern	cvar_t	*r_clear;						// force screen clear every frame
+extern	cvar_t	*r_clearColor;
 
 extern	cvar_t	*r_shadows;						// controls shadows: 0 = none, 1 = blur, 2 = stencil, 3 = black planar projection
 extern	cvar_t	*r_flares;						// light flares
