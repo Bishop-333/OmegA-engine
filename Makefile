@@ -48,6 +48,7 @@ USE_LOCAL_HEADERS= 0
 USE_OGG_VORBIS    = 1
 USE_SYSTEM_OGG    = 0
 USE_SYSTEM_VORBIS = 0
+USE_FLAC          = 1
 
 USE_OPENAL        = 1
 USE_OPENAL_DLOPEN = 1
@@ -223,6 +224,10 @@ endif
 
 ifndef USE_SYSTEM_VORBIS
   USE_SYSTEM_VORBIS=1
+endif
+
+ifndef USE_FLAC
+  USE_FLAC=1
 endif
 
 ifndef USE_OPENAL
@@ -602,6 +607,10 @@ ifdef MINGW
     CLIENT_LDFLAGS += $(OGG_LIBS) $(VORBIS_LIBS)
   endif
 
+  ifeq ($(USE_FLAC),1)
+    BASE_CFLAGS += -DUSE_FLAC
+  endif
+
   ifeq ($(USE_OPENAL),1)
     BASE_CFLAGS += -DUSE_OPENAL $(OPENAL_CFLAGS)
     ifeq ($(USE_OPENAL_DLOPEN),1)
@@ -708,6 +717,10 @@ ifeq ($(COMPILE_PLATFORM),darwin)
   ifeq ($(USE_OGG_VORBIS),1)
     BASE_CFLAGS += -DUSE_OGG_VORBIS $(OGG_CFLAGS) $(VORBIS_CFLAGS)
     CLIENT_LDFLAGS += $(OGG_LIBS) $(VORBIS_LIBS)
+  endif
+
+  ifeq ($(USE_FLAC),1)
+    BASE_CFLAGS += -DUSE_FLAC
   endif
 
   ifeq ($(USE_OPENAL),1)
@@ -825,6 +838,10 @@ else
   ifeq ($(USE_OGG_VORBIS),1)
     BASE_CFLAGS += -DUSE_OGG_VORBIS $(OGG_CFLAGS) $(VORBIS_CFLAGS)
     CLIENT_LDFLAGS += $(OGG_LIBS) $(VORBIS_LIBS)
+  endif
+
+  ifeq ($(USE_FLAC),1)
+    BASE_CFLAGS += -DUSE_FLAC
   endif
 
   ifeq ($(USE_OPENAL),1)
@@ -1382,6 +1399,10 @@ endif
 ifeq ($(USE_OGG_VORBIS),1)
   Q3OBJ += $(OGGOBJ) $(VORBISOBJ) \
     $(B)/client/snd_codec_ogg.o
+endif
+
+ifeq ($(USE_FLAC),1)
+  Q3OBJ += $(B)/client/snd_codec_flac.o
 endif
 
 ifeq ($(USE_OPENAL),1)

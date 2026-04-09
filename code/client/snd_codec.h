@@ -94,4 +94,13 @@ void S_OGG_CodecCloseStream(snd_stream_t *stream);
 int S_OGG_CodecReadStream(snd_stream_t *stream, int bytes, void *buffer);
 #endif // USE_OGG_VORBIS
 
+// FLAC codec
+#ifdef USE_FLAC
+extern snd_codec_t flac_codec;
+void *S_FLAC_CodecLoad(const char *filename, snd_info_t *info);
+snd_stream_t *S_FLAC_CodecOpenStream(const char *filename);
+void S_FLAC_CodecCloseStream(snd_stream_t *stream);
+int S_FLAC_CodecReadStream(snd_stream_t *stream, int bytes, void *buffer);
+#endif // USE_FLAC
+
 #endif // !_SND_CODEC_H_
