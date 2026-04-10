@@ -1835,10 +1835,9 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_ext_alpha_to_coverage, "Enables alpha-to-coverage multisampling, requires \\r_fbo 1." );
 #endif
 
-	r_ext_fxaa = ri.Cvar_Get( "r_ext_fxaa", "0", CVAR_ARCHIVE_ND );
+	r_ext_fxaa = ri.Cvar_Get( "r_ext_fxaa", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_fxaa, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ext_fxaa, "Fast approximate anti-aliasing, requires \\r_fbo 1." );
-	ri.Cvar_SetGroup( r_ext_fxaa, CVG_RENDERER );
 
 	r_renderWidth = ri.Cvar_Get( "r_renderWidth", "800", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_renderWidth, "96", NULL, CV_INTEGER );

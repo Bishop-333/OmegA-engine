@@ -6510,8 +6510,13 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 				break;
 		}
 
-		attachment_blend_state.srcAlphaBlendFactor = attachment_blend_state.srcColorBlendFactor;
-		attachment_blend_state.dstAlphaBlendFactor = attachment_blend_state.dstColorBlendFactor;
+		if ( vk.fboActive && r_ext_fxaa->integer && ( state_bits & GLS_DEPTHTEST_DISABLE ) ) {
+			attachment_blend_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+			attachment_blend_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+		} else {
+			attachment_blend_state.srcAlphaBlendFactor = attachment_blend_state.srcColorBlendFactor;
+			attachment_blend_state.dstAlphaBlendFactor = attachment_blend_state.dstColorBlendFactor;
+		}
 		attachment_blend_state.colorBlendOp = VK_BLEND_OP_ADD;
 		attachment_blend_state.alphaBlendOp = VK_BLEND_OP_ADD;
 
