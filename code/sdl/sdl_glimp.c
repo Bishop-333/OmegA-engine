@@ -72,7 +72,7 @@ void GLimp_Shutdown( qboolean unloadDLL )
 
 	if ( glw_state.isFullscreen ) {
 		if ( drv && strcmp( drv, "x11" ) == 0 ) {
-			SDL_WarpMouseGlobal( glw_state.desktop_width / 2, glw_state.desktop_height / 2 );
+			SDL_WarpMouseGlobal( glw_state.desktop_width * 0.5f, glw_state.desktop_height * 0.5f );
 		} else {
 			SDL_ShowCursor();
 		}
@@ -398,6 +398,18 @@ if ( !vulkan ) {
 	}
 
 	desktopMode = SDL_GetDesktopDisplayMode( display );
+	if( desktopMode && desktopMode->h > 0 )
+	{
+		displayAspect = (float)desktopMode->w / (float)desktopMode->h;
+
+		Com_Printf( "Display aspect: %.3f\n", displayAspect );
+	}
+	else
+	{
+		Com_Printf( "Cannot determine display aspect, assuming 1.333\n" );
+	}
+
+	Com_Printf( "...setting mode %d:", mode );
 
 	if ( desktopMode && desktopMode->h > 0 )	{
 		glw_state.desktop_width = desktopMode->w;
@@ -411,20 +423,6 @@ if ( !vulkan ) {
 
 	config->isFullscreen = fullscreen;
 	glw_state.isFullscreen = fullscreen;
-
-	desktopMode = SDL_GetDesktopDisplayMode( display );
-	if( desktopMode && desktopMode->h > 0 )
-	{
-		displayAspect = (float)desktopMode->w / (float)desktopMode->h;
-
-		Com_Printf( "Display aspect: %.3f\n", displayAspect );
-	}
-	else
-	{
-		Com_Printf( "Cannot determine display aspect, assuming 1.333\n" );
-	}
-
-	Com_Printf( "...setting mode %d:", mode );
 
 	if ( !CL_GetModeInfo( &config->vidWidth, &config->vidHeight, &config->windowAspect, mode, modeFS, glw_state.desktop_width, glw_state.desktop_height, fullscreen ) )
 	{
@@ -633,11 +631,12 @@ if ( !vulkan ) {
 				continue;
 			}
 
-			if ( SDL_GetWindowFullscreenMode( SDL_window ) )
+			const SDL_DisplayMode *actualMode = SDL_GetWindowFullscreenMode( SDL_window );
+			if ( actualMode )
 			{
-				config->displayFrequency = mode.refresh_rate;
-				config->vidWidth = mode.w;
-				config->vidHeight = mode.h;
+				config->displayFrequency = actualMode->refresh_rate;
+				config->vidWidth = actualMode->w;
+				config->vidHeight = actualMode->h;
 			}
 		}
 
@@ -717,7 +716,7 @@ if ( !vulkan ) {
 	glw_state.window_width = config->vidWidth;
 	glw_state.window_height = config->vidHeight;
 
-	SDL_WarpMouseInWindow( SDL_window, glw_state.window_width / 2, glw_state.window_height / 2 );
+	SDL_WarpMouseInWindow( SDL_window, glw_state.window_width * 0.5f, glw_state.window_height * 0.5f );
 
 	return RSERR_OK;
 }
@@ -984,7 +983,7 @@ void VKimp_Shutdown( qboolean unloadDLL )
 
 	if ( glw_state.isFullscreen ) {
 		if ( drv && strcmp( drv, "x11" ) == 0 ) {
-			SDL_WarpMouseGlobal( glw_state.desktop_width / 2, glw_state.desktop_height / 2 );
+			SDL_WarpMouseGlobal( glw_state.desktop_width * 0.5f, glw_state.desktop_height * 0.5f );
 		} else {
 			SDL_ShowCursor();
 		}
