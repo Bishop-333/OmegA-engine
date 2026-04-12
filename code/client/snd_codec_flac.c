@@ -49,6 +49,8 @@ snd_codec_t flac_codec =
 	NULL
 };
 
+// callbacks for dr_flac
+
 // read() replacement
 size_t S_FLAC_Callback_read( void *datasource, void *ptr, size_t bytesToRead )
 {

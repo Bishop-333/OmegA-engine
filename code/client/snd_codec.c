@@ -131,6 +131,10 @@ void S_CodecInit( void )
 	S_CodecRegister( &ogg_codec );
 #endif
 
+#ifdef USE_MP3
+	S_CodecRegister( &mp3_codec );
+#endif
+
 #ifdef USE_FLAC
 	S_CodecRegister( &flac_codec );
 #endif

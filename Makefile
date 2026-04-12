@@ -49,6 +49,8 @@ USE_OGG_VORBIS    = 1
 USE_SYSTEM_OGG    = 0
 USE_SYSTEM_VORBIS = 0
 USE_FLAC          = 1
+USE_MP3           = 1
+USE_SYSTEM_MP3    = 0
 
 USE_OPENAL        = 1
 USE_OPENAL_DLOPEN = 1
@@ -230,6 +232,14 @@ ifndef USE_FLAC
   USE_FLAC=1
 endif
 
+ifndef USE_MP3
+  USE_MP3=1
+endif
+
+ifndef USE_SYSTEM_MP3
+  USE_SYSTEM_MP3=1
+endif
+
 ifndef USE_OPENAL
   USE_OPENAL=1
 endif
@@ -294,6 +304,7 @@ JPTURBODIR=$(MOUNT_DIR)/thirdparty/libjpeg-turbo
 CURLDIR=$(MOUNT_DIR)/thirdparty/libcurl
 OGGDIR=$(MOUNT_DIR)/thirdparty/libogg
 VORBISDIR=$(MOUNT_DIR)/thirdparty/libvorbis
+MADDIR=$(MOUNT_DIR)/thirdparty/libmad
 OPENALDIR=$(MOUNT_DIR)/thirdparty/libopenal
 ZNGDIR=$(MOUNT_DIR)/thirdparty/libz-ng
 VULKANDIR=$(MOUNT_DIR)/thirdparty/libvulkan
@@ -326,6 +337,10 @@ ifneq ($(call bin_path, $(PKG_CONFIG)),)
   ifeq ($(USE_SYSTEM_VORBIS),1)
     VORBIS_CFLAGS ?= $(shell $(PKG_CONFIG) --silence-errors --cflags vorbisfile || true)
     VORBIS_LIBS ?= $(shell $(PKG_CONFIG) --silence-errors --libs vorbisfile || echo -lvorbisfile)
+  endif
+  ifeq ($(USE_SYSTEM_MP3),1)
+    MAD_CFLAGS ?= $(shell $(PKG_CONFIG) --silence-errors --cflags mad || true)
+    MAD_LIBS ?= $(shell $(PKG_CONFIG) --silence-errors --libs mad || echo -lmad)
   endif
   ifeq ($(USE_SYSTEM_OPENAL),1)
     OPENAL_CFLAGS ?= $(shell $(PKG_CONFIG) --silence-errors --cflags openal || true)
@@ -363,6 +378,46 @@ endif
 ifeq ($(USE_SYSTEM_VORBIS),1)
   ifeq ($(VORBIS_LIBS),)
     VORBIS_LIBS = -lvorbisfile
+  endif
+endif
+
+# supply some reasonable defaults for mp3
+ifeq ($(MAD_CFLAGS),)
+  MAD_CFLAGS = -I$(MADDIR)/include
+endif
+ifeq ($(USE_SYSTEM_MP3),1)
+  ifeq ($(MAD_LIBS),)
+    MAD_LIBS = -lmad
+  endif
+else
+  ifeq ($(ARCH),x86)
+    MAD_CFLAGS += -DFPM_INTEL
+  else
+  ifeq ($(ARCH),x86_64)
+    MAD_CFLAGS += -DFPM_64BIT
+  else
+  ifeq ($(ARCH),arm64)
+    MAD_CFLAGS += -DFPM_64BIT
+  else
+  ifeq ($(ARCH),ppc)
+    MAD_CFLAGS += -DFPM_PPC
+  else
+  ifeq ($(ARCH),arm)
+    MAD_CFLAGS += -DFPM_ARM
+  else
+  ifeq ($(ARCH),mips)
+    MAD_CFLAGS += -DFPM_MIPS
+  else
+  ifeq ($(ARCH),sparc)
+    MAD_CFLAGS += -DFPM_SPARC
+  else
+    MAD_CFLAGS += -DFPM_DEFAULT
+  endif
+  endif
+  endif
+  endif
+  endif
+  endif
   endif
 endif
 
@@ -611,6 +666,10 @@ ifdef MINGW
     BASE_CFLAGS += -DUSE_FLAC
   endif
 
+  ifeq ($(USE_MP3),1)
+    BASE_CFLAGS += -DUSE_MP3 $(MAD_CFLAGS)
+  endif
+
   ifeq ($(USE_OPENAL),1)
     BASE_CFLAGS += -DUSE_OPENAL $(OPENAL_CFLAGS)
     ifeq ($(USE_OPENAL_DLOPEN),1)
@@ -721,6 +780,10 @@ ifeq ($(COMPILE_PLATFORM),darwin)
 
   ifeq ($(USE_FLAC),1)
     BASE_CFLAGS += -DUSE_FLAC
+  endif
+
+  ifeq ($(USE_MP3),1)
+    BASE_CFLAGS += -DUSE_MP3 $(MAD_CFLAGS)
   endif
 
   ifeq ($(USE_OPENAL),1)
@@ -842,6 +905,10 @@ else
 
   ifeq ($(USE_FLAC),1)
     BASE_CFLAGS += -DUSE_FLAC
+  endif
+
+  ifeq ($(USE_MP3),1)
+    BASE_CFLAGS += -DUSE_MP3 $(MAD_CFLAGS)
   endif
 
   ifeq ($(USE_OPENAL),1)
@@ -1096,6 +1163,9 @@ endif
 ifeq ($(USE_SYSTEM_VORBIS),0)
 	@if [ ! -d $(B)/client/vorbis ];then $(MKDIR) $(B)/client/vorbis;fi
 endif
+ifeq ($(USE_SYSTEM_MP3),0)
+	@if [ ! -d $(B)/client/libmad ];then $(MKDIR) $(B)/client/libmad;fi
+endif
 	@if [ ! -d $(B)/rend1 ];then $(MKDIR) $(B)/rend1;fi
 	@if [ ! -d $(B)/rendv ];then $(MKDIR) $(B)/rendv;fi
 ifneq ($(BUILD_SERVER),0)
@@ -1300,6 +1370,23 @@ VORBISOBJ = \
 endif
 endif
 
+ifeq ($(USE_MP3),1)
+ifeq ($(USE_SYSTEM_MP3),0)
+MP3OBJ = \
+  $(B)/client/libmad/bit.o \
+  $(B)/client/libmad/decoder.o \
+  $(B)/client/libmad/fixed.o \
+  $(B)/client/libmad/frame.o \
+  $(B)/client/libmad/huffman.o \
+  $(B)/client/libmad/layer3.o \
+  $(B)/client/libmad/layer12.o \
+  $(B)/client/libmad/stream.o \
+  $(B)/client/libmad/synth.o \
+  $(B)/client/libmad/timer.o \
+  $(B)/client/libmad/version.o
+endif
+endif
+
 Q3OBJ = \
   $(B)/client/cl_cgame.o \
   $(B)/client/cl_cin.o \
@@ -1403,6 +1490,11 @@ endif
 
 ifeq ($(USE_FLAC),1)
   Q3OBJ += $(B)/client/snd_codec_flac.o
+endif
+
+ifeq ($(USE_MP3),1)
+  Q3OBJ += $(MP3OBJ) \
+    $(B)/client/snd_codec_mp3.o
 endif
 
 ifeq ($(USE_OPENAL),1)
@@ -1684,6 +1776,9 @@ $(B)/client/ogg/%.o: $(OGGDIR)/src/%.c
 
 $(B)/client/vorbis/%.o: $(VORBISDIR)/lib/%.c
 	$(DO_VORBIS_CC)
+
+$(B)/client/libmad/%.o: $(MADDIR)/%.c
+	$(DO_CC)
 
 $(B)/client/%.o: $(SDLDIR)/%.c
 	$(DO_CC)

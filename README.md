@@ -31,8 +31,7 @@ Go to [Releases](../../releases) section to download latest binaries for your pl
 * reworked Zone memory allocator, no more out-of-memory errors
 * non-intrusive support for SDL3 backend (video, audio, input), selectable at compile time (based on [timangus](https://github.com/timangus)'s work on [ioquake3](https://github.com/ioquake/ioq3))
 * OpenAL sound API support (multiple speaker support and better sound quality)
-* Optional Ogg Vorbis support
-* Optional FLAC support
+* Optional Ogg Vorbis, MP3 and FLAC support
 * libjpeg-turbo support (JPEG image codec that uses SIMD instructions to accelerate baseline JPEG compression and decompression)
 * zlib-ng support (zlib replacement with optimizations for "next generation" systems)
 * [QWFWD](https://www.quakeworld.nu/wiki/QWfwd) proxy support from [fX3](https://codeberg.org/ChannelZ/fX3), [list of servers](https://www.quakeservers.net//quakeworld/servers/t=proxy/)
