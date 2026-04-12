@@ -450,7 +450,7 @@ if ( !vulkan ) {
 	gw_active = qfalse;
 	gw_minimized = qtrue;
 
-	if ( fullscreen )
+	if ( r_fullscreen->integer == 1 )
 	{
 		flags |= SDL_WINDOW_FULLSCREEN;
 	}
