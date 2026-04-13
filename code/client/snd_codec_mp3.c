@@ -717,4 +717,4 @@ void *S_MP3_CodecLoad(const char *filename, snd_info_t *info)
 	return pcmbuffer;
 }
 
-#endif // USE_CODEC_MP3
+#endif // USE_MP3

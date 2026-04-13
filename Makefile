@@ -49,6 +49,7 @@ USE_OGG_VORBIS    = 1
 USE_SYSTEM_OGG    = 0
 USE_SYSTEM_VORBIS = 0
 USE_FLAC          = 1
+USE_SYSTEM_FLAC   = 0
 USE_MP3           = 1
 USE_SYSTEM_MP3    = 0
 
@@ -305,6 +306,7 @@ CURLDIR=$(MOUNT_DIR)/thirdparty/libcurl
 OGGDIR=$(MOUNT_DIR)/thirdparty/libogg
 VORBISDIR=$(MOUNT_DIR)/thirdparty/libvorbis
 MADDIR=$(MOUNT_DIR)/thirdparty/libmad
+FLACDIR=$(MOUNT_DIR)/thirdparty/libflac
 OPENALDIR=$(MOUNT_DIR)/thirdparty/libopenal
 ZNGDIR=$(MOUNT_DIR)/thirdparty/libz-ng
 VULKANDIR=$(MOUNT_DIR)/thirdparty/libvulkan
@@ -341,6 +343,10 @@ ifneq ($(call bin_path, $(PKG_CONFIG)),)
   ifeq ($(USE_SYSTEM_MP3),1)
     MAD_CFLAGS ?= $(shell $(PKG_CONFIG) --silence-errors --cflags mad || true)
     MAD_LIBS ?= $(shell $(PKG_CONFIG) --silence-errors --libs mad || echo -lmad)
+  endif
+  ifeq ($(USE_SYSTEM_FLAC),1)
+    FLAC_CFLAGS ?= $(shell $(PKG_CONFIG) --silence-errors --cflags flac || true)
+    FLAC_LIBS ?= $(shell $(PKG_CONFIG) --silence-errors --libs flac || echo -lFLAC)
   endif
   ifeq ($(USE_SYSTEM_OPENAL),1)
     OPENAL_CFLAGS ?= $(shell $(PKG_CONFIG) --silence-errors --cflags openal || true)
@@ -416,6 +422,29 @@ else
   endif
   endif
   endif
+  endif
+  endif
+  endif
+endif
+
+# supply some reasonable defaults for flac
+ifeq ($(FLAC_CFLAGS),)
+  FLAC_CFLAGS = -I$(FLACDIR)/include -I$(FLACDIR)/src/include
+endif
+ifeq ($(USE_SYSTEM_FLAC),1)
+  ifeq ($(FLAC_LIBS),)
+    FLAC_LIBS = -lFLAC
+  endif
+else
+  FLAC_CFLAGS += -DHAVE_FSEEKO -DHAVE_LROUND -DFLAC__HAS_OGG=0
+  ifeq ($(ARCH),x86)
+    FLAC_CFLAGS += -DFLAC__CPU_IA32
+  else
+  ifeq ($(ARCH),x86_64)
+    FLAC_CFLAGS += -FLAC__CPU_X86_64
+  else
+  ifeq ($(ARCH),arm64)
+    FLAC_CFLAGS += -DFLAC__CPU_ARM64
   endif
   endif
   endif
@@ -663,11 +692,13 @@ ifdef MINGW
   endif
 
   ifeq ($(USE_FLAC),1)
-    BASE_CFLAGS += -DUSE_FLAC
+    BASE_CFLAGS += -DUSE_FLAC $(FLAC_CFLAGS)
+    CLIENT_LDFLAGS += $(FLAC_LIBS)
   endif
 
   ifeq ($(USE_MP3),1)
     BASE_CFLAGS += -DUSE_MP3 $(MAD_CFLAGS)
+    CLIENT_LDFLAGS += $(MAD_LIBS)
   endif
 
   ifeq ($(USE_OPENAL),1)
@@ -779,11 +810,13 @@ ifeq ($(COMPILE_PLATFORM),darwin)
   endif
 
   ifeq ($(USE_FLAC),1)
-    BASE_CFLAGS += -DUSE_FLAC
+    BASE_CFLAGS += -DUSE_FLAC $(FLAC_CFLAGS)
+    CLIENT_LDFLAGS += $(FLAC_LIBS)
   endif
 
   ifeq ($(USE_MP3),1)
     BASE_CFLAGS += -DUSE_MP3 $(MAD_CFLAGS)
+    CLIENT_LDFLAGS += $(MAD_LIBS)
   endif
 
   ifeq ($(USE_OPENAL),1)
@@ -904,11 +937,13 @@ else
   endif
 
   ifeq ($(USE_FLAC),1)
-    BASE_CFLAGS += -DUSE_FLAC
+    BASE_CFLAGS += -DUSE_FLAC $(FLAC_CFLAGS)
+    CLIENT_LDFLAGS += $(FLAC_LIBS)
   endif
 
   ifeq ($(USE_MP3),1)
     BASE_CFLAGS += -DUSE_MP3 $(MAD_CFLAGS)
+    CLIENT_LDFLAGS += $(MAD_LIBS)
   endif
 
   ifeq ($(USE_OPENAL),1)
@@ -1013,6 +1048,11 @@ endef
 define DO_VORBIS_CC
 $(echo_cmd) "CC $<"
 $(Q)$(CC) $(CFLAGS) -w -o $@ -c $<
+endef
+
+define DO_FLAC_CC
+$(echo_cmd) "CC $<"
+$(Q)$(CC) $(CFLAGS) -DPACKAGE_VERSION=\"1.4.3\" -o $@ -c $<
 endef
 
 define DO_AS
@@ -1165,6 +1205,9 @@ ifeq ($(USE_SYSTEM_VORBIS),0)
 endif
 ifeq ($(USE_SYSTEM_MP3),0)
 	@if [ ! -d $(B)/client/libmad ];then $(MKDIR) $(B)/client/libmad;fi
+endif
+ifeq ($(USE_SYSTEM_FLAC),0)
+	@if [ ! -d $(B)/client/libflac ];then $(MKDIR) $(B)/client/libflac;fi
 endif
 	@if [ ! -d $(B)/rend1 ];then $(MKDIR) $(B)/rend1;fi
 	@if [ ! -d $(B)/rendv ];then $(MKDIR) $(B)/rendv;fi
@@ -1387,6 +1430,25 @@ MP3OBJ = \
 endif
 endif
 
+ifeq ($(USE_FLAC),1)
+ifeq ($(USE_SYSTEM_FLAC),0)
+FLACOBJ = \
+  $(B)/client/libflac/bitmath.o \
+  $(B)/client/libflac/bitreader.o \
+  $(B)/client/libflac/bitwriter.o \
+  $(B)/client/libflac/cpu.o \
+  $(B)/client/libflac/crc.o \
+  $(B)/client/libflac/fixed.o \
+  $(B)/client/libflac/float.o \
+  $(B)/client/libflac/format.o \
+  $(B)/client/libflac/lpc.o \
+  $(B)/client/libflac/md5.o \
+  $(B)/client/libflac/memory.o \
+  $(B)/client/libflac/stream_decoder.o \
+  $(B)/client/libflac/window.o
+endif
+endif
+
 Q3OBJ = \
   $(B)/client/cl_cgame.o \
   $(B)/client/cl_cin.o \
@@ -1489,7 +1551,8 @@ ifeq ($(USE_OGG_VORBIS),1)
 endif
 
 ifeq ($(USE_FLAC),1)
-  Q3OBJ += $(B)/client/snd_codec_flac.o
+  Q3OBJ += $(FLACOBJ) \
+    $(B)/client/snd_codec_flac.o
 endif
 
 ifeq ($(USE_MP3),1)
@@ -1779,6 +1842,9 @@ $(B)/client/vorbis/%.o: $(VORBISDIR)/lib/%.c
 
 $(B)/client/libmad/%.o: $(MADDIR)/%.c
 	$(DO_CC)
+
+$(B)/client/libflac/%.o: $(FLACDIR)/src/%.c
+	$(DO_FLAC_CC)
 
 $(B)/client/%.o: $(SDLDIR)/%.c
 	$(DO_CC)
