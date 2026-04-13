@@ -178,8 +178,7 @@ void metadata_callback( const FLAC__StreamDecoder *decoder, const FLAC__StreamMe
 void error_callback( const FLAC__StreamDecoder *decoder, FLAC__StreamDecoderErrorStatus status, void *client_data ) {
 	(void)decoder;
 	(void)client_data;
-
-	Com_Printf( S_COLOR_ERROR "FLAC: error callback %s\n", FLAC__StreamDecoderErrorStatusString[status] );
+	(void)status;
 }
 
 /*
@@ -192,15 +191,13 @@ snd_stream_t *S_FLAC_CodecOpenStream( const char *filename ) {
 	snd_stream_t *stream;
 	struct snd_codec_flac_info *flacinfo;
 
-	if ( !filename ) return NULL;
-
 	// Open the stream
 	stream = S_CodecUtilOpen( filename, &flac_codec );
 	if ( !stream || stream->length <= 0 )
 		return NULL;
 
 	// Initialize the flac info structure we need for streaming
-	flacinfo = Z_Malloc( sizeof( struct snd_codec_flac_info ) );
+	flacinfo = Z_Malloc( sizeof( *flacinfo ) );
 	if ( !flacinfo ) {
 		S_CodecUtilClose( &stream );
 		return NULL;
@@ -227,10 +224,6 @@ snd_stream_t *S_FLAC_CodecOpenStream( const char *filename ) {
 		S_FLAC_CodecCloseStream( stream );
 		return NULL;
 	}
-
-	flacinfo->pcmbufsize = 32768;
-	flacinfo->pcmbuf = Z_Malloc( flacinfo->pcmbufsize );
-	flacinfo->buflen = 0;
 
 	return stream;
 }
