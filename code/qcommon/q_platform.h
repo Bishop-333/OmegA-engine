@@ -62,7 +62,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define PATH_SEP_FOREIGN '/'
 #define DLL_EXT ".dll"
 
-#if defined( _M_IX86 )
+#if defined( _M_IX86 ) || defined( __i386__ )
 #define ARCH_STRING "x86"
 #define Q3_LITTLE_ENDIAN
 #undef id386
@@ -72,7 +72,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 #endif
 
-#if defined( _M_AMD64 )
+#if defined( _M_AMD64 ) || defined( __x86_64__ )
 #define ARCH_STRING "x86_64"
 #define Q3_LITTLE_ENDIAN
 #undef idx64
@@ -83,7 +83,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 #endif
 
-#if defined( _M_ARM64 )
+#if defined( _M_ARM64 ) || defined( __aarch64__ )
 #define ARCH_STRING "arm64"
 #define Q3_LITTLE_ENDIAN
 #undef arm64
@@ -93,7 +93,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 #endif
 
-#if defined( _M_ARM )
+#if defined( _M_ARM ) || defined( __arm__ )
 #define ARCH_STRING "arm32"
 #define Q3_LITTLE_ENDIAN
 #undef arm32
