@@ -370,7 +370,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 	}
 
 if ( !vulkan ) {
-	if ( r_allowResize->integer )
+	if ( r_allowResize->integer && !fullscreen )
 	{
 		flags |= SDL_WINDOW_RESIZABLE;
 	}
