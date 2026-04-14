@@ -100,7 +100,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define R_OPSTACKTOP	R_R15
 #endif
 
-#define FUNC_ALIGN		4
+#define FUNC_ALIGN		16
 
 /*
   -------------
@@ -211,6 +211,7 @@ static	int jumpSizeChanged;
 #endif
 
 static	int	funcOffset[ FUNC_LAST ];
+static	qboolean forceDataMask;
 
 // literal pool
 #ifdef USE_LITERAL_POOL
@@ -1869,7 +1870,7 @@ static void EmitCallOffset( func_t Func )
 
 static void emit_CheckReg( vm_t *vm, uint32_t reg, func_t func )
 {
-	if ( vm->forceDataMask || !( vm_rtChecks->integer & VM_RTCHECK_DATA ) )
+	if ( forceDataMask )
 	{
 #if idx64
 		emit_and_rx( reg, R_DATAMASK );					// reg = reg & dataMask
@@ -2298,7 +2299,8 @@ static qboolean ConstOptimize( vm_t *vm, instruction_t *ci, instruction_t *ni )
 				var.size = 4;
 				wipe_var_range( &var );
 			} else {
-				int rx = load_rx_opstack( R_EAX | RCONST ); dec_opstack(); // eax = *opstack; opstack -= 4
+				int rx = load_rx_opstack( forceDataMask ? R_EAX : R_EAX | RCONST );
+				dec_opstack(); // eax = *opStack; opStack -= 4
 				emit_CheckReg( vm, rx, FUNC_DATW );
 				emit_store_imm32_index( ci->value, R_DATABASE, rx ); // (dword*)dataBase[ eax ] = 0x12345678
 				unmask_rx( rx );
@@ -2318,7 +2320,8 @@ static qboolean ConstOptimize( vm_t *vm, instruction_t *ci, instruction_t *ni )
 				var.size = 2;
 				wipe_var_range( &var );
 			} else {
-				int rx = load_rx_opstack( R_EAX | RCONST ); dec_opstack(); // eax = *opstack; opstack -= 4
+				int rx = load_rx_opstack( forceDataMask ? R_EAX : R_EAX | RCONST );
+				dec_opstack(); // eax = *opStack; opStack -= 4
 				emit_CheckReg( vm, rx, FUNC_DATW );
 				emit_store2_imm16_index( ci->value, R_DATABASE, rx ); // (word*)dataBase[ eax ] = 0x12345678
 				unmask_rx( rx );
@@ -2338,7 +2341,8 @@ static qboolean ConstOptimize( vm_t *vm, instruction_t *ci, instruction_t *ni )
 				var.size = 1;
 				wipe_var_range( &var );
 			} else {
-				int rx = load_rx_opstack( R_EAX | RCONST ); dec_opstack(); // eax = *opstack; opstack -= 4
+				int rx = load_rx_opstack( forceDataMask ? R_EAX : R_EAX | RCONST );
+				dec_opstack(); // eax = *opStack; opStack -= 4
 				emit_CheckReg( vm, rx, FUNC_DATW );
 				emit_store1_imm8_index( ci->value, R_DATABASE, rx ); // (char*)dataBase[ eax ] = 0x12345678
 				unmask_rx( rx );
@@ -2536,6 +2540,30 @@ static qboolean ConstOptimize( vm_t *vm, instruction_t *ci, instruction_t *ni )
 #endif
 
 
+#ifdef MACRO_OPTIMIZE
+/*
+=================
+VM_FindSameInst
+
+Search for the same base instruction ahead
+=================
+*/
+static qboolean VM_FindSameInst( const instruction_t *base, int offset, int count ) {
+	const instruction_t *next = base + offset;
+	while ( count-- > 0 ) {
+		if ( next->jused ) {
+			break;
+		}
+		if ( next->op == base->op && next->value == base->value ) {
+			return qtrue;
+		}
+		next++;
+	}
+	return qfalse;
+}
+#endif
+
+
 /*
 =================
 VM_FindMOps
@@ -2553,11 +2581,13 @@ static void VM_FindMOps( instruction_t *buf, int instructionCount )
 
 	while ( n < instructionCount )
 	{
-		if ( i->op == OP_LOCAL ) {
 #ifdef MACRO_OPTIMIZE
-			// OP_LOCAL + OP_LOCAL + OP_LOAD4 + OP_CONST + OP_XXX + OP_STORE4
-			if ( ( i + 1 )->op == OP_LOCAL && i->value == ( i + 1 )->value && ( i + 2 )->op == OP_LOAD4 && ( i + 3 )->op == OP_CONST && ( i + 4 )->op != OP_UNDEF && ( i + 5 )->op == OP_STORE4 ) {
-				int v = ( i + 4 )->op;
+		if ( i->op == OP_LOCAL || i->op == OP_CONST ) {
+			// OP_LOCAL|OP_CONST + OP_LOCAL|OP_CONST + OP_LOAD4 + OP_CONST + OP_XXX + OP_STORE4
+			if ( (i + 1)->op == i->op && i->value == (i + 1)->value && (i + 2)->op == OP_LOAD4 && (i + 3)->op == OP_CONST && (i + 4)->op != OP_UNDEF && (i + 5)->op == OP_STORE4 
+				// also check this local/global variable not referenced nearby
+				&& !VM_FindSameInst(i, 6, min(instructionCount - n - 1, 8) ) ) {
+				int v = (i + 4)->op;
 				if ( v == OP_ADD ) {
 					i->op = MOP_ADD;
 					i += 6; n += 6;
@@ -2584,19 +2614,20 @@ static void VM_FindMOps( instruction_t *buf, int instructionCount )
 					continue;
 				}
 			}
+		}
 #endif
-			if ( (i+1)->op == OP_CONST && (i+2)->op == OP_CALL && (i+3)->op == OP_STORE4 && (i+4)->op == OP_LOCAL && (i+5)->op == OP_LOAD4 && (i+6)->op == OP_LEAVE ) {
-				if ( i->value == (i+4)->value && !(i+4)->jused ) {
-					(i+0)->op = OP_IGNORE; (i+0)->value = 0;
-					(i+3)->op = OP_IGNORE; (i+3)->value = 0;
-					(i+4)->op = OP_IGNORE; (i+4)->value = 0;
-					(i+5)->op = OP_IGNORE; (i+5)->value = 0;
-					i += 7;
-					n += 7;
-					continue;
-				}
+		if ( i->op == OP_LOCAL && (i+1)->op == OP_CONST && (i+2)->op == OP_CALL && (i+3)->op == OP_STORE4 && (i+4)->op == OP_LOCAL && (i+5)->op == OP_LOAD4 && (i + 6)->op == OP_LEAVE ) {
+			if ( i->value == (i+4)->value && !(i+4)->jused ) {
+				(i+0)->op = OP_IGNORE; (i+0)->value = 0;
+				(i+3)->op = OP_IGNORE; (i+3)->value = 2;
+				(i+4)->op = OP_IGNORE; (i+4)->value = 0;
+				(i+5)->op = OP_IGNORE; (i+5)->value = 0;
+				i += 7;
+				n += 7;
+				continue;
 			}
 		}
+
 		i++;
 		n++;
 	}
@@ -2612,6 +2643,7 @@ EmitMOPs
 static qboolean EmitMOPs( vm_t *vm, instruction_t *ci, macro_op_t op )
 {
 	uint32_t reg_base;
+	var_addr_t var;
 	int n;
 
 	if ( (ci + 1 )->op == OP_LOCAL )
@@ -2619,40 +2651,46 @@ static qboolean EmitMOPs( vm_t *vm, instruction_t *ci, macro_op_t op )
 	else
 		reg_base = R_DATABASE;
 
+	var.base = reg_base;
+	var.addr = ci->value;
+	var.size = 4;
+
+	wipe_var_range( &var );
+
 	switch ( op )
 	{
-		//[local] += CONST
+		//[var] += CONST
 		case MOP_ADD:
 			n = inst[ ip + 2 ].value;
-			emit_op_mem_imm( X_ADD, R_PROCBASE, ci->value, n );
+			emit_op_mem_imm( X_ADD, reg_base, ci->value, n );
 			ip += 5;
 			return qtrue;
 
-		//[local] -= CONST
+		//[var] -= CONST
 		case MOP_SUB:
 			n = inst[ ip + 2 ].value;
-			emit_op_mem_imm( X_SUB, R_PROCBASE, ci->value, n );
+			emit_op_mem_imm( X_SUB, reg_base, ci->value, n );
 			ip += 5;
 			return qtrue;
 
-		//[local] &= CONST
+		//[var] &= CONST
 		case MOP_BAND:
 			n = inst[ ip + 2 ].value;
-			emit_op_mem_imm( X_AND, R_PROCBASE, ci->value, n );
+			emit_op_mem_imm( X_AND, reg_base, ci->value, n );
 			ip += 5;
 			return qtrue;
 
-		//[local] |= CONST
+		//[var] |= CONST
 		case MOP_BOR:
 			n = inst[ ip + 2 ].value;
-			emit_op_mem_imm( X_OR, R_PROCBASE, ci->value, n );
+			emit_op_mem_imm( X_OR, reg_base, ci->value, n );
 			ip += 5;
 			return qtrue;
 
-		//[local] ^= CONST
+		//[var] ^= CONST
 		case MOP_BXOR:
 			n = inst[ ip + 2 ].value;
-			emit_op_mem_imm( X_XOR, R_PROCBASE, ci->value, n );
+			emit_op_mem_imm( X_XOR, reg_base, ci->value, n );
 			ip += 5;
 			return qtrue;
 	}
@@ -2753,6 +2791,12 @@ qboolean VM_Compile( vm_t *vm, vmHeader_t *header ) {
 
 	code = NULL; // we will allocate memory later, after last defined pass
 	instructionPointers = NULL;
+
+	if ( vm->forceDataMask || ( vm_rtChecks->integer & VM_RTCHECK_DATA ) == 0 ) {
+		forceDataMask = qtrue;
+	} else {
+		forceDataMask = qfalse;
+	}
 
 	memset( funcOffset, 0, sizeof( funcOffset ) );
 
@@ -3091,7 +3135,7 @@ __compile:
 						}
 					} else {
 						// address stored in register
-						rx[0] = load_rx_opstack( R_EAX | RCONST );		// eax = *opstack
+						rx[0] = load_rx_opstack( forceDataMask ? R_EAX : R_EAX | RCONST );		// eax = *opstack
 						emit_CheckReg( vm, rx[0], FUNC_DATR );
 						sx[0] = alloc_sx( R_XMM0 );
 						emit_load_sx_index( sx[0], R_DATABASE, rx[0] ); // xmmm0 = dataBase[eax]
@@ -3160,8 +3204,11 @@ __compile:
 					} // not cached, perform load
 				} else {
 					// address stored in register
-					// rx[0] = rx[1] = load_rx_opstack( R_EAX );		// target, address = *opstack
-					load_rx_opstack2( &rx[0], R_EDX, &rx[1], R_EAX ); // target, address = *opstack
+					if ( forceDataMask ) {
+						rx[0] = rx[1] = load_rx_opstack( R_EAX );			// target = address = *opStack
+					} else {
+						load_rx_opstack2( &rx[0], R_EDX, &rx[1], R_EAX );	// target, address (const) = *opStack
+					}
 
 					emit_CheckReg( vm, rx[1], FUNC_DATR );			// check address bounds
 					if ( (ci+1)->op == sign_extend && sign_extend != OP_UNDEF ) {
@@ -3199,7 +3246,8 @@ __compile:
 						wipe_var_range( &var );
 						set_sx_var( sx[0], &var );									// update metadata
 					} else {
-						rx[1] = load_rx_opstack( R_EDX | RCONST ); dec_opstack();	// edx = *opstack; opstack -= 4
+						rx[1] = load_rx_opstack( forceDataMask ? R_EDX : R_EDX | RCONST );
+						dec_opstack();												// edx = *opStack; opStack -= 4
 						emit_CheckReg( vm, rx[1], FUNC_DATW );
 						emit_store_sx_index( sx[0], R_DATABASE, rx[1] );			// dataBase[edx] = xmm0
 						unmask_rx( rx[1] );
@@ -3221,7 +3269,8 @@ __compile:
 						set_rx_var( rx[0], &var ); // update metadata
 					} else {
 						// address specified by register
-						rx[1] = load_rx_opstack( R_EDX | RCONST ); dec_opstack();	// edx = *opstack; opstack -= 4
+						rx[1] = load_rx_opstack( forceDataMask ? R_EDX : R_EDX | RCONST );
+						dec_opstack();	// edx = *opStack; opStack -= 4
 						emit_CheckReg( vm, rx[1], FUNC_DATW );
 						switch ( ci->op ) {
 							case OP_STORE1: emit_store1_index( rx[0], R_DATABASE, rx[1] ); break;	// (byte*)dataBase[edx] = al
