@@ -1114,6 +1114,7 @@ void HandleEvents( void )
 	SDL_Event e;
 	keyNum_t key = 0;
 	static keyNum_t lastKeyDown = 0;
+	static Uint64 lastKeyDownTime = 0;
 
 	if ( !SDL_WasInit( SDL_INIT_VIDEO ) )
 			return;
@@ -1127,8 +1128,12 @@ void HandleEvents( void )
 		switch( e.type )
 		{
 			case SDL_EVENT_KEY_DOWN:
-				if ( e.key.repeat && Key_GetCatcher() == 0 )
+				if ( e.key.repeat && ( Key_GetCatcher() == 0 || ( e.key.timestamp - lastKeyDownTime < SDL_NS_PER_MS * 100 ) ) )
 					break;
+
+				if ( !e.key.repeat )
+					lastKeyDownTime = e.key.timestamp;
+
 				key = IN_TranslateSDLToQ3Key( &e.key, qtrue );
 
 				if ( key == K_ENTER && keys[K_ALT].down ) {
