@@ -1125,6 +1125,10 @@ void HandleEvents( void )
 
 	while ( SDL_PollEvent( &e ) )
 	{
+#ifdef DEBUG_EVENTS
+		if ( e.type >= SDL_EVENT_WINDOW_FIRST && e.type <= SDL_EVENT_WINDOW_LAST )
+			Com_Printf( "%4llu %s\n", e.window.timestamp, eventName( e.type ) );
+#endif
 		switch( e.type )
 		{
 			case SDL_EVENT_KEY_DOWN:
