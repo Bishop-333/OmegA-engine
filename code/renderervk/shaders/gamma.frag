@@ -1,7 +1,5 @@
 #version 450
 
-#include "glsl/fxaa.glsl"
-
 layout(set = 0, binding = 0) uniform sampler2D texture0;
 
 layout(location = 0) in vec2 frag_tex_coord;
@@ -16,7 +14,6 @@ layout(constant_id = 7) const int ditherMode = 0; // 0 - disabled, 1 - ordered
 layout(constant_id = 8) const int depth_r = 255;
 layout(constant_id = 9) const int depth_g = 255;
 layout(constant_id = 10) const int depth_b = 255;
-layout(constant_id = 11) const int fxaa = 0;
 
 const vec3 sRGB = { 0.2126, 0.7152, 0.0722 };
 
@@ -49,30 +46,8 @@ vec3 dither(vec3 color) {
 	return cDithered / depth;
 }
 
-vec3 applyFxaa(vec2 frag_tex_coord) {
-	vec2 resolution = vec2(textureSize(texture0, 0));
-	vec2 inverseVP = 1.0 / resolution;
-
-	return fxaaFilter(
-		texture0,
-		frag_tex_coord * resolution,
-		resolution,
-		frag_tex_coord + inverseVP * vec2(-1.0, -1.0),
-		frag_tex_coord + inverseVP * vec2( 1.0, -1.0),
-		frag_tex_coord + inverseVP * vec2(-1.0,  1.0),
-		frag_tex_coord + inverseVP * vec2( 1.0,  1.0),
-		frag_tex_coord
-	).rgb;
-}
-
 void main() {
-	vec4 color = texture(texture0, frag_tex_coord);
-	vec3 base = color.rgb;
-
-	if ( fxaa == 1 && color.a >= 1.0 )
-	{
-		base = applyFxaa(frag_tex_coord);
-	}
+	vec3 base = texture(texture0, frag_tex_coord).rgb;
 
 	if ( greyscale == 1 )
 	{

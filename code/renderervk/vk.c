@@ -5155,7 +5155,6 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 		int depth_r;
 		int depth_g;
 		int depth_b;
-		int fxaa;
 	} frag_spec_data;
 
 	switch ( program_index ) {
@@ -5223,7 +5222,6 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	frag_spec_data.bloom_threshold_mode = r_bloom_threshold_mode->integer;
 	frag_spec_data.bloom_modulate = r_bloom_modulate->integer;
 	frag_spec_data.dither = r_dither->integer;
-	frag_spec_data.fxaa = vk.fboActive && r_ext_fxaa->integer;
 
 	if ( !vk_surface_format_color_depth( vk.present_format.format, &frag_spec_data.depth_r, &frag_spec_data.depth_g, &frag_spec_data.depth_b ) )
 		ri.Printf( PRINT_ALL, "Format %s not recognized, dither to assume 8bpc\n", vk_format_string( vk.base_format.format ) );
@@ -5272,11 +5270,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	spec_entries[10].offset = offsetof(struct FragSpecData, depth_b);
 	spec_entries[10].size = sizeof(frag_spec_data.depth_b);
 
-	spec_entries[11].constantID = 11;
-	spec_entries[11].offset = offsetof(struct FragSpecData, fxaa);
-	spec_entries[11].size = sizeof(frag_spec_data.fxaa);
-
-	frag_spec_info.mapEntryCount = 12;
+	frag_spec_info.mapEntryCount = 11;
 	frag_spec_info.pMapEntries = spec_entries;
 	frag_spec_info.dataSize = sizeof( frag_spec_data );
 	frag_spec_info.pData = &frag_spec_data;
@@ -6510,13 +6504,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 				break;
 		}
 
-		if ( vk.fboActive && r_ext_fxaa->integer && ( state_bits & GLS_DEPTHTEST_DISABLE ) ) {
-			attachment_blend_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-			attachment_blend_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-		} else {
-			attachment_blend_state.srcAlphaBlendFactor = attachment_blend_state.srcColorBlendFactor;
-			attachment_blend_state.dstAlphaBlendFactor = attachment_blend_state.dstColorBlendFactor;
-		}
+		attachment_blend_state.srcAlphaBlendFactor = attachment_blend_state.srcColorBlendFactor;
+		attachment_blend_state.dstAlphaBlendFactor = attachment_blend_state.dstColorBlendFactor;
 		attachment_blend_state.colorBlendOp = VK_BLEND_OP_ADD;
 		attachment_blend_state.alphaBlendOp = VK_BLEND_OP_ADD;
 
