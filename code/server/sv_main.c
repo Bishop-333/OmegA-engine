@@ -1491,7 +1491,7 @@ int SV_SendQueuedPackets( void )
 				// There are active downloads
 				deltaT = Sys_Milliseconds() - dlStart;
 
-				delayT = 1000 * numBlocks * MAX_DOWNLOAD_BLKSIZE;
+				delayT = 1000 * numBlocks;
 				delayT /= sv_dlRate->integer * 1024;
 
 				if(delayT <= deltaT + 1)

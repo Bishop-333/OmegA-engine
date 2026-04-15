@@ -1323,11 +1323,12 @@ static int SV_WriteDownloadToClient( client_t *cl )
 {
 	int curindex;
 	int unreferenced = 1;
+	int downloadBlockSize;
 	char errorMessage[1024];
 	char pakbuf[MAX_QPATH], *pakptr;
 	int numRefPaks;
 	msg_t msg;
-	byte msgBuffer[MAX_DOWNLOAD_BLKSIZE*2+8];
+	byte msgBuffer[MAX_MSGLEN_BUF];
 
 	if ( cl->download == FS_INVALID_HANDLE ) {
 		qboolean idPack = qfalse;
@@ -1438,6 +1439,12 @@ static int SV_WriteDownloadToClient( client_t *cl )
 		cl->downloadEOF = qfalse;
 	}
 
+	if ( cl->netchan.isLANAddress ) {
+		downloadBlockSize = MAX_DOWNLOAD_BLKSIZE * 8;
+	} else {
+		downloadBlockSize = MAX_DOWNLOAD_BLKSIZE;
+	}
+
 	// Perform any reads that we need to
 	while (cl->downloadCurrentBlock - cl->downloadClientBlock < MAX_DOWNLOAD_WINDOW &&
 		cl->downloadSize != cl->downloadCount) {
@@ -1445,9 +1452,9 @@ static int SV_WriteDownloadToClient( client_t *cl )
 		curindex = (cl->downloadCurrentBlock % MAX_DOWNLOAD_WINDOW);
 
 		if (!cl->downloadBlocks[curindex])
-			cl->downloadBlocks[curindex] = Z_Malloc( MAX_DOWNLOAD_BLKSIZE );
+			cl->downloadBlocks[curindex] = Z_Malloc( downloadBlockSize );
 
-		cl->downloadBlockSize[curindex] = FS_Read( cl->downloadBlocks[curindex], MAX_DOWNLOAD_BLKSIZE, cl->download );
+		cl->downloadBlockSize[curindex] = FS_Read( cl->downloadBlocks[curindex], downloadBlockSize, cl->download );
 
 		if (cl->downloadBlockSize[curindex] <= 0) {
 			// EOF right now
@@ -1515,7 +1522,7 @@ static int SV_WriteDownloadToClient( client_t *cl )
 	cl->downloadXmitBlock++;
 	cl->downloadSendTime = svs.time;
 
-	return 1;
+	return cl->downloadBlockSize[curindex];
 }
 
 
