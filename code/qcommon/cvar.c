@@ -779,10 +779,10 @@ void Cvar_SetSafe( const char *var_name, const char *value )
 		if ( flags & ( CVAR_PROTECTED | CVAR_PRIVATE ) )
 		{
 			if( value )
-				Com_Printf( S_COLOR_YELLOW "Restricted source tried to set "
+				Com_WPrintf( "Restricted source tried to set "
 					"\"%s\" to \"%s\"\n", var_name, value );
 			else
-				Com_Printf( S_COLOR_YELLOW "Restricted source tried to "
+				Com_WPrintf( "Restricted source tried to "
 					"modify \"%s\"\n", var_name );
 			return;
 		}

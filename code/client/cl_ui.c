@@ -821,7 +821,11 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 		return 0;
 
 	case UI_CVAR_SETVALUE:
-		Cvar_SetValueSafe( VMA(1), VMF(2) );
+		if ( VMA(1) && !Q_stricmp( VMA(1), "com_maxfps" ) ) {
+			Cvar_SetValue( VMA(1), VMF(2) );
+		} else {
+			Cvar_SetValueSafe( VMA(1), VMF(2) );
+		}
 		return 0;
 
 	case UI_CVAR_RESET:
