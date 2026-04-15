@@ -441,7 +441,7 @@ qboolean CL_OpenAVIForWriting( const char *fileName, qboolean pipe, qboolean reo
 	{
 		if( afd.a.bits != 16 || afd.a.channels != 2 )
 		{
-			Com_WPrintf( "WARNING: Audio format of %d bit/%d channels not supported", afd.a.bits, afd.a.channels );
+			Com_Printf( S_COLOR_YELLOW "WARNING: Audio format of %d bit/%d channels not supported", afd.a.bits, afd.a.channels );
 			afd.audio = qfalse;
 		}
 		else
@@ -640,7 +640,7 @@ void CL_WriteAVIAudioFrame( const byte *pcmBuffer, int size )
 
 	if ( bytesInBuffer + size > PCM_BUFFER_SIZE )
 	{
-		Com_WPrintf( "WARNING: Audio capture buffer overflow -- truncating\n" );
+		Com_Printf( S_COLOR_YELLOW "WARNING: Audio capture buffer overflow -- truncating\n" );
 		size = PCM_BUFFER_SIZE - bytesInBuffer;
 	}
 

@@ -588,7 +588,7 @@ static void CL_Record_f( void ) {
 
 	// sync 0 doesn't prevent recording, so not forcing it off .. everyone does g_sync 1 ; record ; g_sync 0 ..
 	if ( NET_IsLocalAddress( &clc.serverAddress ) && !Cvar_VariableIntegerValue( "g_synchronousClients" ) ) {
-		Com_WPrintf ("WARNING: You should set 'g_synchronousClients 1' for smoother demo recording\n");
+		Com_Printf (S_COLOR_YELLOW "WARNING: You should set 'g_synchronousClients 1' for smoother demo recording\n");
 	}
 
 	if ( Cmd_Argc() == 2 ) {
@@ -1618,9 +1618,9 @@ static void CL_Connect_f( void ) {
 		else if( !strcmp( Cmd_Argv(1), "-6" ) )
 			family = NA_IP6;
 		else
-			Com_WPrintf( "warning: only -4 or -6 as address type understood.\n" );
+			Com_Printf( S_COLOR_YELLOW "warning: only -4 or -6 as address type understood.\n" );
 #else
-			Com_WPrintf( "warning: only -4 as address type understood.\n" );
+			Com_Printf( S_COLOR_YELLOW "warning: only -4 as address type understood.\n" );
 #endif
 		Q_strncpyz( server, Cmd_Argv(2), sizeof( server ) );
 	}
@@ -2388,7 +2388,7 @@ static void CL_CheckForResend( void ) {
 		Info_SetValueForKey_s( info, MAX_USERINFO_LENGTH, "client", Q3_VERSION );
 
 		if ( !notOverflowed ) {
-			Com_WPrintf( "WARNING: oversize userinfo, you might be not able to join remote server!\n" );
+			Com_Printf( S_COLOR_YELLOW "WARNING: oversize userinfo, you might be not able to join remote server!\n" );
 		}
 
 		len = Com_sprintf( data, sizeof( data ), "connect \"%s\"", info );
@@ -2709,7 +2709,7 @@ static qboolean CL_ConnectionlessPacket( const netadr_t *from, msg_t *msg ) {
 						// we support new protocol features by default
 						cl_proto = NEW_PROTOCOL_VERSION;
 					}
-					Com_WPrintf( "Warning: Server reports protocol version %d, "
+					Com_Printf( S_COLOR_YELLOW "Warning: Server reports protocol version %d, "
 						"we have %d. Trying legacy protocol %d.\n",
 						sv_proto, cl_proto, OLD_PROTOCOL_VERSION );
 				}
@@ -3024,7 +3024,7 @@ static void CL_CheckUserinfo( void ) {
 
 		info = Cvar_InfoString( CVAR_USERINFO, &infoTruncated );
 		if ( strlen( info ) > MAX_USERINFO_LENGTH || infoTruncated ) {
-			Com_WPrintf( "WARNING: oversize userinfo, you might be not able to play on remote server!\n" );
+			Com_Printf( S_COLOR_YELLOW "WARNING: oversize userinfo, you might be not able to play on remote server!\n" );
 		}
 
 		CL_AddReliableCommand( va( "userinfo \"%s\"", info ), qfalse );

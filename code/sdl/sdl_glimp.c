@@ -256,7 +256,7 @@ static void GLimp_DetectAvailableModes(void)
 	SDL_DisplayID display = SDL_GetDisplayForWindow( SDL_window );
 	if( display <= 0 )
 	{
-		Com_WPrintf( "Couldn't get window display index, no resolutions detected: %s\n", SDL_GetError() );
+		Com_Printf( S_COLOR_WARNING "Couldn't get window display index, no resolutions detected: %s\n", SDL_GetError() );
 		return;
 	}
 
@@ -266,7 +266,7 @@ static void GLimp_DetectAvailableModes(void)
 	if( !desktopMode || !displayModes || numSDLModes <= 0 )
 	{
 		SDL_free( displayModes );
-		Com_WPrintf( "Couldn't get display modes, no resolutions detected: %s\n", SDL_GetError() );
+		Com_Printf( S_COLOR_WARNING "Couldn't get display modes, no resolutions detected: %s\n", SDL_GetError() );
 		return;
 	}
 	SDL_DisplayMode windowMode = *desktopMode;
@@ -326,7 +326,7 @@ static void GLimp_DetectAvailableModes(void)
 		if( strlen( newModeString ) < (int)sizeof( buf ) - strlen( buf ) )
 			Q_strcat( buf, sizeof( buf ), newModeString );
 		else
-			Com_WPrintf( "Skipping mode %ux%u, buffer too small\n", modes[ i ].w, modes[ i ].h );
+			Com_Printf( S_COLOR_WARNING "Skipping mode %ux%u, buffer too small\n", modes[ i ].w, modes[ i ].h );
 	}
 
 	if( *buf )

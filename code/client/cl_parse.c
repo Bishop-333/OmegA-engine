@@ -364,7 +364,7 @@ void CL_SystemInfoChanged( qboolean onlyGame ) {
 	s = Info_ValueForKey( systemInfo, "fs_game" );
 
 	if ( FS_InvalidGameDir( s ) ) {
-		Com_WPrintf( "WARNING: Server sent invalid fs_game value %s\n", s );
+		Com_Printf( S_COLOR_YELLOW "WARNING: Server sent invalid fs_game value %s\n", s );
 	} else {
 		Cvar_Set( "fs_game", s );
 	}
@@ -443,7 +443,7 @@ void CL_SystemInfoChanged( qboolean onlyGame ) {
 				if ( Q_stricmp( key, "g_synchronousClients" ) && Q_stricmp( key, "pmove_fixed" ) && Q_stricmp( key, "pmove_msec" ) )
 #endif
 				{
-					Com_WPrintf( "WARNING: server is not allowed to set %s=%s\n", key, value );
+					Com_Printf( S_COLOR_YELLOW "WARNING: server is not allowed to set %s=%s\n", key, value );
 					continue;
 				}
 			}
@@ -852,7 +852,7 @@ void CL_ParseServerMessage( msg_t *msg ) {
 
 	if ( clc.reliableSequence - clc.reliableAcknowledge > MAX_RELIABLE_COMMANDS ) {
 		if ( !clc.demoplaying ) {
-			Com_WPrintf( "WARNING: dropping %i commands from server\n", clc.reliableSequence - clc.reliableAcknowledge );
+			Com_Printf( S_COLOR_YELLOW "WARNING: dropping %i commands from server\n", clc.reliableSequence - clc.reliableAcknowledge );
 		}
 		clc.reliableAcknowledge = clc.reliableSequence;
 	} else if ( clc.reliableSequence - clc.reliableAcknowledge < 0 ) {

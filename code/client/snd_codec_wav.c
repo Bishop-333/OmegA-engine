@@ -69,7 +69,7 @@ static int S_ReadChunkInfo(fileHandle_t f, char *name)
 
 	len = FGetLittleLong(f);
 	if( len < 0 ) {
-		Com_WPrintf( "WARNING: Negative chunk length\n" );
+		Com_Printf( S_COLOR_YELLOW "WARNING: Negative chunk length\n" );
 		return -1;
 	}
 

@@ -1320,12 +1320,12 @@ static void S_OpenBackgroundStream( const char *filename ) {
 	// Open stream
 	s_backgroundStream = S_CodecOpenStream( filename );
 	if( !s_backgroundStream ) {
-		Com_WPrintf( "WARNING: couldn't open music file %s\n", filename );
+		Com_Printf( S_COLOR_YELLOW "WARNING: couldn't open music file %s\n", filename );
 		return;
 	}
 
 	if( s_backgroundStream->info.channels != 2 || s_backgroundStream->info.rate != 22050 ) {
-		Com_WPrintf( "WARNING: music file %s is not 22k stereo\n", filename );
+		Com_WPrintf("WARNING: music file %s is not 22k stereo\n", filename );
 	}
 }
 
