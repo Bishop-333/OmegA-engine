@@ -1484,6 +1484,9 @@ void Con_RunConsole( void )
 		{
 			if ( con_anim->integer ) {
 				con[i].displayFrac += ( con[i].finalFrac - con[i].displayFrac ) * con_conspeed->value * 0.05;
+
+				if ( con[i].finalFrac < con[i].displayFrac + 0.001f )
+					con[i].displayFrac = con[i].finalFrac;
 			} else {
 				con[i].displayFrac += con_conspeed->value * cls.realFrametime * 0.001;
 			}
