@@ -1169,9 +1169,10 @@ static void Con_DrawHelp( int y, float conColorValue[4] ) {
 	int lines = 1;
 	int len = 0;
 	int maxLen = 0;
+	int maxChars = g_console_field_width - 16;
 
 	while ( *s ) {
-		if ( *s == '\n' ) {
+		if ( *s == '\n' || len >= maxChars ) {
 			lines++;
 			len = 0;
 		} else {
@@ -1204,7 +1205,7 @@ static void Con_DrawHelp( int y, float conColorValue[4] ) {
 	re.SetColor( NULL );
 
 	while ( *desc ) {
-		for ( i = 0; *desc && *desc != '\n' && i < sizeof( help ) - 1; i++ ) {
+		for ( i = 0; *desc && *desc != '\n' && i < maxChars && i < sizeof( help ) - 1; i++ ) {
 			help[i] = *desc++;
 		}
 		help[i] = '\0';
