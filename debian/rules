@@ -1,0 +1,26 @@
+#!/usr/bin/make -f
+# See debhelper(7) (uncomment to enable)
+# output every command that modifies files on the build system.
+#DH_VERBOSE = 1
+
+# see FEATURE AREAS in dpkg-buildflags(1)
+#export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+# see ENVIRONMENT in dpkg-buildflags(1)
+# package maintainers to append CFLAGS
+#export DEB_CFLAGS_MAINT_APPEND  = -Wall -pedantic
+# package maintainers to append LDFLAGS
+#export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
+
+
+%:
+		dh $@
+
+override_dh_auto_build:
+		dh_auto_build -- USE_SYSTEM_JPEG=1 USE_SYSTEM_ZLIB=1 USE_SYSTEM_OGG=1 USE_SYSTEM_VORBIS=1 USE_SYSTEM_FLAC=1 USE_SYSTEM_MP3=1 USE_SYSTEM_OPENAL=1 BUILD_SERVER=1 NO_STRIP=1
+
+override_dh_auto_install:
+		mkdir -p debian/omega-engine/usr/lib/omega-engine
+		cp build/release-linux-*/omega* debian/omega-engine/usr/lib/omega-engine/omega-engine
+		cp build/release-linux-*/renderer_*.so debian/omega-engine/usr/lib/omega-engine/
+		cp build/release-linux-*/omgded* debian/omega-engine/usr/lib/omega-engine/omgded

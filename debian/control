@@ -1,0 +1,18 @@
+Source: omega-engine
+Section: games
+Priority: optional
+Maintainer: Debian Games Team <pkg-games-devel@lists.alioth.debian.org>
+Build-Depends: debhelper-compat (= 13), pkgconf, libgl-dev, libvulkan-dev, libcurl4-openssl-dev, libjpeg-dev, libopenal-dev, libsdl3-dev, libogg-dev, libvorbis-dev, libmad0-dev, libflac-dev, zlib1g-dev
+Standards-Version: 4.7.0
+Homepage: https://github.com/Bishop-333/OmegA-engine
+
+Package: omega-engine
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Unofficial fork of the Quake3e engine for OpenArena OmegA.
+ This package installs a modified version of the Quake3e game engine,
+ which is made especially for OmegA but can be used to play OpenArena
+ and Quake3.
+ .
+ This package alone isn't of any use; to get a playable game, install
+ openarena or another suitable set of game data.
