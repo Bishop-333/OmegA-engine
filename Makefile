@@ -369,6 +369,11 @@ ifeq ($(SDL_LIBS),)
   SDL_LIBS = -lSDL3
 endif
 
+# supply some reasonable defaults for libjpeg-turbo
+ifeq ($(USE_SYSTEM_JPEG),1)
+  USE_JPEG_TURBO = 0
+endif
+
 # supply some reasonable defaults for ogg/vorbis
 ifeq ($(OGG_CFLAGS),)
   OGG_CFLAGS = -I$(OGGDIR)/include
@@ -388,14 +393,12 @@ ifeq ($(USE_SYSTEM_VORBIS),1)
 endif
 
 # supply some reasonable defaults for mp3
-ifeq ($(MAD_CFLAGS),)
-  MAD_CFLAGS = -I$(MADDIR)/include
-endif
 ifeq ($(USE_SYSTEM_MP3),1)
   ifeq ($(MAD_LIBS),)
     MAD_LIBS = -lmad
   endif
 else
+  MAD_CFLAGS = -I$(MADDIR)/include
   ifeq ($(ARCH),x86)
     MAD_CFLAGS += -DFPM_INTEL
   else
