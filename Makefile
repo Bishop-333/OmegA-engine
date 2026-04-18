@@ -48,10 +48,10 @@ USE_LOCAL_HEADERS= 0
 USE_OGG_VORBIS    = 1
 USE_SYSTEM_OGG    = 0
 USE_SYSTEM_VORBIS = 0
-USE_FLAC          = 1
-USE_SYSTEM_FLAC   = 0
 USE_MP3           = 1
 USE_SYSTEM_MP3    = 0
+USE_FLAC          = 1
+USE_SYSTEM_FLAC   = 0
 
 USE_OPENAL        = 1
 USE_OPENAL_DLOPEN = 1
@@ -229,16 +229,20 @@ ifndef USE_SYSTEM_VORBIS
   USE_SYSTEM_VORBIS=1
 endif
 
-ifndef USE_FLAC
-  USE_FLAC=1
-endif
-
 ifndef USE_MP3
   USE_MP3=1
 endif
 
 ifndef USE_SYSTEM_MP3
   USE_SYSTEM_MP3=1
+endif
+
+ifndef USE_FLAC
+  USE_FLAC=1
+endif
+
+ifndef USE_SYSTEM_FLAC
+  USE_SYSTEM_FLAC=1
 endif
 
 ifndef USE_OPENAL
@@ -369,11 +373,6 @@ ifeq ($(SDL_LIBS),)
   SDL_LIBS = -lSDL3
 endif
 
-# supply some reasonable defaults for libjpeg-turbo
-ifeq ($(USE_SYSTEM_JPEG),1)
-  USE_JPEG_TURBO = 0
-endif
-
 # supply some reasonable defaults for ogg/vorbis
 ifeq ($(OGG_CFLAGS),)
   OGG_CFLAGS = -I$(OGGDIR)/include
@@ -468,7 +467,6 @@ ifeq ($(USE_SYSTEM_ZLIB),1)
   ifeq ($(ZLIB_LIBS),)
     ZLIB_LIBS = -lz
   endif
-  USE_ZLIB_NG = 0
 endif
 
 # extract version info
@@ -694,14 +692,14 @@ ifdef MINGW
     CLIENT_LDFLAGS += $(OGG_LIBS) $(VORBIS_LIBS)
   endif
 
-  ifeq ($(USE_FLAC),1)
-    BASE_CFLAGS += -DUSE_FLAC $(FLAC_CFLAGS)
-    CLIENT_LDFLAGS += $(FLAC_LIBS)
-  endif
-
   ifeq ($(USE_MP3),1)
     BASE_CFLAGS += -DUSE_MP3 $(MAD_CFLAGS)
     CLIENT_LDFLAGS += $(MAD_LIBS)
+  endif
+
+  ifeq ($(USE_FLAC),1)
+    BASE_CFLAGS += -DUSE_FLAC $(FLAC_CFLAGS)
+    CLIENT_LDFLAGS += $(FLAC_LIBS)
   endif
 
   ifeq ($(USE_OPENAL),1)
@@ -716,13 +714,13 @@ ifdef MINGW
     endif
   endif
 
-  ifeq ($(USE_ZLIB_NG),1)
+  ifeq ($(USE_SYSTEM_ZLIB),1)
+    BASE_CFLAGS += $(ZLIB_CFLAGS)
+    LDFLAGS += $(ZLIB_LIBS)
+  else ifeq ($(USE_ZLIB_NG),1)
     BASE_CFLAGS += -I$(TARGETDIR)/libz-ng/include
     LDFLAGS += -L$(TARGETDIR)/libz-ng/lib
     LDFLAGS += -lz
-  else
-    BASE_CFLAGS += $(ZLIB_CFLAGS)
-    LDFLAGS += $(ZLIB_LIBS)
   endif
 
   DEBUG_CFLAGS = $(BASE_CFLAGS) -DDEBUG -D_DEBUG -g -O0
@@ -812,14 +810,14 @@ ifeq ($(COMPILE_PLATFORM),darwin)
     CLIENT_LDFLAGS += $(OGG_LIBS) $(VORBIS_LIBS)
   endif
 
-  ifeq ($(USE_FLAC),1)
-    BASE_CFLAGS += -DUSE_FLAC $(FLAC_CFLAGS)
-    CLIENT_LDFLAGS += $(FLAC_LIBS)
-  endif
-
   ifeq ($(USE_MP3),1)
     BASE_CFLAGS += -DUSE_MP3 $(MAD_CFLAGS)
     CLIENT_LDFLAGS += $(MAD_LIBS)
+  endif
+
+  ifeq ($(USE_FLAC),1)
+    BASE_CFLAGS += -DUSE_FLAC $(FLAC_CFLAGS)
+    CLIENT_LDFLAGS += $(FLAC_LIBS)
   endif
 
   ifeq ($(USE_OPENAL),1)
@@ -836,11 +834,12 @@ ifeq ($(COMPILE_PLATFORM),darwin)
     endif
   endif
 
-  ifeq ($(USE_ZLIB_NG),1)
+  ifeq ($(USE_SYSTEM_ZLIB),1)
+    BASE_CFLAGS += $(ZLIB_CFLAGS)
+    LDFLAGS += -lz
+  else ifeq ($(USE_ZLIB_NG),1)
     BASE_CFLAGS += -I$(TARGETDIR)/libz-ng/include
     LDFLAGS += -L$(TARGETDIR)/libz-ng/lib
-    LDFLAGS += -lz
-  else
     LDFLAGS += -lz
   endif
 
@@ -939,14 +938,14 @@ else
     CLIENT_LDFLAGS += $(OGG_LIBS) $(VORBIS_LIBS)
   endif
 
-  ifeq ($(USE_FLAC),1)
-    BASE_CFLAGS += -DUSE_FLAC $(FLAC_CFLAGS)
-    CLIENT_LDFLAGS += $(FLAC_LIBS)
-  endif
-
   ifeq ($(USE_MP3),1)
     BASE_CFLAGS += -DUSE_MP3 $(MAD_CFLAGS)
     CLIENT_LDFLAGS += $(MAD_LIBS)
+  endif
+
+  ifeq ($(USE_FLAC),1)
+    BASE_CFLAGS += -DUSE_FLAC $(FLAC_CFLAGS)
+    CLIENT_LDFLAGS += $(FLAC_LIBS)
   endif
 
   ifeq ($(USE_OPENAL),1)
@@ -958,13 +957,13 @@ else
     endif
   endif
 
-  ifeq ($(USE_ZLIB_NG),1)
+  ifeq ($(USE_SYSTEM_ZLIB),1)
+    BASE_CFLAGS += $(ZLIB_CFLAGS)
+    LDFLAGS += $(ZLIB_LIBS)
+  else ifeq ($(USE_ZLIB_NG),1)
     BASE_CFLAGS += -I$(TARGETDIR)/libz-ng/include
     LDFLAGS += -L$(TARGETDIR)/libz-ng/lib
     LDFLAGS += -lz
-  else
-    BASE_CFLAGS += $(ZLIB_CFLAGS)
-    LDFLAGS += $(ZLIB_LIBS)
   endif
 
   ifeq ($(PLATFORM),linux)
@@ -1121,8 +1120,10 @@ ifeq ($(USE_CURL),1)
       ifeq ($(ARCH),x86)
         CURL_CMAKE_ARGS += -DENABLE_IPV6=OFF -DCURL_ENABLE_SSL=OFF
       endif
-      ifeq ($(USE_ZLIB_NG),1)
-        CURL_CMAKE_ARGS += -DZLIB_LIBRARY=$(CURDIR)/$(TARGETDIR)/libz-ng/lib/libz.a -DZLIB_INCLUDE_DIR=$(CURDIR)/$(TARGETDIR)/libz-ng/include
+      ifneq ($(USE_SYSTEM_ZLIB),1)
+        ifeq ($(USE_ZLIB_NG),1)
+          CURL_CMAKE_ARGS += -DZLIB_LIBRARY=$(CURDIR)/$(TARGETDIR)/libz-ng/lib/libz.a -DZLIB_INCLUDE_DIR=$(CURDIR)/$(TARGETDIR)/libz-ng/include
+        endif
       endif
     endif
   endif
@@ -1219,6 +1220,7 @@ ifneq ($(BUILD_SERVER),0)
 endif
 
 thirdparty:
+ifneq ($(USE_SYSTEM_JPEG),1)
 ifeq ($(USE_JPEG_TURBO),1)
 	@echo ""
 	@echo "Building libjpeg-turbo in $(TARGETDIR)/libjpeg-turbo:"
@@ -1228,7 +1230,9 @@ ifeq ($(USE_JPEG_TURBO),1)
 	@$(MAKE) -C $(TARGETDIR)/libjpeg-turbo/build
 	@$(MAKE) -C $(TARGETDIR)/libjpeg-turbo/build install DESTDIR=""
 endif
+endif
 ifeq ($(USE_ZLIB_NG),1)
+ifneq ($(USE_SYSTEM_ZLIB),1)
 	@echo ""
 	@echo "Building zlib-ng in $(TARGETDIR)/libz-ng:"
 	@echo ""
@@ -1236,6 +1240,7 @@ ifeq ($(USE_ZLIB_NG),1)
 	@cd $(TARGETDIR)/libz-ng/build && CFLAGS="" cmake $(CURDIR)/$(ZNGDIR) $(ZLIBNG_CMAKE_ARGS)
 	@$(MAKE) -C $(TARGETDIR)/libz-ng/build
 	@$(MAKE) -C $(TARGETDIR)/libz-ng/build install DESTDIR=""
+endif
 endif
 ifeq ($(USE_CURL),1)
 ifdef MINGW
@@ -1553,14 +1558,14 @@ ifeq ($(USE_OGG_VORBIS),1)
     $(B)/client/snd_codec_ogg.o
 endif
 
-ifeq ($(USE_FLAC),1)
-  Q3OBJ += $(FLACOBJ) \
-    $(B)/client/snd_codec_flac.o
-endif
-
 ifeq ($(USE_MP3),1)
   Q3OBJ += $(MP3OBJ) \
     $(B)/client/snd_codec_mp3.o
+endif
+
+ifeq ($(USE_FLAC),1)
+  Q3OBJ += $(FLACOBJ) \
+    $(B)/client/snd_codec_flac.o
 endif
 
 ifeq ($(USE_OPENAL),1)
