@@ -164,6 +164,10 @@ jobs:
 
     steps:
 
+    - name: Install tools
+      run: |
+        brew install create-dmg
+
     - uses: actions/checkout@v6
       with:
         submodules: recursive
@@ -171,7 +175,7 @@ jobs:
     - name: Build
       run: |
         ./make-macosx-ub2.sh
-        hdiutil create -format UDZO -srcfolder build/release-darwin-universal2/OmegA.app build/omega-engine-macos-universal2.dmg
+        create-dmg --volname "OmegA" --volicon "code/unix/VolumeIcon.icns" --background "code/unix/background.png" --window-size 680 425 --text-size 12 --icon "OmegA.app" 209 190 --app-drop-link 472 190 "build/omega-engine-macos-universal2.dmg" "build/release-darwin-universal2/"
 
     - uses: actions/upload-artifact@v7
       with:
