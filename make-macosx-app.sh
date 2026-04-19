@@ -178,6 +178,7 @@ WRAPPER_EXTENSION="app"
 WRAPPER_NAME="OmegA.${WRAPPER_EXTENSION}"
 CONTENTS_FOLDER_PATH="${WRAPPER_NAME}/Contents"
 UNLOCALIZED_RESOURCES_FOLDER_PATH="${CONTENTS_FOLDER_PATH}/Resources"
+LICENSES_FOLDER_PATH="${UNLOCALIZED_RESOURCES_FOLDER_PATH}/LICENSES"
 EXECUTABLE_FOLDER_PATH="${CONTENTS_FOLDER_PATH}/MacOS"
 EXECUTABLE_NAME="${PRODUCT_NAME}"
 
@@ -262,12 +263,32 @@ fi
 if [ ! -d "${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}" ]; then
 	mkdir -p "${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}" || exit 1;
 fi
+mkdir -p "${BUILT_PRODUCTS_DIR}/${LICENSES_FOLDER_PATH}/SDL" \
+         "${BUILT_PRODUCTS_DIR}/${LICENSES_FOLDER_PATH}/openal-soft" \
+         "${BUILT_PRODUCTS_DIR}/${LICENSES_FOLDER_PATH}/MoltenVK" \
+         "${BUILT_PRODUCTS_DIR}/${LICENSES_FOLDER_PATH}/libjpeg-turbo" \
+         "${BUILT_PRODUCTS_DIR}/${LICENSES_FOLDER_PATH}/libogg" \
+         "${BUILT_PRODUCTS_DIR}/${LICENSES_FOLDER_PATH}/vorbis" \
+         "${BUILT_PRODUCTS_DIR}/${LICENSES_FOLDER_PATH}/libmad" \
+         "${BUILT_PRODUCTS_DIR}/${LICENSES_FOLDER_PATH}/flac" || exit 1
+
 
 # copy and generate some application bundle resources
 cp code/thirdparty/libsdl/macosx/*.dylib "${BUILT_PRODUCTS_DIR}/${EXECUTABLE_FOLDER_PATH}"
 cp code/thirdparty/libopenal/macosx/*.dylib "${BUILT_PRODUCTS_DIR}/${EXECUTABLE_FOLDER_PATH}"
 cp code/thirdparty/libvulkan/macosx/*.dylib "${BUILT_PRODUCTS_DIR}/${EXECUTABLE_FOLDER_PATH}"
-cp code/thirdparty/libvulkan/macosx/LICENSE "${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}" || exit 1;
+
+# copy licenses
+cp COPYING.txt "${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/" || exit 1
+cp code/thirdparty/libsdl/LICENSE.txt "${BUILT_PRODUCTS_DIR}/${LICENSES_FOLDER_PATH}/SDL/" || exit 1
+cp code/thirdparty/libopenal/COPYING "${BUILT_PRODUCTS_DIR}/${LICENSES_FOLDER_PATH}/openal-soft/" || exit 1
+cp code/thirdparty/libvulkan/LICENSE "${BUILT_PRODUCTS_DIR}/${LICENSES_FOLDER_PATH}/MoltenVK/" || exit 1
+cp code/thirdparty/libjpeg-turbo/LICENSE.md "${BUILT_PRODUCTS_DIR}/${LICENSES_FOLDER_PATH}/libjpeg-turbo/" || exit 1
+cp code/thirdparty/libogg/COPYING "${BUILT_PRODUCTS_DIR}/${LICENSES_FOLDER_PATH}/libogg/" || exit 1
+cp code/thirdparty/libvorbis/COPYING "${BUILT_PRODUCTS_DIR}/${LICENSES_FOLDER_PATH}/vorbis/" || exit 1
+cp code/thirdparty/libmad/COPYRIGHT "${BUILT_PRODUCTS_DIR}/${LICENSES_FOLDER_PATH}/libmad/" || exit 1
+cp code/thirdparty/libflac/COPYING.Xiph "${BUILT_PRODUCTS_DIR}/${LICENSES_FOLDER_PATH}/flac/" || exit 1
+
 cp ${ICNSDIR}/${ICNS} "${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/$ICNS" || exit 1;
 echo -n ${PKGINFO} > "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/PkgInfo" || exit 1;
 
