@@ -120,6 +120,41 @@ jobs:
         path: build/omega-engine-linux-arm64.tar.gz
         if-no-files-found: error
         retention-days: 5
+  
+  debian:
+    name: Release Debian amd64
+    runs-on: ubuntu-24.04
+    container: debian:trixie
+    strategy:
+      fail-fast: false
+
+    steps:
+
+    - name: Install tools
+      run: |
+        apt-get -qq update
+        apt-get install -y make gcc git
+
+    - uses: actions/checkout@v6
+      with:
+        submodules: recursive
+
+    - name: Install build dependencies
+      run: |
+        apt-get build-dep -y .
+
+    - name: Build
+      run: |
+        chmod +x debian/rules
+        dpkg-buildpackage -b -us -uc
+        mv ../omega-engine_*.deb ./build/
+
+    - uses: actions/upload-artifact@v7
+      with:
+        name: release-debian-amd64
+        path: build/omega-engine_*.deb
+        if-no-files-found: error
+        retention-days: 5
 
   macos:
     name: Release macOS universal2
@@ -147,7 +182,7 @@ jobs:
 
   create-testing:
     if: github.event_name == 'workflow_dispatch'
-    needs: [windows, linux, linux-arm, macos]
+    needs: [windows, linux, linux-arm, debian, macos]
     runs-on: ubuntu-latest
     steps:
       - name: Download Artifacts
@@ -157,6 +192,7 @@ jobs:
         run: |
           cp ./release-linux-x86_64/omega-engine-linux-x86_64.tar.gz .
           cp ./release-linux-arm64/omega-engine-linux-arm64.tar.gz .
+          cp ./release-debian-amd64/omega-engine_*.deb .
           cp ./release-mingw64-x86_64/omega-engine-windows-x86_64.zip .
           cp ./release-darwin-universal2/omega-engine-macos-universal2.dmg .
       - name: Create latest build
@@ -170,3 +206,4 @@ jobs:
             *.tar.gz
             *.zip
             *.dmg
+            *.deb
