@@ -1102,7 +1102,7 @@ void CL_MapLoading( void ) {
 		Com_Memset( cls.updateInfoString, 0, sizeof( cls.updateInfoString ) );
 		Com_Memset( clc.serverMessage, 0, sizeof( clc.serverMessage ) );
 		Com_Memset( &cl.gameState, 0, sizeof( cl.gameState ) );
-		clc.lastPacketSentTime = cls.realtime - 9999;  // send packet immediately
+		clc.lastPacketSentTime = cls.realtime - RETRANSMIT_TIMEOUT; // send packet immediately
 		cls.framecount++;
 		SCR_UpdateScreen();
 	} else {
@@ -1114,7 +1114,7 @@ void CL_MapLoading( void ) {
 		Key_SetCatcher( 0 );
 		cls.framecount++;
 		SCR_UpdateScreen();
-		clc.connectTime = -RETRANSMIT_TIMEOUT;
+		clc.connectTime = cls.realtime - RECONNECT_TIMEOUT; // send packet immediately
 		NET_StringToAdr( cls.servername, &clc.serverAddress, NA_UNSPEC );
 		// we don't need a challenge on the localhost
 		CL_CheckForResend();
@@ -1595,8 +1595,9 @@ CL_Connect_f
 static void CL_Connect_f( void ) {
 	netadrtype_t family;
 	netadr_t	addr;
+	char	buffer[ sizeof( cls.servername ) ];  // same length as cls.servername
 	char	args[ sizeof( cls.servername ) + MAX_CVAR_VALUE_STRING ];
-	char		server[MAX_OSPATH];
+	const char	*server;
 	const char	*serverString;
 	int		len;
 	int		argc;
@@ -1610,7 +1611,7 @@ static void CL_Connect_f( void ) {
 	}
 
 	if ( argc == 2 ) {
-		Q_strncpyz( server, Cmd_Argv(1), sizeof( server ) );
+		server = Cmd_Argv(1);
 	} else {
 		if( !strcmp( Cmd_Argv(1), "-4" ) )
 			family = NA_IP;
@@ -1622,17 +1623,34 @@ static void CL_Connect_f( void ) {
 #else
 			Com_Printf( S_COLOR_YELLOW "warning: only -4 as address type understood.\n" );
 #endif
-		Q_strncpyz( server, Cmd_Argv(2), sizeof( server ) );
+		server = Cmd_Argv(2);
 	}
 
-	len = strlen( server );
+	Q_strncpyz( buffer, server, sizeof( buffer ) );
+
+	len = strlen( buffer );
 	if ( len <= 0 ) {
 		return;
 	}
 
-	// try resolve remote server first
-	if ( !NET_StringToAdr( server, &addr, family ) ) {
-		Com_Printf( S_COLOR_YELLOW "Bad server address - %s\n", server );
+	// some programs may add ending slash
+	if ( buffer[len - 1] == '/' ) {
+		buffer[len - 1] = '\0';
+	}
+
+	server = buffer;
+
+	// skip leading "q3a:/" in connection string
+	if ( !Q_stricmpn( server, "q3a:/", 5 ) ) {
+		server += 5;
+	}
+
+	// skip all slash prefixes
+	while ( *server == '/' ) {
+		server++;
+	}
+
+	if ( *server == '\0' ) {
 		return;
 	}
 
@@ -1650,7 +1668,8 @@ static void CL_Connect_f( void ) {
 			clc.proxinuse = qtrue;
 		}
 		Cbuf_AddText( va( "setu prx %s\n", cls.fwd_to ) );
-		Q_strncpyz( server, fwd_addr->string, sizeof( server ) );
+		Q_strncpyz( buffer, fwd_addr->string, sizeof( buffer ) );
+		server = buffer;
 	}
 
 	Cvar_Set( "ui_singlePlayerActive", "0" );
@@ -1673,11 +1692,14 @@ static void CL_Connect_f( void ) {
 
 	Q_strncpyz( cls.servername, server, sizeof( cls.servername ) );
 
-	if ( !NET_StringToAdr( cls.servername, &clc.serverAddress, family ) ) {
-		Com_Printf( "Bad server address\n" );
-		cls.state = CA_DISCONNECTED;
+	// try resolve remote server first
+	if ( !NET_StringToAdr( server, &addr, family ) ) {
+		Com_Printf( S_COLOR_YELLOW "Bad server address - %s\n", server );
 		return;
 	}
+
+	// copy resolved address
+	clc.serverAddress = addr;
 
 	if (clc.serverAddress.port == 0) {
 		clc.serverAddress.port = BigShort( PORT_SERVER );
@@ -1705,7 +1727,7 @@ static void CL_Connect_f( void ) {
 	}
 
 	Key_SetCatcher( 0 );
-	clc.connectTime = -99999;	// CL_CheckForResend() will fire immediately
+	clc.connectTime = cls.realtime - RECONNECT_TIMEOUT; // CL_CheckForResend() will fire immediately
 	clc.connectPacketCount = 0;
 
 	Cvar_Set( "cl_reconnectArgs", args );
@@ -2331,7 +2353,7 @@ static void CL_CheckForResend( void ) {
 		return;
 	}
 
-	if ( cls.realtime - clc.connectTime < RETRANSMIT_TIMEOUT ) {
+	if ( cls.realtime - clc.connectTime < RECONNECT_TIMEOUT ) {
 		return;
 	}
 
@@ -2743,7 +2765,7 @@ static qboolean CL_ConnectionlessPacket( const netadr_t *from, msg_t *msg ) {
 		clc.challenge = atoi(Cmd_Argv(1));
 		cls.state = CA_CHALLENGING;
 		clc.connectPacketCount = 0;
-		clc.connectTime = -99999;
+		clc.connectTime = cls.realtime - RECONNECT_TIMEOUT;
 
 		// take this address as the new server address.  This allows
 		// a server proxy to hand off connections to multiple servers
@@ -2804,7 +2826,7 @@ static qboolean CL_ConnectionlessPacket( const netadr_t *from, msg_t *msg ) {
 		Netchan_Setup( NS_CLIENT, &clc.netchan, from, Cvar_VariableIntegerValue( "net_qport" ), clc.challenge, clc.compat );
 
 		cls.state = CA_CONNECTED;
-		clc.lastPacketSentTime = cls.realtime - 9999; // send first packet immediately
+		clc.lastPacketSentTime = cls.realtime - RETRANSMIT_TIMEOUT; // send first packet immediately
 		return qtrue;
 	}
 
