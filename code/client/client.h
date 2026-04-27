@@ -241,7 +241,7 @@ typedef struct {
 	char	videoName[MAX_QPATH];
 	int		videoIndex;
 
-	// fx3 forward system
+	// for the fx3 forward system
 	qboolean proxinuse;
 	qboolean fwdreconnect;
 	qboolean fwddownload;
@@ -358,7 +358,7 @@ typedef struct {
 	float		biasX;
 	float		biasY;
 
-        char		fwd_to[MAX_OSPATH];
+    char		fwd_to[MAX_OSPATH];
 
 } clientStatic_t;
 

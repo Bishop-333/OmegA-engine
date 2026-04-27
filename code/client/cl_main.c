@@ -1664,9 +1664,11 @@ static void CL_Connect_f( void ) {
 		} else {
 			Cvar_VariableStringBuffer( "cl_forwardedTo", cls.fwd_to, sizeof( cls.fwd_to ) );
 			Cvar_VariableStringBuffer( "cl_currentServerAddress", clc.fwd, sizeof( clc.fwd ) );
+
 			clc.fwddownload  = qfalse;
 			clc.proxinuse = qtrue;
 		}
+
 		Cbuf_AddText( va( "setu prx %s\n", cls.fwd_to ) );
 		Q_strncpyz( buffer, fwd_addr->string, sizeof( buffer ) );
 		server = buffer;
@@ -2256,6 +2258,7 @@ void CL_NextDownload( void )
 		return;
 	}
 
+	// might need to check this for the forwarder
 	clc.fwdreconnect = qfalse;
 
 	CL_DownloadsComplete();
@@ -2871,13 +2874,16 @@ static qboolean CL_ConnectionlessPacket( const netadr_t *from, msg_t *msg ) {
 			Q_strncpyz( clc.serverMessage, s, sizeof( clc.serverMessage ) );
 			Com_Printf( "%s", s );
 		}
-		if( fwd_use->integer && clc.fwdreconnect == qfalse ) {
+
+		// this is the place to catch "/reconnect ASAP!" from the server
+		if ( fwd_use->integer && clc.fwdreconnect == qfalse ) {
 			if ( !Q_stricmp( s, "/reconnect ASAP!" ) ) {
 				clc.fwdreconnect = qtrue;
 				Com_Printf( "forwarder requested a reconnect\n" );
 				Cbuf_AddText( "reconnect\n" );
 			}
 		}
+
 		return fromserver;
 	}
 
