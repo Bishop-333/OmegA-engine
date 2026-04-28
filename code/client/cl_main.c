@@ -2899,6 +2899,10 @@ static qboolean CL_ConnectionlessPacket( const netadr_t *from, msg_t *msg ) {
 		return qfalse;
 	}
 
+	if ( !Q_stricmp(c, "getinfo") ) {
+		return qfalse;
+	}
+
 	Com_DPrintf( "Unknown connectionless packet command.\n" );
 	return qfalse;
 }
