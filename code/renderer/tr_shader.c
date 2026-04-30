@@ -3740,9 +3740,8 @@ static void ScanAndLoadShaderFiles( void )
 
 	textEnd = s_shaderText;
 
-	// free in reverse order, so the temp files are all dumped
 	// legacy shaders
-	for ( i = numShaderFiles - 1; i >= 0 ; i-- ) {
+	for ( i = 0; i < numShaderFiles; i++ ) {
 		if ( buffers[ i ] ) {
 			textEnd = Q_stradd( textEnd, buffers[ i ] );
 			textEnd = Q_stradd( textEnd, "\n" );
