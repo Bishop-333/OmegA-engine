@@ -36,7 +36,7 @@ struct aas_entityinfo_s;
 struct aas_areainfo_s;
 struct aas_altroutegoal_s;
 struct aas_predictroute_s;
-struct bot_consolemessage_s;
+struct bot_consolemessage_qvm_s;
 struct bot_match_s;
 struct bot_goal_s;
 struct bot_moveresult_s;
@@ -318,7 +318,7 @@ typedef struct ai_export_s
 	void	(*BotFreeChatState)(int handle);
 	void	(*BotQueueConsoleMessage)(int chatstate, int type, const char *message);
 	void	(*BotRemoveConsoleMessage)(int chatstate, int handle);
-	int		(*BotNextConsoleMessage)(int chatstate, struct bot_consolemessage_s *cm);
+	int		(*BotNextConsoleMessage)(int chatstate, struct bot_consolemessage_qvm_s *cm);
 	int		(*BotNumConsoleMessages)(int chatstate);
 	void	(*BotInitialChat)(int chatstate, const char *type, int mcontext, const char *var0, const char *var1, const char *var2, const char *var3, const char *var4, const char *var5, const char *var6, const char *var7);
 	int		(*BotNumInitialChats)(int chatstate, const char *type);

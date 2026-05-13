@@ -1051,6 +1051,9 @@ static void SV_SendClientGameState( client_t *client ) {
 	Com_Memset( &client->lastUsercmd, 0x0, sizeof( client->lastUsercmd ) );
 	client->lastUsercmd.serverTime = sv.time - 1;
 
+	// don't delta from messages prior to this gamestate
+	client->deltaStart = client->netchan.outgoingSequence;
+
 	MSG_Init( &msg, msgBuffer, MAX_MSGLEN );
 
 	// NOTE, MRE: all server->client messages now acknowledge
@@ -1184,7 +1187,7 @@ void SV_ClientEnterWorld( client_t *client ) {
 	ent->s.number = clientNum;
 	client->gentity = ent;
 
-	client->deltaMessage = client->netchan.outgoingSequence - (PACKET_BACKUP + 1); // force delta reset
+	client->deltaActive = qfalse;				// force delta reset
 	client->lastSnapshotTime = svs.time - 9999; // generate a snapshot immediately
 
 	// call the game begin function
@@ -1259,6 +1262,9 @@ static void SV_DoneDownload_f( client_t *cl ) {
 
 	// resend the game state to update any clients that entered during the download
 	SV_SendClientGameState( cl );
+
+	// apply rate to avoid retranmission after late gamestate acknowledge check
+	SVC_RateLimit( &cl->gamestate_rate, 1, 1000 );
 }
 
 
@@ -2162,11 +2168,7 @@ static void SV_UserMove( client_t *cl, msg_t *msg, qboolean delta ) {
 	usercmd_t	cmds[MAX_PACKET_USERCMDS], *cmd;
 	const usercmd_t *oldcmd;
 
-	if ( delta ) {
-		cl->deltaMessage = cl->messageAcknowledge;
-	} else {
-		cl->deltaMessage = cl->netchan.outgoingSequence - ( PACKET_BACKUP + 1 ); // force delta reset
-	}
+	cl->deltaActive = delta;
 
 	cmdCount = MSG_ReadByte( msg );
 
@@ -2204,7 +2206,7 @@ static void SV_UserMove( client_t *cl, msg_t *msg, qboolean delta ) {
 	if ( cl->state == CS_PRIMED ) {
 		if ( sv.pure != 0 && !cl->gotCP ) {
 			// we didn't get a cp yet, don't assume anything and just send the gamestate all over again
-			if ( !SVC_RateLimit( &cl->gamestate_rate, 2, 1000 ) ) {
+			if ( !SVC_RateLimit( &cl->gamestate_rate, 1, 1000 ) ) {
 				Com_DPrintf( "%s: didn't get cp command, resending gamestate\n", cl->name );
 				SV_SendClientGameState( cl );
 			}
@@ -2221,7 +2223,7 @@ static void SV_UserMove( client_t *cl, msg_t *msg, qboolean delta ) {
 	}
 
 	if ( cl->state != CS_ACTIVE ) {
-		cl->deltaMessage = cl->netchan.outgoingSequence - ( PACKET_BACKUP + 1 ); // force delta reset
+		// cl->deltaActive = qfalse; // force delta reset
 		return;
 	}
 

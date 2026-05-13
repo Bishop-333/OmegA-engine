@@ -643,6 +643,12 @@ static void VM_FreeBuffers( void )
 #define PPC_MODSW(rt, ra, rb)		PPC_X(31, rt, ra, rb, 779, 0)
 // moduw rt, ra, rb  (unsigned word modulo)
 #define PPC_MODUW(rt, ra, rb)		PPC_X(31, rt, ra, rb, 267, 0)
+
+// mtvsrws vsr, ra  (move to VSR word and splat: writes ra into all four word
+// elements of the destination VSR). Combined with xscvspdp this gives a
+// memory-free path from a GPR holding a 32-bit IEEE-754 single bit pattern to
+// an FPR holding the equivalent double-precision value.
+#define PPC_MTVSRWS(frt, ra)		PPC_X(31, frt, ra, 0, 403, 0)
 #endif
 
 // -- ISA 2.07 (POWER8) direct-move and VSX conversion --
@@ -854,12 +860,22 @@ static void mov_rx_sx( uint32_t gpreg, uint32_t fpreg )
 
 static void mov_sx_rx( uint32_t fpreg, uint32_t gpreg )
 {
-//#if USE_ISA_2_07
-//	emit( PPC_MTVSRWZ( fpreg, gpreg ) ); // this didn't work properly
-//#else
+#if USE_ISA_3_0
+	// POWER9+: GPR -> FPR (single-precision bit pattern -> double in FPR)
+	// without a memory round-trip.
+	//
+	// The earlier attempt with mtvsrwz alone left the bits in word element 1
+	// of the VSR (low half of the high doubleword), but xscvspdp reads word
+	// element 0. mtvsrws splats the GPR into all four word elements, so the
+	// single-precision bit pattern is also in word element 0 where xscvspdp
+	// expects it. xscvspdp then converts that single to a double in the FPR,
+	// matching the result of stw + lfs exactly.
+	emit( PPC_MTVSRWS( fpreg, gpreg ) );  // VSR[fpreg].word[0..3] = gpreg
+	emit( PPC_XSCVSPDP( fpreg, fpreg ) ); // fpreg = (double)bitcast<float>(word0)
+#else
 	emit( PPC_STW( gpreg, 0, rPROCBASE ) ); // procBase[0] = gpreg
 	emit( PPC_LFS( fpreg, 0, rPROCBASE ) ); // fpreg = procBase[0]
-//#endif
+#endif
 }
 
 

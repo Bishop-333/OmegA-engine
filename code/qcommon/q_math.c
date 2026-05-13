@@ -565,6 +565,14 @@ float Q_rsqrt( float number )
 #elif defined(_GCC_SSE2)
 	/* writing it this way allows gcc to recognize that rsqrt can be used with -ffast-math */
 	return 1.0f / sqrtf( number );
+#elif defined(_GCC_VSX)
+	/* VSX scalar reciprocal sqrt estimate (POWER7+, ~14-bit precision)
+	 * + one Newton-Raphson iteration → matches SSE rsqrtss + NR accuracy.
+	 * Scalar form avoids the splat/extract overhead of the vector path. */
+	float y;
+	__asm__( "xsrsqrtesp %x0,%x1" : "=wa"(y) : "wa"(number) );
+	y = y * ( 1.5f - 0.5f * number * y * y );
+	return y;
 #else
 	floatint_t t;
 	float x2, y;
