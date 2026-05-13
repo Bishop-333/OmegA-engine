@@ -34,27 +34,31 @@ permissions: {}
 env:
   MAKEFLAGS: -j 5
   CURL_CI: github
-  CURL_TEST_MIN: 1600
-  # handled in renovate.json
-  OPENSSL_VERSION: 3.6.1
+  CURL_TEST_MIN: 1850
+  DO_NOT_TRACK: '1'
+  # renovate: datasource=github-releases depName=openssl/openssl versioning=semver extractVersion=^openssl-(?<version>.+)$ registryUrl=https://github.com
+  OPENSSL_VERSION: 4.0.0
+  # manually bumped
+  OPENSSL_PREV_VERSION: 3.6.2
+  OPENSSL_PREV_SHA256: aaf51a1fe064384f811daeaeb4ec4dce7340ec8bd893027eee676af31e83a04f
   # renovate: datasource=github-tags depName=libressl/portable versioning=semver registryUrl=https://github.com
-  LIBRESSL_VERSION: 4.2.1
+  LIBRESSL_VERSION: 4.3.1
   # renovate: datasource=github-tags depName=awslabs/aws-lc versioning=semver registryUrl=https://github.com
-  AWSLC_VERSION: 1.69.0
+  AWSLC_VERSION: 1.71.0
   # renovate: datasource=github-tags depName=google/boringssl versioning=semver registryUrl=https://github.com
-  BORINGSSL_VERSION: 0.20260211.0
+  BORINGSSL_VERSION: 0.20260413.0
   # renovate: datasource=github-tags depName=gnutls/nettle versioning=semver registryUrl=https://github.com
   NETTLE_VERSION: 3.10.2
   # renovate: datasource=github-tags depName=gnutls/gnutls versioning=semver extractVersion=^nettle_?(?<version>.+)_release_.+$ registryUrl=https://github.com
   GNUTLS_VERSION: 3.8.11
   # renovate: datasource=github-tags depName=wolfSSL/wolfssl versioning=semver extractVersion=^v?(?<version>.+)-stable$ registryUrl=https://github.com
-  WOLFSSL_VERSION: 5.8.4
+  WOLFSSL_VERSION: 5.9.1
   # renovate: datasource=github-tags depName=ngtcp2/nghttp3 versioning=semver registryUrl=https://github.com
   NGHTTP3_VERSION: 1.15.0
   # renovate: datasource=github-tags depName=ngtcp2/ngtcp2 versioning=semver registryUrl=https://github.com
-  NGTCP2_VERSION: 1.21.0
+  NGTCP2_VERSION: 1.22.1
   # renovate: datasource=github-tags depName=nghttp2/nghttp2 versioning=semver registryUrl=https://github.com
-  NGHTTP2_VERSION: 1.68.0
+  NGHTTP2_VERSION: 1.69.0
   # renovate: datasource=github-tags depName=cloudflare/quiche versioning=semver registryUrl=https://github.com
   QUICHE_VERSION: 0.24.7
 
@@ -65,7 +69,7 @@ jobs:
 
     steps:
       - name: 'cache openssl'
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         id: cache-openssl-http3-no-deprecated
         env:
           cache-name: cache-openssl-http3-no-deprecated
@@ -73,8 +77,17 @@ jobs:
           path: ~/openssl/build
           key: ${{ runner.os }}-http3-build-${{ env.cache-name }}-${{ env.OPENSSL_VERSION }}
 
+      - name: 'cache openssl-prev'
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        id: cache-openssl-prev-http3-no-deprecated
+        env:
+          cache-name: cache-openssl-prev-http3-no-deprecated
+        with:
+          path: ~/openssl-prev/build
+          key: ${{ runner.os }}-http3-build-${{ env.cache-name }}-${{ env.OPENSSL_PREV_VERSION }}
+
       - name: 'cache libressl'
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         id: cache-libressl
         env:
           cache-name: cache-libressl
@@ -83,7 +96,7 @@ jobs:
           key: ${{ runner.os }}-http3-build-${{ env.cache-name }}-${{ env.LIBRESSL_VERSION }}
 
       - name: 'cache awslc'
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         id: cache-awslc
         env:
           cache-name: cache-awslc
@@ -92,7 +105,7 @@ jobs:
           key: ${{ runner.os }}-http3-build-${{ env.cache-name }}-${{ env.AWSLC_VERSION }}
 
       - name: 'cache boringssl'
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         id: cache-boringssl
         env:
           cache-name: cache-boringssl
@@ -101,7 +114,7 @@ jobs:
           key: ${{ runner.os }}-http3-build-${{ env.cache-name }}-${{ env.BORINGSSL_VERSION }}
 
       - name: 'cache nettle'
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         id: cache-nettle
         env:
           cache-name: cache-nettle
@@ -110,7 +123,7 @@ jobs:
           key: ${{ runner.os }}-http3-build-${{ env.cache-name }}-${{ env.NETTLE_VERSION }}
 
       - name: 'cache gnutls'
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         id: cache-gnutls
         env:
           cache-name: cache-gnutls
@@ -119,7 +132,7 @@ jobs:
           key: ${{ runner.os }}-http3-build-${{ env.cache-name }}-${{ env.GNUTLS_VERSION }}-${{ env.NETTLE_VERSION }}
 
       - name: 'cache wolfssl'
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         id: cache-wolfssl
         env:
           cache-name: cache-wolfssl
@@ -128,7 +141,7 @@ jobs:
           key: ${{ runner.os }}-http3-build-${{ env.cache-name }}-${{ env.WOLFSSL_VERSION }}
 
       - name: 'cache nghttp3'
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         id: cache-nghttp3
         env:
           cache-name: cache-nghttp3
@@ -137,16 +150,26 @@ jobs:
           key: ${{ runner.os }}-http3-build-${{ env.cache-name }}-${{ env.NGHTTP3_VERSION }}
 
       - name: 'cache ngtcp2'
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         id: cache-ngtcp2
         env:
           cache-name: cache-ngtcp2
         with:
           path: ~/ngtcp2/build
-          key: ${{ runner.os }}-http3-build-${{ env.cache-name }}-${{ env.NGTCP2_VERSION }}-${{ env.OPENSSL_VERSION }}-${{ env.LIBRESSL_VERSION }}-${{ env.AWSLC_VERSION }}-${{ env.NETTLE_VERSION }}-${{ env.GNUTLS_VERSION }}-${{ env.WOLFSSL_VERSION }}
+          key: "${{ runner.os }}-http3-build-${{ env.cache-name }}-${{ env.NGTCP2_VERSION }}-${{ env.OPENSSL_VERSION }}-\
+            ${{ env.LIBRESSL_VERSION }}-${{ env.AWSLC_VERSION }}-${{ env.NETTLE_VERSION }}-${{ env.GNUTLS_VERSION }}-${{ env.WOLFSSL_VERSION }}"
+
+      - name: 'cache ngtcp2 openssl-prev'
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        id: cache-ngtcp2-openssl-prev
+        env:
+          cache-name: cache-ngtcp2-openssl-prev
+        with:
+          path: ~/ngtcp2-openssl-prev/build
+          key: ${{ runner.os }}-http3-build-${{ env.cache-name }}-${{ env.NGTCP2_VERSION }}-${{ env.OPENSSL_PREV_VERSION }}
 
       - name: 'cache ngtcp2 boringssl'
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         id: cache-ngtcp2-boringssl
         env:
           cache-name: cache-ngtcp2-boringssl
@@ -155,17 +178,19 @@ jobs:
           key: ${{ runner.os }}-http3-build-${{ env.cache-name }}-${{ env.NGTCP2_VERSION }}-${{ env.BORINGSSL_VERSION }}
 
       - name: 'cache nghttp2'
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         id: cache-nghttp2
         env:
           cache-name: cache-nghttp2
         with:
           path: ~/nghttp2/build
-          key: ${{ runner.os }}-http3-build-${{ env.cache-name }}-${{ env.NGHTTP2_VERSION }}-${{ env.OPENSSL_VERSION }}-${{ env.NGTCP2_VERSION }}-${{ env.NGHTTP3_VERSION }}
+          key: "${{ runner.os }}-http3-build-${{ env.cache-name }}-${{ env.NGHTTP2_VERSION }}-${{ env.OPENSSL_VERSION }}-\
+            ${{ env.NGTCP2_VERSION }}-${{ env.NGHTTP3_VERSION }}"
 
       - id: settings
         if: >-
           ${{ steps.cache-openssl-http3-no-deprecated.outputs.cache-hit != 'true' ||
+              steps.cache-openssl-prev-http3-no-deprecated.outputs.cache-hit != 'true' ||
               steps.cache-libressl.outputs.cache-hit != 'true' ||
               steps.cache-awslc.outputs.cache-hit != 'true' ||
               steps.cache-boringssl.outputs.cache-hit != 'true' ||
@@ -174,6 +199,7 @@ jobs:
               steps.cache-wolfssl.outputs.cache-hit != 'true' ||
               steps.cache-nghttp3.outputs.cache-hit != 'true' ||
               steps.cache-ngtcp2.outputs.cache-hit != 'true' ||
+              steps.cache-ngtcp2-openssl-prev.outputs.cache-hit != 'true' ||
               steps.cache-ngtcp2-boringssl.outputs.cache-hit != 'true' ||
               steps.cache-nghttp2.outputs.cache-hit != 'true' }}
 
@@ -181,8 +207,10 @@ jobs:
 
       - name: 'install build prereqs'
         if: ${{ steps.settings.outputs.needs-build == 'true' }}
+        timeout-minutes: 2
         run: |
-          sudo rm -f /etc/apt/sources.list.d/{azure-cli.sources,microsoft-prod.list,ondrej-ubuntu-php-noble.sources}
+          sudo find /etc/apt/sources.list.d -type f -not -name 'ubuntu.sources' -delete -print
+          sudo sed -i 's/priority:1/priority:9/' /etc/apt/apt-mirrors.txt; cat /etc/apt/apt-mirrors.txt
           sudo apt-get -o Dpkg::Use-Pty=0 update
           sudo apt-get -o Dpkg::Use-Pty=0 install \
             libtool autoconf automake pkgconf \
@@ -197,9 +225,21 @@ jobs:
         if: ${{ steps.cache-openssl-http3-no-deprecated.outputs.cache-hit != 'true' }}
         run: |
           cd ~
-          git clone --quiet --depth 1 -b "openssl-${OPENSSL_VERSION}" https://github.com/openssl/openssl
+          git clone --quiet --depth 1 --branch "openssl-${OPENSSL_VERSION}" https://github.com/openssl/openssl
           cd openssl
           ./config --prefix="$PWD"/build --libdir=lib no-makedepend no-apps no-docs no-tests no-deprecated
+          make
+          make -j1 install_sw
+
+      - name: 'build openssl-prev'
+        if: ${{ steps.cache-openssl-prev-http3-no-deprecated.outputs.cache-hit != 'true' }}
+        run: |
+          cd ~
+          curl --disable --fail --silent --show-error --connect-timeout 15 --max-time 120 --retry 6 --retry-connrefused \
+            --location "https://github.com/openssl/openssl/releases/download/openssl-${OPENSSL_PREV_VERSION}/openssl-${OPENSSL_PREV_VERSION}.tar.gz" --output pkg.bin
+          sha256sum pkg.bin | tee /dev/stderr | grep -qwF -- "${OPENSSL_PREV_SHA256}" && tar -xzf pkg.bin && rm -f pkg.bin
+          cd "openssl-${OPENSSL_PREV_VERSION}"
+          ./config --prefix=/home/runner/openssl-prev/build --libdir=lib no-makedepend no-apps no-docs no-tests no-deprecated
           make
           make -j1 install_sw
 
@@ -247,8 +287,9 @@ jobs:
             --location "https://ftpmirror.gnu.org/nettle/nettle-${NETTLE_VERSION}.tar.gz" --output pkg.bin
           sha256sum pkg.bin && tar -xzf pkg.bin && rm -f pkg.bin
           cd "nettle-${NETTLE_VERSION}"
+          autoreconf -fi
           ./configure --disable-dependency-tracking --prefix=/home/runner/nettle/build \
-            --disable-silent-rules --disable-static --disable-openssl --disable-documentation
+            --disable-static --disable-openssl --disable-documentation
           make install
 
       - name: 'build gnutls'
@@ -259,6 +300,7 @@ jobs:
             "https://www.gnupg.org/ftp/gcrypt/gnutls/v${GNUTLS_VERSION%.*}/gnutls-${GNUTLS_VERSION}.tar.xz" --output pkg.bin
           sha256sum pkg.bin && tar -xJf pkg.bin && rm -f pkg.bin
           cd "gnutls-${GNUTLS_VERSION}"
+          autoreconf -fi
           # required: libp11-kit-dev libev-dev autopoint bison gperf gtk-doc-tools libtasn1-bin
           ./configure --disable-dependency-tracking --prefix=/home/runner/gnutls/build \
             PKG_CONFIG_PATH=/home/runner/nettle/build/lib64/pkgconfig \
@@ -271,7 +313,7 @@ jobs:
         if: ${{ steps.cache-wolfssl.outputs.cache-hit != 'true' }}
         run: |
           cd ~
-          git clone --quiet --depth 1 -b "v${WOLFSSL_VERSION}-stable" https://github.com/wolfSSL/wolfssl
+          git clone --quiet --depth 1 --branch "v${WOLFSSL_VERSION}-stable" https://github.com/wolfSSL/wolfssl
           cd wolfssl
           ./autogen.sh
           ./configure --disable-dependency-tracking --prefix="$PWD"/build --enable-all --enable-quic \
@@ -283,7 +325,7 @@ jobs:
         if: ${{ steps.cache-nghttp3.outputs.cache-hit != 'true' }}
         run: |
           cd ~
-          git clone --quiet --depth 1 -b "v${NGHTTP3_VERSION}" https://github.com/ngtcp2/nghttp3
+          git clone --quiet --depth 1 --branch "v${NGHTTP3_VERSION}" https://github.com/ngtcp2/nghttp3
           cd nghttp3
           git submodule update --init --depth 1
           autoreconf -fi
@@ -296,7 +338,7 @@ jobs:
         # building twice to get crypto libs for ossl, libressl and awslc installed
         run: |
           cd ~
-          git clone --quiet --depth 1 -b "v${NGTCP2_VERSION}" https://github.com/ngtcp2/ngtcp2
+          git clone --quiet --depth 1 --branch "v${NGTCP2_VERSION}" https://github.com/ngtcp2/ngtcp2
           cd ngtcp2
           autoreconf -fi
           ./configure --disable-dependency-tracking --prefix="$PWD"/build --enable-lib-only \
@@ -304,18 +346,33 @@ jobs:
             --with-openssl
           make install
           make clean
+          export PKG_CONFIG_PATH=/home/runner/openssl/build/lib/pkgconfig
+          PKG_CONFIG_PATH+=:/home/runner/nettle/build/lib64/pkgconfig
+          PKG_CONFIG_PATH+=:/home/runner/gnutls/build/lib/pkgconfig
+          PKG_CONFIG_PATH+=:/home/runner/wolfssl/build/lib/pkgconfig
           ./configure --disable-dependency-tracking --prefix="$PWD"/build --enable-lib-only \
-            PKG_CONFIG_PATH=/home/runner/openssl/build/lib/pkgconfig:/home/runner/nettle/build/lib64/pkgconfig:/home/runner/gnutls/build/lib/pkgconfig:/home/runner/wolfssl/build/lib/pkgconfig \
             --with-openssl --with-gnutls --with-wolfssl --with-boringssl \
             BORINGSSL_LIBS='-L/home/runner/awslc/build/lib -lssl -lcrypto' \
             BORINGSSL_CFLAGS='-I/home/runner/awslc/build/include'
+          make install
+
+      - name: 'build ngtcp2 openssl-prev'
+        if: ${{ steps.cache-ngtcp2-openssl-prev.outputs.cache-hit != 'true' }}
+        run: |
+          cd ~
+          git clone --quiet --depth 1 --branch "v${NGTCP2_VERSION}" https://github.com/ngtcp2/ngtcp2 ngtcp2-openssl-prev
+          cd ngtcp2-openssl-prev
+          autoreconf -fi
+          ./configure --disable-dependency-tracking --prefix="$PWD"/build --enable-lib-only \
+            PKG_CONFIG_PATH=/home/runner/openssl-prev/build/lib/pkgconfig \
+            --with-openssl
           make install
 
       - name: 'build ngtcp2 boringssl'
         if: ${{ steps.cache-ngtcp2-boringssl.outputs.cache-hit != 'true' }}
         run: |
           cd ~
-          git clone --quiet --depth 1 -b "v${NGTCP2_VERSION}" https://github.com/ngtcp2/ngtcp2 ngtcp2-boringssl
+          git clone --quiet --depth 1 --branch "v${NGTCP2_VERSION}" https://github.com/ngtcp2/ngtcp2 ngtcp2-boringssl
           cd ngtcp2-boringssl
           autoreconf -fi
           ./configure --disable-dependency-tracking --prefix="$PWD"/build --enable-lib-only \
@@ -328,14 +385,16 @@ jobs:
         if: ${{ steps.cache-nghttp2.outputs.cache-hit != 'true' }}
         run: |
           cd ~
-          git clone --quiet --depth 1 -b "v${NGHTTP2_VERSION}" https://github.com/nghttp2/nghttp2
+          git clone --quiet --depth 1 --branch "v${NGHTTP2_VERSION}" https://github.com/nghttp2/nghttp2
           cd nghttp2
           git submodule update --init --depth 1
           autoreconf -fi
           # required (for nghttpx application): libc-ares-dev libev-dev zlib1g-dev
           # optional (for nghttpx application): libbrotli-dev
+          export PKG_CONFIG_PATH=/home/runner/openssl/build/lib/pkgconfig
+          PKG_CONFIG_PATH+=:/home/runner/nghttp3/build/lib/pkgconfig
+          PKG_CONFIG_PATH+=:/home/runner/ngtcp2/build/lib/pkgconfig
           ./configure --disable-dependency-tracking --prefix="$PWD"/build --enable-app --enable-http3 \
-            PKG_CONFIG_PATH=/home/runner/openssl/build/lib/pkgconfig:/home/runner/nghttp3/build/lib/pkgconfig:/home/runner/ngtcp2/build/lib/pkgconfig \
             LDFLAGS=-Wl,-rpath,/home/runner/openssl/build/lib \
             --with-libbrotlienc --with-libbrotlidec
           make install
@@ -346,6 +405,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
+      CURL_TRACE_PKG_CONFIG: '1'
       MATRIX_BUILD: ${{ matrix.build.generate && 'cmake' || 'autotools' }}
       MATRIX_INSTALL_PACKAGES: '${{ matrix.build.install_packages }}'
     strategy:
@@ -353,11 +413,11 @@ jobs:
       matrix:
         build:
           - name: 'openssl'
-            PKG_CONFIG_PATH: /home/runner/openssl/build/lib/pkgconfig:/home/runner/nghttp3/build/lib/pkgconfig:/home/runner/ngtcp2/build/lib/pkgconfig:/home/runner/nghttp2/build/lib/pkgconfig
-            tflags: '--min=1640'
+            tflags: '--min=1700'
+            LDFLAGS: -Wl,-rpath,/home/runner/openssl/build/lib
+            PKG_CONFIG_PATH: /home/runner/openssl/build/lib/pkgconfig:/home/runner/nghttp3/build/lib/pkgconfig:/home/runner/nghttp2/build/lib/pkgconfig
             configure: >-
-              LDFLAGS=-Wl,-rpath,/home/runner/openssl/build/lib
-              --with-openssl=/home/runner/openssl/build --with-ngtcp2 --enable-ssls-export
+              --with-openssl=/home/runner/openssl/build --with-ngtcp2=/home/runner/ngtcp2/build --enable-ech --enable-ssls-export
 
           - name: 'openssl'
             install_steps: skipall
@@ -365,46 +425,71 @@ jobs:
             generate: >-
               -DOPENSSL_ROOT_DIR=/home/runner/openssl/build -DUSE_NGTCP2=ON
               -DCURL_DISABLE_LDAP=ON
+              -DUSE_ECH=ON
               -DCMAKE_UNITY_BUILD=ON
+
+          - name: 'openssl-prev'
+            install_steps: skipall
+            LDFLAGS: -Wl,-rpath,/home/runner/openssl-prev/build/lib
+            PKG_CONFIG_PATH: "\
+              /home/runner/openssl-prev/build/lib/pkgconfig:\
+              /home/runner/nghttp3/build/lib/pkgconfig:\
+              /home/runner/nghttp2-openssl-prev/build/lib/pkgconfig"
+            configure: >-
+              --with-openssl=/home/runner/openssl-prev/build --with-ngtcp2=/home/runner/ngtcp2-openssl-prev/build --enable-ssls-export
+
+          - name: 'openssl-prev'
+            tflags: '--min=1700'
+            PKG_CONFIG_PATH: "\
+              /home/runner/openssl-prev/build/lib/pkgconfig:\
+              /home/runner/nghttp3/build/lib/pkgconfig:\
+              /home/runner/ngtcp2-openssl-prev/build/lib/pkgconfig:\
+              /home/runner/nghttp2/build/lib/pkgconfig"
+            generate: >-
+              -DOPENSSL_ROOT_DIR=/home/runner/openssl-prev/build -DUSE_NGTCP2=ON
+              -DCURL_DISABLE_LDAP=ON
 
           - name: 'libressl'
             install_steps: skipall
-            PKG_CONFIG_PATH: /home/runner/libressl/build/lib/pkgconfig:/home/runner/nghttp3/build/lib/pkgconfig:/home/runner/ngtcp2/build/lib/pkgconfig:/home/runner/nghttp2/build/lib/pkgconfig
+            LDFLAGS: -Wl,-rpath,/home/runner/libressl/build/lib
+            PKG_CONFIG_PATH: /home/runner/libressl/build/lib/pkgconfig:/home/runner/nghttp3/build/lib/pkgconfig:/home/runner/nghttp2/build/lib/pkgconfig
+            # Intentionally using '--with-ngtcp2=<path>' to test this way of configuration, in addition to bare '--with-ngtcp2' + 'PKG_CONFIG_PATH' in other jobs.
             configure: >-
-              LDFLAGS=-Wl,-rpath,/home/runner/libressl/build/lib
-              --with-openssl=/home/runner/libressl/build --with-ngtcp2 --enable-ssls-export
+              --with-openssl=/home/runner/libressl/build --with-ngtcp2=/home/runner/ngtcp2/build --enable-ssls-export
               --enable-unity
 
           - name: 'libressl'
             PKG_CONFIG_PATH: /home/runner/libressl/build/lib/pkgconfig:/home/runner/nghttp3/build/lib/pkgconfig:/home/runner/ngtcp2/build/lib/pkgconfig:/home/runner/nghttp2/build/lib/pkgconfig
-            tflags: '--min=1790'
             generate: >-
               -DOPENSSL_ROOT_DIR=/home/runner/libressl/build -DUSE_NGTCP2=ON
 
           - name: 'awslc'
             install_steps: skipall
+            LDFLAGS: -Wl,-rpath,/home/runner/awslc/build/lib
             PKG_CONFIG_PATH: /home/runner/awslc/build/lib/pkgconfig:/home/runner/nghttp3/build/lib/pkgconfig:/home/runner/ngtcp2/build/lib/pkgconfig:/home/runner/nghttp2/build/lib/pkgconfig
+            # Intentionally using bare '--with-ngtcp2' + 'PKG_CONFIG_PATH' to test this way of configuration, in addition to '--with-ngtcp2=<path>' in other jobs.
             configure: >-
-              LDFLAGS=-Wl,-rpath,/home/runner/awslc/build/lib
               --with-openssl=/home/runner/awslc/build --with-ngtcp2 --enable-ssls-export
 
           - name: 'awslc'
             PKG_CONFIG_PATH: /home/runner/awslc/build/lib/pkgconfig:/home/runner/nghttp3/build/lib/pkgconfig:/home/runner/ngtcp2/build/lib/pkgconfig:/home/runner/nghttp2/build/lib/pkgconfig
-            tflags: '--min=1790'
             generate: >-
               -DOPENSSL_ROOT_DIR=/home/runner/awslc/build -DUSE_NGTCP2=ON -DBUILD_SHARED_LIBS=OFF
               -DCMAKE_UNITY_BUILD=ON -DCURL_DROP_UNUSED=ON
 
           - name: 'boringssl'
             install_steps: skipall
-            PKG_CONFIG_PATH: /home/runner/boringssl/build/lib/pkgconfig:/home/runner/nghttp3/build/lib/pkgconfig:/home/runner/ngtcp2-boringssl/build/lib/pkgconfig:/home/runner/nghttp2/build/lib/pkgconfig
+            LDFLAGS: -Wl,-rpath,/home/runner/boringssl/build/lib
+            PKG_CONFIG_PATH: /home/runner/boringssl/build/lib/pkgconfig:/home/runner/nghttp3/build/lib/pkgconfig:/home/runner/nghttp2/build/lib/pkgconfig
             configure: >-
-              LDFLAGS=-Wl,-rpath,/home/runner/boringssl/build/lib
-              --with-openssl=/home/runner/boringssl/build --with-ngtcp2 --enable-ssls-export
+              --with-openssl=/home/runner/boringssl/build --with-ngtcp2=/home/runner/ngtcp2-boringssl/build --enable-ssls-export
 
           - name: 'boringssl'
-            PKG_CONFIG_PATH: /home/runner/boringssl/build/lib/pkgconfig:/home/runner/nghttp3/build/lib/pkgconfig:/home/runner/ngtcp2-boringssl/build/lib/pkgconfig:/home/runner/nghttp2/build/lib/pkgconfig
-            tflags: '--min=1790'
+            PKG_CONFIG_PATH: "\
+              /home/runner/boringssl/build/lib/pkgconfig:\
+              /home/runner/nghttp3/build/lib/pkgconfig:\
+              /home/runner/ngtcp2-boringssl/build/lib/pkgconfig:\
+              /home/runner/nghttp2/build/lib/pkgconfig"
             generate: >-
               -DOPENSSL_ROOT_DIR=/home/runner/boringssl/build -DUSE_NGTCP2=ON -DBUILD_SHARED_LIBS=OFF
               -DCMAKE_UNITY_BUILD=ON
@@ -412,16 +497,20 @@ jobs:
           - name: 'gnutls'
             install_packages: libp11-kit-dev libssh-dev
             install_steps: skipall
-            PKG_CONFIG_PATH: /home/runner/nettle/build/lib64/pkgconfig:/home/runner/gnutls/build/lib/pkgconfig:/home/runner/nghttp3/build/lib/pkgconfig:/home/runner/ngtcp2/build/lib/pkgconfig:/home/runner/nghttp2/build/lib/pkgconfig
             LDFLAGS: -Wl,-rpath,/home/runner/gnutls/build/lib -Wl,-rpath,/home/runner/nettle/build/lib64 -Wl,-rpath,/home/runner/ngtcp2/build/lib
+            PKG_CONFIG_PATH: /home/runner/nettle/build/lib64/pkgconfig:/home/runner/gnutls/build/lib/pkgconfig:/home/runner/nghttp3/build/lib/pkgconfig:/home/runner/nghttp2/build/lib/pkgconfig
             configure: >-
-              --with-gnutls=/home/runner/gnutls/build --with-ngtcp2 --with-libssh --enable-ssls-export
+              --with-gnutls=/home/runner/gnutls/build --with-ngtcp2=/home/runner/ngtcp2/build --with-libssh --enable-ssls-export
 
           - name: 'gnutls'
             install_packages: libp11-kit-dev libssh-dev
-            PKG_CONFIG_PATH: /home/runner/nettle/build/lib64/pkgconfig:/home/runner/gnutls/build/lib/pkgconfig:/home/runner/nghttp3/build/lib/pkgconfig:/home/runner/ngtcp2/build/lib/pkgconfig:/home/runner/nghttp2/build/lib/pkgconfig
             LDFLAGS: -Wl,-rpath,/home/runner/gnutls/build/lib
-            tflags: '--min=1840'
+            PKG_CONFIG_PATH: "\
+              /home/runner/nettle/build/lib64/pkgconfig:\
+              /home/runner/gnutls/build/lib/pkgconfig:\
+              /home/runner/nghttp3/build/lib/pkgconfig:\
+              /home/runner/ngtcp2/build/lib/pkgconfig:\
+              /home/runner/nghttp2/build/lib/pkgconfig"
             generate: >-
               -DCURL_USE_GNUTLS=ON -DUSE_NGTCP2=ON -DCURL_USE_LIBSSH=ON
               -DCMAKE_UNITY_BUILD=ON
@@ -429,25 +518,25 @@ jobs:
           - name: 'wolfssl'
             install_packages: libssh2-1-dev
             install_steps: skipall
-            PKG_CONFIG_PATH: /home/runner/wolfssl/build/lib/pkgconfig:/home/runner/nghttp3/build/lib/pkgconfig:/home/runner/ngtcp2/build/lib/pkgconfig:/home/runner/nghttp2/build/lib/pkgconfig
+            LDFLAGS: -Wl,-rpath,/home/runner/wolfssl/build/lib
+            PKG_CONFIG_PATH: /home/runner/wolfssl/build/lib/pkgconfig:/home/runner/nghttp3/build/lib/pkgconfig:/home/runner/nghttp2/build/lib/pkgconfig
             configure: >-
-              LDFLAGS=-Wl,-rpath,/home/runner/wolfssl/build/lib
-              --with-wolfssl=/home/runner/wolfssl/build --with-ngtcp2 --enable-ech --with-libssh2 --enable-ssls-export
+              --with-wolfssl=/home/runner/wolfssl/build --with-ngtcp2=/home/runner/ngtcp2/build --enable-ech --with-libssh2 --enable-ssls-export
               --enable-unity
 
           - name: 'wolfssl'
             install_packages: libssh2-1-dev
+            tflags: '--min=1900'
             PKG_CONFIG_PATH: /home/runner/wolfssl/build/lib/pkgconfig:/home/runner/nghttp3/build/lib/pkgconfig:/home/runner/ngtcp2/build/lib/pkgconfig:/home/runner/nghttp2/build/lib/pkgconfig
-            tflags: '--min=1840'
             generate: >-
               -DCURL_USE_WOLFSSL=ON -DUSE_NGTCP2=ON
               -DUSE_ECH=ON
 
           - name: 'quiche'
             install_steps: skipall
+            LDFLAGS: -Wl,-rpath,/home/runner/quiche/target/release
             PKG_CONFIG_PATH: /home/runner/nghttp2/build/lib/pkgconfig
             configure: >-
-              LDFLAGS=-Wl,-rpath,/home/runner/quiche/target/release
               --with-openssl=/home/runner/quiche/quiche/deps/boringssl/src
               --with-quiche=/home/runner/quiche/target/release
               --with-ca-fallback
@@ -455,7 +544,6 @@ jobs:
 
           - name: 'quiche'
             PKG_CONFIG_PATH: /home/runner/nghttp2/build/lib/pkgconfig:/home/runner/quiche/target/release
-            tflags: '--min=1790'
             generate: >-
               -DOPENSSL_ROOT_DIR=/home/runner/quiche/quiche/deps/boringssl/src
               -DUSE_QUICHE=ON
@@ -463,13 +551,16 @@ jobs:
 
     steps:
       - name: 'install prereqs'
+        timeout-minutes: 2
         env:
           INSTALL_PACKAGES: >-
             ${{ !contains(matrix.build.install_steps, 'skipall') && !contains(matrix.build.install_steps, 'skiprun') && 'stunnel4 ' || '' }}
-            ${{ !contains(matrix.build.install_steps, 'skipall') && !contains(matrix.build.install_steps, 'skiprun') && 'apache2 apache2-dev libnghttp2-dev vsftpd dante-server libev-dev' || '' }}
+            ${{ !contains(matrix.build.install_steps, 'skipall') && !contains(matrix.build.install_steps, 'skiprun') &&
+              'apache2 apache2-dev libnghttp2-dev vsftpd dante-server libev-dev' || '' }}
 
         run: |
-          sudo rm -f /etc/apt/sources.list.d/{azure-cli.sources,microsoft-prod.list,ondrej-ubuntu-php-noble.sources}
+          sudo find /etc/apt/sources.list.d -type f -not -name 'ubuntu.sources' -delete -print
+          sudo sed -i 's/priority:1/priority:9/' /etc/apt/apt-mirrors.txt; cat /etc/apt/apt-mirrors.txt
           sudo apt-get -o Dpkg::Use-Pty=0 update
           sudo apt-get -o Dpkg::Use-Pty=0 install \
             libtool autoconf automake pkgconf \
@@ -480,7 +571,7 @@ jobs:
           echo 'CXX=g++-12' >> "$GITHUB_ENV"
 
       - name: 'cache openssl'
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         id: cache-openssl-http3-no-deprecated
         env:
           cache-name: cache-openssl-http3-no-deprecated
@@ -489,8 +580,20 @@ jobs:
           key: ${{ runner.os }}-http3-build-${{ env.cache-name }}-${{ env.OPENSSL_VERSION }}
           fail-on-cache-miss: true
 
+      - name: 'cache openssl-prev'
+        if: ${{ contains(matrix.build.name, 'openssl-prev') }}
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        id: cache-openssl-prev-http3-no-deprecated
+        env:
+          cache-name: cache-openssl-prev-http3-no-deprecated
+        with:
+          path: ~/openssl-prev/build
+          key: ${{ runner.os }}-http3-build-${{ env.cache-name }}-${{ env.OPENSSL_PREV_VERSION }}
+          fail-on-cache-miss: true
+
       - name: 'cache libressl'
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        if: ${{ contains(matrix.build.name, 'libressl') }}
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         id: cache-libressl
         env:
           cache-name: cache-libressl
@@ -500,7 +603,8 @@ jobs:
           fail-on-cache-miss: true
 
       - name: 'cache awslc'
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        if: ${{ contains(matrix.build.name, 'awslc') }}
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         id: cache-awslc
         env:
           cache-name: cache-awslc
@@ -510,7 +614,8 @@ jobs:
           fail-on-cache-miss: true
 
       - name: 'cache boringssl'
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        if: ${{ contains(matrix.build.name, 'boringssl') }}
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         id: cache-boringssl
         env:
           cache-name: cache-boringssl
@@ -520,8 +625,8 @@ jobs:
           fail-on-cache-miss: true
 
       - name: 'cache nettle'
-        if: ${{ matrix.build.name == 'gnutls' }}
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        if: ${{ contains(matrix.build.name, 'gnutls') }}
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         id: cache-nettle
         env:
           cache-name: cache-nettle
@@ -531,8 +636,8 @@ jobs:
           fail-on-cache-miss: true
 
       - name: 'cache gnutls'
-        if: ${{ matrix.build.name == 'gnutls' }}
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        if: ${{ contains(matrix.build.name, 'gnutls') }}
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         id: cache-gnutls
         env:
           cache-name: cache-gnutls
@@ -542,8 +647,8 @@ jobs:
           fail-on-cache-miss: true
 
       - name: 'cache wolfssl'
-        if: ${{ matrix.build.name == 'wolfssl' }}
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        if: ${{ contains(matrix.build.name, 'wolfssl') }}
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         id: cache-wolfssl
         env:
           cache-name: cache-wolfssl
@@ -553,7 +658,7 @@ jobs:
           fail-on-cache-miss: true
 
       - name: 'cache nghttp3'
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         id: cache-nghttp3
         env:
           cache-name: cache-nghttp3
@@ -563,17 +668,30 @@ jobs:
           fail-on-cache-miss: true
 
       - name: 'cache ngtcp2'
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         id: cache-ngtcp2
         env:
           cache-name: cache-ngtcp2
         with:
           path: ~/ngtcp2/build
-          key: ${{ runner.os }}-http3-build-${{ env.cache-name }}-${{ env.NGTCP2_VERSION }}-${{ env.OPENSSL_VERSION }}-${{ env.LIBRESSL_VERSION }}-${{ env.AWSLC_VERSION }}-${{ env.NETTLE_VERSION }}-${{ env.GNUTLS_VERSION }}-${{ env.WOLFSSL_VERSION }}
+          key: "${{ runner.os }}-http3-build-${{ env.cache-name }}-${{ env.NGTCP2_VERSION }}-${{ env.OPENSSL_VERSION }}-\
+            ${{ env.LIBRESSL_VERSION }}-${{ env.AWSLC_VERSION }}-${{ env.NETTLE_VERSION }}-${{ env.GNUTLS_VERSION }}-${{ env.WOLFSSL_VERSION }}"
+          fail-on-cache-miss: true
+
+      - name: 'cache ngtcp2 openssl-prev'
+        if: ${{ contains(matrix.build.name, 'openssl-prev') }}
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        id: cache-ngtcp2-openssl-prev
+        env:
+          cache-name: cache-ngtcp2-openssl-prev
+        with:
+          path: ~/ngtcp2-openssl-prev/build
+          key: ${{ runner.os }}-http3-build-${{ env.cache-name }}-${{ env.NGTCP2_VERSION }}-${{ env.OPENSSL_PREV_VERSION }}
           fail-on-cache-miss: true
 
       - name: 'cache ngtcp2 boringssl'
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        if: ${{ contains(matrix.build.name, 'boringssl') }}
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         id: cache-ngtcp2-boringssl
         env:
           cache-name: cache-ngtcp2-boringssl
@@ -583,7 +701,7 @@ jobs:
           fail-on-cache-miss: true
 
       - name: 'cache nghttp2'
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         id: cache-nghttp2
         env:
           cache-name: cache-nghttp2
@@ -593,8 +711,8 @@ jobs:
           fail-on-cache-miss: true
 
       - name: 'cache quiche'
-        if: ${{ matrix.build.name == 'quiche' }}
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        if: ${{ contains(matrix.build.name, 'quiche') }}
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         id: cache-quiche
         env:
           cache-name: cache-quiche
@@ -603,10 +721,10 @@ jobs:
           key: ${{ runner.os }}-http3-build-${{ env.cache-name }}-${{ env.QUICHE_VERSION }}
 
       - name: 'build quiche and boringssl'
-        if: ${{ matrix.build.name == 'quiche' && steps.cache-quiche.outputs.cache-hit != 'true' }}
+        if: ${{ contains(matrix.build.name, 'quiche') && steps.cache-quiche.outputs.cache-hit != 'true' }}
         run: |
           cd ~
-          git clone --quiet --depth 1 -b "${QUICHE_VERSION}" --recursive https://github.com/cloudflare/quiche
+          git clone --quiet --depth 1 --branch "${QUICHE_VERSION}" --recursive https://github.com/cloudflare/quiche
           cd quiche
           #### Work-around https://github.com/curl/curl/issues/7927 #######
           #### See https://github.com/alexcrichton/cmake-rs/issues/131 ####
@@ -643,7 +761,7 @@ jobs:
             cmake -B bld -G Ninja \
               -DCMAKE_C_COMPILER_TARGET="$(uname -m)-pc-linux-gnu" -DBUILD_STATIC_LIBS=ON \
               -DCURL_WERROR=ON -DENABLE_DEBUG=ON \
-              -DCURL_USE_LIBUV=ON \
+              -DCURL_USE_LIBUV=ON -DCURL_ENABLE_NTLM=ON \
               -DTEST_NGHTTPX=/home/runner/nghttp2/build/bin/nghttpx \
               -DHTTPD_NGHTTPX=/home/runner/nghttp2/build/bin/nghttpx \
               ${MATRIX_GENERATE} ${options}
@@ -651,7 +769,7 @@ jobs:
             [[ "${MATRIX_CONFIGURE}" = *'boringssl'* ]] && export CPPFLAGS="-DCURL_BORINGSSL_VERSION=\\\"${BORINGSSL_VERSION}\\\""
             mkdir bld && cd bld && ../configure --enable-warnings --enable-werror --enable-debug --disable-static \
               --disable-dependency-tracking --enable-option-checking=fatal \
-              --with-libuv \
+              --with-libuv --enable-ntlm \
               --with-test-nghttpx=/home/runner/nghttp2/build/bin/nghttpx \
               ${MATRIX_CONFIGURE}
           fi
