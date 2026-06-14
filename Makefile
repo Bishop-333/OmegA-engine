@@ -635,12 +635,12 @@ ifdef MINGW
 
   ifeq ($(ARCH),x86_64)
     BASE_CFLAGS += -m64
-    OPTIMIZE = -O2 -ffast-math -fstrength-reduce
+    OPTIMIZE = -O3 -march=x86-64-v2 -ffast-math
   endif
   ifeq ($(ARCH),x86)
     ARCHEXT = -x86
     BASE_CFLAGS += -m32
-    OPTIMIZE = -O2 -march=i586 -mtune=i686 -ffast-math -fstrength-reduce
+    OPTIMIZE = -O3 -march=i586 -mtune=i686 -ffast-math
   endif
 
   SHLIBEXT = dll
@@ -740,7 +740,7 @@ ifeq ($(COMPILE_PLATFORM),darwin)
 
   BASE_CFLAGS += -ffunction-sections -flto=thin
 
-  OPTIMIZE = -O2 -fvisibility=hidden -ffast-math
+  OPTIMIZE = -O3 -fvisibility=hidden -ffast-math
 
   SHLIBEXT = dylib
   SHLIBCFLAGS = -fPIC -fvisibility=hidden
@@ -773,6 +773,7 @@ ifeq ($(COMPILE_PLATFORM),darwin)
   ifeq ($(ARCH),x86_64)
     BASE_CFLAGS += -arch x86_64
     LDFLAGS += -arch x86_64
+    OPTIMIZE += -march=x86-64-v2
   endif
   ifeq ($(ARCH),arm64)
     BASE_CFLAGS += -arch arm64
@@ -867,10 +868,11 @@ else
 
   BASE_CFLAGS += -ffunction-sections -flto=auto
 
-  OPTIMIZE = -O2 -fvisibility=hidden -ffast-math
+  OPTIMIZE = -O3 -fvisibility=hidden -ffast-math
 
   ifeq ($(ARCH),x86_64)
     ARCHEXT = -x64
+    OPTIMIZE += -march=x86-64-v2
   else
   ifeq ($(ARCH),x86)
     OPTIMIZE += -march=i586 -mtune=i686
