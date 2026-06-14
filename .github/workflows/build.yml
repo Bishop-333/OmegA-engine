@@ -23,7 +23,7 @@ on:
 jobs:
   windows:
     name: Release Windows x86_64
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     strategy:
       fail-fast: false
 
@@ -55,8 +55,7 @@ jobs:
         
   linux:
     name: Release Linux x86_64
-    runs-on: ubuntu-24.04
-    container: debian:trixie
+    runs-on: ubuntu-26.04
     strategy:
       fail-fast: false
 
@@ -64,9 +63,9 @@ jobs:
 
     - name: Install tools
       run: |
-        apt-get -qq update
-        apt-get install -y make gcc git cmake
-        apt-get -y install libcurl4-openssl-dev libsdl3-dev libopenal-dev nasm
+        sudo apt-get -qq update
+        sudo apt-get install -y make gcc git cmake
+        sudo apt-get -y install libcurl4-openssl-dev libsdl3-dev libopenal-dev nasm
 
     - uses: actions/checkout@v6
       with:
@@ -89,8 +88,7 @@ jobs:
 
   linux-arm:
     name: Release Linux arm64
-    runs-on: ubuntu-24.04-arm
-    container: debian:trixie
+    runs-on: ubuntu-26.04-arm
     strategy:
       fail-fast: false
 
@@ -98,9 +96,9 @@ jobs:
 
     - name: Install tools
       run: |
-        apt-get -qq update
-        apt-get install -y make gcc git cmake
-        apt-get -y install libcurl4-openssl-dev libsdl3-dev libopenal-dev
+        sudo apt-get -qq update
+        sudo apt-get install -y make gcc git cmake
+        sudo apt-get -y install libcurl4-openssl-dev libsdl3-dev libopenal-dev
 
     - uses: actions/checkout@v6
       with:
@@ -123,7 +121,7 @@ jobs:
   
   debian:
     name: Release Debian amd64
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     container: debian:trixie
     strategy:
       fail-fast: false
