@@ -64,7 +64,6 @@ jobs:
     - name: Install tools
       run: |
         sudo apt-get -qq update
-        sudo apt-get install -y make gcc git cmake
         sudo apt-get -y install libcurl4-openssl-dev libsdl3-dev libopenal-dev nasm
 
     - uses: actions/checkout@v6
@@ -97,7 +96,6 @@ jobs:
     - name: Install tools
       run: |
         sudo apt-get -qq update
-        sudo apt-get install -y make gcc git cmake
         sudo apt-get -y install libcurl4-openssl-dev libsdl3-dev libopenal-dev
 
     - uses: actions/checkout@v6
