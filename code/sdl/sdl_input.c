@@ -1100,6 +1100,22 @@ static void IN_SyncModifiers( void ) {
     keys[K_CTRL].down  = (mod & SDL_KMOD_CTRL)  ? qtrue : qfalse;
     keys[K_SHIFT].down = (mod & SDL_KMOD_SHIFT) ? qtrue : qfalse;
     keys[K_ALT].down   = (mod & SDL_KMOD_ALT)   ? qtrue : qfalse;
+    keys[K_CAPSLOCK].down = (mod & SDL_KMOD_CAPS) ? qtrue : qfalse;
+}
+
+
+/*
+===================
+Key_CapsLockOn
+===================
+*/
+qboolean Key_CapsLockOn( void )
+{
+	if ( !SDL_WasInit( SDL_INIT_VIDEO ) ) {
+		return qfalse;
+	}
+
+	return ( SDL_GetModState() & SDL_KMOD_CAPS ) ? qtrue : qfalse;
 }
 
 

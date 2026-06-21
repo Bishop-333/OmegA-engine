@@ -160,6 +160,9 @@ jobs:
 
     steps:
 
+    - name: Trust taps
+      run: brew trust aws/tap azure/bicep
+
     - name: Install tools
       run: |
         brew install create-dmg
