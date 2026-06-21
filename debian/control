@@ -1,7 +1,7 @@
 Source: omega-engine
 Section: games
 Priority: optional
-Maintainer: Debian Games Team <pkg-games-devel@lists.alioth.debian.org>
+Maintainer: Bishop-333 <bishop-333@outlook.com>
 Build-Depends: debhelper-compat (= 13), pkgconf, libgl-dev, libvulkan-dev, libcurl4-openssl-dev, libjpeg-dev, libopenal-dev, libsdl3-dev, libogg-dev, libvorbis-dev, libmad0-dev, libflac-dev, zlib1g-dev
 Standards-Version: 4.7.0
 Homepage: https://github.com/Bishop-333/OmegA-engine
