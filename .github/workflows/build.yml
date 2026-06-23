@@ -56,6 +56,8 @@ jobs:
   linux:
     name: Release Linux x86_64
     runs-on: ubuntu-26.04
+    container:
+      image: debian:trixie
     strategy:
       fail-fast: false
 
@@ -63,8 +65,9 @@ jobs:
 
     - name: Install tools
       run: |
-        sudo apt-get -qq update
-        sudo apt-get -y install libcurl4-openssl-dev libsdl3-dev libopenal-dev nasm
+        apt-get -qq update
+        apt-get -y install build-essential cmake git
+        apt-get -y install libcurl4-openssl-dev libopenal-dev libsdl3-dev nasm
 
     - uses: actions/checkout@v6
       with:
@@ -88,6 +91,8 @@ jobs:
   linux-arm:
     name: Release Linux arm64
     runs-on: ubuntu-26.04-arm
+    container:
+      image: debian:trixie
     strategy:
       fail-fast: false
 
@@ -95,8 +100,9 @@ jobs:
 
     - name: Install tools
       run: |
-        sudo apt-get -qq update
-        sudo apt-get -y install libcurl4-openssl-dev libsdl3-dev libopenal-dev
+        apt-get -qq update
+        apt-get -y install build-essential cmake git
+        apt-get -y install libcurl4-openssl-dev libopenal-dev libsdl3-dev
 
     - uses: actions/checkout@v6
       with:
@@ -129,7 +135,7 @@ jobs:
     - name: Install tools
       run: |
         apt-get -qq update
-        apt-get install -y make gcc git
+        apt-get -y install build-essential git
 
     - uses: actions/checkout@v6
       with:
@@ -137,7 +143,7 @@ jobs:
 
     - name: Install build dependencies
       run: |
-        apt-get build-dep -y .
+        apt-get -y build-dep .
 
     - name: Build
       run: |
@@ -153,7 +159,7 @@ jobs:
         retention-days: 5
 
   macos:
-    name: Release macOS universal2
+    name: Release macOS Universal 2
     runs-on: macos-26
     strategy:
       fail-fast: false
