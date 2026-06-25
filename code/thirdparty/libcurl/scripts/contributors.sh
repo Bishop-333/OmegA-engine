@@ -62,7 +62,7 @@ CURLWWW="${CURLWWW:-../curl-www}"
       git -C "$CURLWWW" log --pretty=full --use-mailmap "$start..HEAD"
     fi
   } | \
-  grep -Eai '(^Author|^Commit|^ +[a-z-]+-by):' | \
+  grep -Eai '(^Author|^Commit|^ +[a-z-]+-by|^ +Credits-to):' | \
   cut -d: -f2- | \
   cut '-d(' -f1 | \
   cut '-d<' -f1 | \
@@ -82,7 +82,7 @@ awk '
 {
   if(length($0)) {
     num++;
-    n = sprintf("%s%s%s,", n, length(n)?" ":"", $0);
+    n = sprintf("%s%s%s,", n, length(n) ? " " : "", $0);
     #print n;
     if(length(n) > 77) {
       printf("  %s\n", p);
@@ -93,7 +93,7 @@ awk '
 }
 
 END {
-  pp=substr(p,1,length(p)-1);
+  pp = substr(p, 1, length(p) - 1);
   printf("  %s\n", pp);
   printf("  (%d contributors)\n", num);
 }

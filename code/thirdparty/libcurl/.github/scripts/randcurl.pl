@@ -61,7 +61,7 @@ sub storedata {
 }
 
 sub getoptions {
-    my @all = `$curl --help all`;
+    my @all = qx($curl --help all);
     for my $o (@all) {
         chomp $o;
         if($o =~ /^ -(.), --([^ ]*) (.*)/) {
@@ -142,7 +142,7 @@ sub runone {
         $a .= " ".addarg();
     }
 
-    my $cmd="$curl$a $url";
+    my $cmd = "$curl$a $url";
 
     my $rc = system("$cmd >curl-output 2>&1 </dev/null -M 0.1") >> 8;
     #my $rc = system("valgrind -q $cmd >/dev/null 2>&1 </dev/null -M 0.1") >> 8;
@@ -194,7 +194,7 @@ sub runconfig {
     print C "$a\n";
     close(C);
 
-    my $cmd="$curl -K config $url";
+    my $cmd = "$curl -K config $url";
 
     my $rc = system("$cmd >curl-output 2>&1 </dev/null -M 0.1") >> 8;
 
@@ -218,7 +218,7 @@ sub runconfig {
 }
 
 # run curl command lines using -K
-my $end = time() + $seconds/2;
+my $end = time() + $seconds / 2;
 my $c = 0;
 print "Running command lines\n";
 do {
@@ -228,7 +228,7 @@ do {
 print "$c command lines\n";
 
 # run curl command lines
-$end = time() + $seconds/2;
+$end = time() + $seconds / 2;
 $c = 0;
 print "Running config lines\n";
 do {

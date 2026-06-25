@@ -74,7 +74,7 @@ jobs:
       - name: 'typos'
         timeout-minutes: 2
         run: |
-          HOMEBREW_NO_AUTO_UPDATE=1 /home/linuxbrew/.linuxbrew/bin/brew install typos-cli
+          /home/linuxbrew/.linuxbrew/bin/brew install typos-cli
           eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
           typos --version
           .github/scripts/typos.sh
@@ -88,18 +88,34 @@ jobs:
         run: |
           scripts/perlcheck.sh
 
-      - name: 'pytype'
-        run: |
-          source ~/venv/bin/activate
-          find . -name '*.py' -exec pytype -j auto -k -- {} +
-
       - name: 'ruff'
         run: |
           source ~/venv/bin/activate
           scripts/pythonlint.sh
 
+  pytype:
+    name: 'pytype'
+    runs-on: ubuntu-24.04-arm  # pytype is discontinued and requires python 3.8-3.12
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: 'install prereqs'
+        run: |
+          python3 -m venv ~/venv
+          ~/venv/bin/pip --disable-pip-version-check --no-input --no-cache-dir install --progress-bar off --prefer-binary pytype==2024.10.11 \
+            -r .github/scripts/requirements.txt \
+            -r tests/http/requirements.txt \
+            -r tests/requirements.txt
+
+      - name: 'check'
+        run: |
+          source ~/venv/bin/activate
+          find . -name '*.py' -exec pytype -j auto -k -- {} +
+
   complexity:
-    name: 'complexity'
+    name: 'complexity and function sizes'
     runs-on: ubuntu-slim
     timeout-minutes: 3
     steps:
@@ -110,15 +126,17 @@ jobs:
           sudo find /etc/apt/sources.list.d -type f -not -name 'ubuntu.sources' -delete -print
           sudo sed -i 's/priority:1/priority:9/' /etc/apt/apt-mirrors.txt; cat /etc/apt/apt-mirrors.txt
           sudo apt-get -o Dpkg::Use-Pty=0 update
-          sudo apt-get -o Dpkg::Use-Pty=0 install \
-            pmccabe
+          sudo apt-get -o Dpkg::Use-Pty=0 install pmccabe
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
-      - name: 'check scores'
+      - name: 'check function complexity'
         run: ./scripts/top-complexity
+
+      - name: 'check function lengths'
+        run: ./scripts/top-length
 
   xmllint:
     name: 'xmllint'
@@ -131,8 +149,7 @@ jobs:
           sudo find /etc/apt/sources.list.d -type f -not -name 'ubuntu.sources' -delete -print
           sudo sed -i 's/priority:1/priority:9/' /etc/apt/apt-mirrors.txt; cat /etc/apt/apt-mirrors.txt
           sudo apt-get -o Dpkg::Use-Pty=0 update
-          sudo apt-get -o Dpkg::Use-Pty=0 install \
-            libxml2-utils
+          sudo apt-get -o Dpkg::Use-Pty=0 install libxml2-utils
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -148,7 +165,7 @@ jobs:
     steps:
       - name: 'install prereqs'
         timeout-minutes: 2
-        run: HOMEBREW_NO_AUTO_UPDATE=1 /home/linuxbrew/.linuxbrew/bin/brew install actionlint shellcheck zizmor
+        run: /home/linuxbrew/.linuxbrew/bin/brew install actionlint shellcheck zizmor
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -161,12 +178,19 @@ jobs:
           eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
           zizmor --persona pedantic .github/workflows/*.yml .github/dependabot.yml
 
+      - name: 'zizmor GHA (auditor, warning-only)'
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: |
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          zizmor --persona auditor .github/workflows/*.yml .github/dependabot.yml || true
+
       - name: 'actionlint'
         run: |
           eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
           export SHELLCHECK_OPTS='--exclude=1090,1091,2086,2153 --enable=avoid-nullary-conditions,deprecate-which'
           actionlint --version
-          actionlint --ignore matrix .github/workflows/*.yml
+          actionlint --ignore matrix --ignore ubuntu-26.04 .github/workflows/*.yml
 
       - name: 'shellcheck CI'
         run: |
