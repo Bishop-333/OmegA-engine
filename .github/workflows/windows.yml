@@ -39,7 +39,7 @@ env:
   OPENSSH_WINDOWS_VERSION: 10.0.0.0p2-Preview
   OPENSSH_WINDOWS_SHA256_ARM64: 698c6aec31c1dd0fb996206e8741f4531a97355686b5431ef347d531b07fcd42
   OPENSSH_WINDOWS_SHA256_WIN64: 23f50f3458c4c5d0b12217c6a5ddfde0137210a30fa870e98b29827f7b43aba5
-  STUNNEL_VERSION: 5.78
+  STUNNEL_VERSION: '5.78'
   STUNNEL_SHA256: 32a88dcc5654f955266109be8bf10fd7d56fa4e125cab821ee508230570e46c5
 
 jobs:
@@ -51,7 +51,7 @@ jobs:
         image: [windows-11-arm, windows-2022]  # Cannot share cache between arm and intel: https://github.com/actions/cache/issues/1622
     steps:
       - name: 'cache test prereqs (stunnel)'
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         id: cache-stunnel
         with:
           path: C:\my-stunnel
@@ -59,7 +59,7 @@ jobs:
           lookup-only: true
 
       - name: 'install test prereqs (stunnel)'
-        if: ${{ steps.cache-stunnel.outputs.cache-hit != 'true' }}
+        if: ${{ !steps.cache-stunnel.outputs.cache-hit }}
         timeout-minutes: 2
         shell: bash
         run: |
@@ -93,10 +93,9 @@ jobs:
               build: 'cmake', platform: 'x86_64', tflags: '',
               config: '-DENABLE_DEBUG=ON -DCURL_USE_OPENSSL=ON -DENABLE_THREADED_RESOLVER=OFF -DCURL_ENABLE_NTLM=ON',
               install: 'libssl-devel libssh2-devel' }
-
       fail-fast: false
     steps:
-      - uses: cygwin/cygwin-install-action@711d29f3da23c9f4a1798e369a6f01198c13b11a # v6.1
+      - uses: cygwin/cygwin-install-action@3f0a3f9f988f7e96b8c18098ae05eaec175f5b52 # v6.0.2
         with:
           platform: ${{ matrix.platform }}
           work-vol: 'D:'
@@ -192,7 +191,7 @@ jobs:
 
       - name: 'cache test prereqs (stunnel)'
         if: ${{ matrix.tflags != 'skipall' && matrix.tflags != 'skiprun' }}
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         id: cache-stunnel
         with:
           path: C:\my-stunnel
@@ -302,7 +301,7 @@ jobs:
               install: 'mingw-w64-clang-aarch64-libssh2' }
           - { name: 'openssl', type: 'Release', chkprefill: '_chkprefill',
               build: 'cmake'    , sys: 'clang64'   , env: 'clang-x86_64' , tflags: 'skiprun'   ,
-              config: '-DENABLE_DEBUG=ON  -DBUILD_SHARED_LIBS=OFF -DCURL_USE_OPENSSL=ON  -DENABLE_UNICODE=OFF -DUSE_NGTCP2=ON',
+              config: '-DENABLE_DEBUG=ON  -DBUILD_SHARED_LIBS=OFF -DCURL_USE_OPENSSL=ON  -DENABLE_UNICODE=OFF -DUSE_NGTCP2=ON -DUSE_PROXY_HTTP3=ON',
               install: 'mingw-w64-clang-x86_64-openssl mingw-w64-clang-x86_64-nghttp3 mingw-w64-clang-x86_64-ngtcp2 mingw-w64-clang-x86_64-libssh2' }
           - { name: 'schannel', type: 'Release', test: 'uwp',
               build: 'cmake'    , sys: 'ucrt64'    , env: 'ucrt-x86_64'  , tflags: 'skiprun'   ,
@@ -322,7 +321,7 @@ jobs:
               install: 'mingw-w64-i686-c-ares mingw-w64-i686-gnutls mingw-w64-i686-libssh2 mingw-w64-i686-openssl' }
       fail-fast: false
     steps:
-      - uses: msys2/setup-msys2@cafece8e6baf9247cf9b1bf95097b0b983cc558d # v2.31.0
+      - uses: msys2/setup-msys2@e9898307ac31d1a803454791be09ab9973336e1c # v2.31.1
         if: ${{ matrix.sys == 'msys' }}
         with:
           msystem: ${{ matrix.sys }}
@@ -338,7 +337,7 @@ jobs:
             libpsl-devel
             ${{ matrix.install }}
 
-      - uses: msys2/setup-msys2@cafece8e6baf9247cf9b1bf95097b0b983cc558d # v2.31.0
+      - uses: msys2/setup-msys2@e9898307ac31d1a803454791be09ab9973336e1c # v2.31.1
         if: ${{ matrix.sys != 'msys' }}
         with:
           msystem: ${{ matrix.sys }}
@@ -463,7 +462,7 @@ jobs:
 
       - name: 'cache test prereqs (stunnel)'
         if: ${{ matrix.tflags != 'skipall' && matrix.tflags != 'skiprun' }}
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         id: cache-stunnel
         with:
           path: C:\my-stunnel
@@ -486,11 +485,11 @@ jobs:
             cd /c  # no D: drive on windows-11-arm runners
             if [[ "${MATRIX_IMAGE}" = *'-arm'* ]]; then
               curl --disable --fail --silent --show-error --connect-timeout 15 --max-time 60 --retry 3 --retry-connrefused \
-                --location "https://github.com/PowerShell/Win32-OpenSSH/releases/download/${OPENSSH_WINDOWS_VERSION}/OpenSSH-ARM64.zip" --output pkg.bin
+                --location --proto-redir =https "https://github.com/PowerShell/Win32-OpenSSH/releases/download/${OPENSSH_WINDOWS_VERSION}/OpenSSH-ARM64.zip" --output pkg.bin
               sha256sum pkg.bin && sha256sum pkg.bin | grep -qwF -- "${OPENSSH_WINDOWS_SHA256_ARM64}" && unzip pkg.bin && rm -f pkg.bin
             else
               curl --disable --fail --silent --show-error --connect-timeout 15 --max-time 60 --retry 3 --retry-connrefused \
-                --location "https://github.com/PowerShell/Win32-OpenSSH/releases/download/${OPENSSH_WINDOWS_VERSION}/OpenSSH-Win64.zip" --output pkg.bin
+                --location --proto-redir =https "https://github.com/PowerShell/Win32-OpenSSH/releases/download/${OPENSSH_WINDOWS_VERSION}/OpenSSH-Win64.zip" --output pkg.bin
               sha256sum pkg.bin && sha256sum pkg.bin | grep -qwF -- "${OPENSSH_WINDOWS_SHA256_WIN64}" && unzip pkg.bin && rm -f pkg.bin
             fi
           fi
@@ -522,11 +521,9 @@ jobs:
             fi
           fi
           if [ -n "${MATRIX_OPENSSH}" ]; then  # OpenSSH-Windows
-            TFLAGS+=' ~601 ~603 ~617 ~619 ~621 ~641 ~665 ~2004'  # SCP
+            TFLAGS+=' ~601 ~603 ~617 ~619 ~621 ~641 ~665 ~2004 ~3022'  # SCP
             if [[ "${MATRIX_INSTALL} " = *'libssh '* ]]; then
               TFLAGS+=' ~614'  # 'SFTP pre-quote chmod' SFTP, pre-quote, directory
-            else
-              TFLAGS+=' ~3022'  # 'SCP correct sha256 host key' SCP, server sha256 key check
             fi
           fi
           if [ "${MATRIX_OPENSSH}" = 'OpenSSH-Windows' ]; then
@@ -577,13 +574,13 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: 'schannel +analyzer'  # mingw-w64 12.0
+          - name: 'schannel +analyzer'  # mingw-w64 14.0
             sys: 'mingw64'
             dir: 'w64devkit'
             env: 'x86_64'
-            ver: '15.1.0'
-            url: 'https://github.com/skeeto/w64devkit/releases/download/v2.2.0/w64devkit-x64-2.2.0.7z.exe'
-            SHA256: e02de30b97196329662007d64bc4509fbd7f5e14339d344075c7f1223dead4a2
+            ver: '16.1.0'
+            url: 'https://github.com/skeeto/w64devkit/releases/download/v2.8.0/w64devkit-x64-2.8.0.7z.exe'
+            SHA256: 6252bf34fe2231a55ac7f03d482b36d2c7c58697990551bba508102cfb3f342e
             config: '-DENABLE_DEBUG=ON -DBUILD_SHARED_LIBS=OFF -DCURL_USE_SCHANNEL=ON -DENABLE_UNICODE=OFF -DENABLE_UNIX_SOCKETS=OFF -DCURL_GCC_ANALYZER=ON'
             type: 'Release'
           - name: 'schannel'  # mingw-w64 10.0
@@ -631,7 +628,7 @@ jobs:
             chkprefill: ''  # Set it once to silence actionlint
       fail-fast: false
     steps:
-      - uses: msys2/setup-msys2@cafece8e6baf9247cf9b1bf95097b0b983cc558d # v2.31.0
+      - uses: msys2/setup-msys2@e9898307ac31d1a803454791be09ab9973336e1c # v2.31.1
         with:
           msystem: ${{ matrix.sys }}
           release: false
@@ -643,14 +640,14 @@ jobs:
             ${{ matrix.install }}
 
       - name: 'cache compiler (gcc ${{ matrix.ver }}-${{ matrix.env }})'
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         id: cache-compiler
         with:
           path: D:\my-cache
           key: ${{ runner.os }}-mingw-w64-${{ matrix.ver }}-${{ matrix.env }}
 
       - name: 'install compiler (gcc ${{ matrix.ver }}-${{ matrix.env }})'
-        if: ${{ steps.cache-compiler.outputs.cache-hit != 'true' }}
+        if: ${{ !steps.cache-compiler.outputs.cache-hit }}
         timeout-minutes: 5
         env:
           MATRIX_URL: '${{ matrix.url }}'
@@ -727,7 +724,7 @@ jobs:
 
       - name: 'cache test prereqs (stunnel)'
         if: ${{ matrix.tflags != 'skipall' && matrix.tflags != 'skiprun' }}
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         id: cache-stunnel
         with:
           path: C:\my-stunnel
@@ -738,7 +735,7 @@ jobs:
         if: ${{ matrix.tflags != 'skipall' && matrix.tflags != 'skiprun' }}
         timeout-minutes: 2
         run: |
-          if "bld/src/curl.exe" --disable -V 2>/dev/null | grep smb; then
+          if bld/src/curl.exe --disable -V 2>/dev/null | grep smb; then
             python3 -m pip --disable-pip-version-check --no-input --no-cache-dir install --progress-bar off --prefer-binary -r tests/requirements.txt
           fi
 
@@ -770,7 +767,7 @@ jobs:
 
   linux-cross-mingw-w64:
     name: "linux-mingw, ${{ matrix.build == 'cmake' && 'CM' || 'AM' }} ${{ matrix.compiler }}"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     env:
       LDFLAGS: -s
@@ -784,14 +781,17 @@ jobs:
         include:
           - { build: 'autotools', compiler: 'gcc' }
           - { build: 'cmake'    , compiler: 'gcc' }
-          - { build: 'cmake'    , compiler: 'clang-tidy', install_packages: 'clang-20 clang-tidy-20' }
+          - { build: 'cmake'    , compiler: 'clang-tidy', install_packages: 'clang-22 clang-tidy-22', CFLAGS: '-Wunused-macros' }
     steps:
       - name: 'install packages'
         timeout-minutes: 2
         env:
           MATRIX_INSTALL_PACKAGES: '${{ matrix.install_packages }}'
         run: |
+          ls -l /etc/apt/sources.list.d
+          sudo find /etc/apt/sources.list.d -type f -not -name 'ubuntu.sources' -delete -print
           sudo sed -i 's/priority:1/priority:9/' /etc/apt/apt-mirrors.txt; cat /etc/apt/apt-mirrors.txt
+          sudo apt-get -o Dpkg::Use-Pty=0 update
           sudo apt-get -o Dpkg::Use-Pty=0 install gcc-mingw-w64-x86-64-win32 ${MATRIX_INSTALL_PACKAGES}
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -803,13 +803,15 @@ jobs:
         run: autoreconf -fi
 
       - name: 'configure'
+        env:
+          CFLAGS: '${{ matrix.CFLAGS }}'
         run: |
           if [ "${MATRIX_BUILD}" = 'cmake' ]; then
             if [ "${MATRIX_COMPILER}" = 'clang-tidy' ]; then
-              options+=' -DCURL_CLANG_TIDY=ON -DCLANG_TIDY=/usr/bin/clang-tidy-20'
+              options+=' -DCURL_CLANG_TIDY=ON -DCLANG_TIDY=/usr/bin/clang-tidy-22'
               options+=' -DENABLE_UNICODE=ON -DUSE_SSLS_EXPORT=ON'
-              options+=' -DCMAKE_C_COMPILER=clang-20'
-              options+=" -DCMAKE_RC_COMPILER=llvm-windres-$(clang-20 -dumpversion | cut -d '.' -f 1)"
+              options+=' -DCMAKE_C_COMPILER=clang-22'
+              options+=" -DCMAKE_RC_COMPILER=llvm-windres-$(clang-22 -dumpversion | cut -d '.' -f 1)"
             else
               options+=" -DCMAKE_C_COMPILER=${TRIPLET}-gcc"
             fi
@@ -922,7 +924,7 @@ jobs:
             env: 'ucrt-x86_64'
             plat: 'windows'
             type: 'Debug'
-            image: 'windows-2025-vs2026'
+            image: 'windows-2025'
             chkprefill: '_chkprefill'
             tflags: '--min=1850'
             config: >-
@@ -951,7 +953,7 @@ jobs:
               -DNGTCP2_LIBRARY=/ucrt64/lib/libngtcp2.dll.a
               -DNGTCP2_CRYPTO_OSSL_LIBRARY=/ucrt64/lib/libngtcp2_crypto_ossl.dll.a
               -DCURL_CA_NATIVE=ON
-              -DCURL_ENABLE_NTLM=ON
+              -DCURL_ENABLE_NTLM=ON -DUSE_PROXY_HTTP3=ON
 
           - name: 'schannel U'
             install-vcpkg: 'zlib libssh2[core,zlib]'
@@ -971,7 +973,7 @@ jobs:
 
       fail-fast: false
     steps:
-      - uses: msys2/setup-msys2@cafece8e6baf9247cf9b1bf95097b0b983cc558d # v2.31.0
+      - uses: msys2/setup-msys2@e9898307ac31d1a803454791be09ab9973336e1c # v2.31.1
         with:
           msystem: ${{ matrix.arch == 'arm64' && 'clangarm64' || 'ucrt64' }}
           release: ${{ contains(matrix.image, 'arm') }}
@@ -1030,7 +1032,7 @@ jobs:
               # VS2022). Since it integrates badly with CI steps and shell scripts,
               # reproduce the necessary build configuration manually, without envs.
               MSVC_EDITION='2022/Enterprise/vc/tools/msvc'
-              [[ "${MATRIX_IMAGE}" = *'vs2026'* ]] && MSVC_EDITION='18/Enterprise/vc/tools/msvc'
+              [[ "${MATRIX_IMAGE}" = *'windows-2025'* ]] && MSVC_EDITION='18/Enterprise/vc/tools/msvc'
               [[ "$(uname -s)" = *'ARM64'* ]] && MSVC_HOST='arm64' || MSVC_HOST='x64'  # x86
               MSVC_ROOTD="$(cygpath --mixed --short-name "$PROGRAMFILES/Microsoft Visual Studio")"  # to avoid spaces in directory names
               MSVC_ROOTU="$(/usr/bin/find "$(cygpath --unix "$MSVC_ROOTD/$MSVC_EDITION")" -mindepth 1 -maxdepth 1 -type d -name '*.*' | sort | tail -n 1)"
@@ -1117,7 +1119,7 @@ jobs:
 
       - name: 'cache test prereqs (stunnel)'
         if: ${{ matrix.tflags != 'skipall' && matrix.tflags != 'skiprun' }}
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         id: cache-stunnel
         with:
           path: C:\my-stunnel
@@ -1140,11 +1142,11 @@ jobs:
             cd /c  # no D: drive on windows-11-arm runners
             if [[ "${MATRIX_IMAGE}" = *'-arm'* ]]; then
               curl --disable --fail --silent --show-error --connect-timeout 15 --max-time 60 --retry 3 --retry-connrefused \
-                --location "https://github.com/PowerShell/Win32-OpenSSH/releases/download/${OPENSSH_WINDOWS_VERSION}/OpenSSH-ARM64.zip" --output pkg.bin
+                --location --proto-redir =https "https://github.com/PowerShell/Win32-OpenSSH/releases/download/${OPENSSH_WINDOWS_VERSION}/OpenSSH-ARM64.zip" --output pkg.bin
               sha256sum pkg.bin && sha256sum pkg.bin | grep -qwF -- "${OPENSSH_WINDOWS_SHA256_ARM64}" && unzip pkg.bin && rm -f pkg.bin
             else
               curl --disable --fail --silent --show-error --connect-timeout 15 --max-time 60 --retry 3 --retry-connrefused \
-                --location "https://github.com/PowerShell/Win32-OpenSSH/releases/download/${OPENSSH_WINDOWS_VERSION}/OpenSSH-Win64.zip" --output pkg.bin
+                --location --proto-redir =https "https://github.com/PowerShell/Win32-OpenSSH/releases/download/${OPENSSH_WINDOWS_VERSION}/OpenSSH-Win64.zip" --output pkg.bin
               sha256sum pkg.bin && sha256sum pkg.bin | grep -qwF -- "${OPENSSH_WINDOWS_SHA256_WIN64}" && unzip pkg.bin && rm -f pkg.bin
             fi
           fi

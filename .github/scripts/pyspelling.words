@@ -167,8 +167,10 @@ CWE
 cyassl
 Cygwin
 daniel
+datagrams
 datatracker
 dbg
+decapsulation
 Debian
 DEBUGBUILD
 decrypt
@@ -234,6 +236,7 @@ EGD
 EHLO
 EINTR
 else's
+encapsulation
 encodings
 enctype
 endianness
@@ -896,6 +899,7 @@ trustless
 Tse
 Tsujikawa
 TTL
+tty
 tvOS
 txt
 typedef
@@ -1010,6 +1014,7 @@ Youtube
 YYYY
 YYYYMMDD
 Zakrzewski
+Zeropath
 Zitzmann
 zlib
 zsh

@@ -36,7 +36,7 @@ permissions: {}
 # or runtime:
 #
 # - 10.7   Lion (2011)          - GSS (build-time, deprecated MIT Kerberos shim)
-# - 10.9   Mavericks (2013)     - LDAP (build-time, deprecated), OCSP (runtime)
+# - 10.9   Mavericks (2013)     - LDAP (build-time, deprecated), memset_s(), OCSP (runtime)
 # - 10.11  El Capitan (2015)    - connectx() (runtime)
 # - 10.12  Sierra (2016)        - clock_gettime() (build-time, runtime)
 # - 10.14  Mojave (2018)        - SecTrustEvaluateWithError() (runtime)
@@ -91,7 +91,7 @@ jobs:
           # shellcheck disable=SC2181
           while [[ $? == 0 ]]; do
             for i in 1 2 3; do
-              if brew update && brew install automake libtool; then
+              if brew install automake libtool; then
                 break 2
               else
                 echo "Error: wait to try again: $i"
@@ -114,7 +114,7 @@ jobs:
 
       - name: 'cache libressl'
         if: ${{ contains(matrix.build.install_steps, 'libressl') }}
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         id: cache-libressl
         env:
           cache-name: cache-libressl
@@ -123,10 +123,10 @@ jobs:
           key: iOS-${{ env.cache-name }}-${{ env.LIBRESSL_VERSION }}
 
       - name: 'build libressl'
-        if: ${{ contains(matrix.build.install_steps, 'libressl') && steps.cache-libressl.outputs.cache-hit != 'true' }}
+        if: ${{ contains(matrix.build.install_steps, 'libressl') && !steps.cache-libressl.outputs.cache-hit }}
         run: |
           curl --disable --fail --silent --show-error --connect-timeout 15 --max-time 60 --retry 3 --retry-connrefused \
-            --location "https://github.com/libressl/portable/releases/download/v${LIBRESSL_VERSION}/libressl-${LIBRESSL_VERSION}.tar.gz" --output pkg.bin
+            --location --proto-redir =https "https://github.com/libressl/portable/releases/download/v${LIBRESSL_VERSION}/libressl-${LIBRESSL_VERSION}.tar.gz" --output pkg.bin
           sha256sum pkg.bin && tar -xzf pkg.bin && rm -f pkg.bin
           cd "libressl-${LIBRESSL_VERSION}"
           cmake -B . -G Ninja \
@@ -244,7 +244,7 @@ jobs:
 
           - name: 'OpenSSL libssh'
             compiler: llvm@18
-            install: libssh libnghttp3
+            install: libssh
             generate: -DENABLE_DEBUG=ON -DCURL_USE_LIBSSH2=OFF -DCURL_USE_LIBSSH=ON -DOPENSSL_ROOT_DIR=/opt/homebrew/opt/openssl -DCURL_BROTLI=OFF -DCURL_ZSTD=OFF
 
           - name: '!ssl HTTP-only c-ares'
@@ -275,13 +275,13 @@ jobs:
             install_steps: pytest
             generate: >-
               -DENABLE_DEBUG=ON -DOPENSSL_ROOT_DIR=/opt/homebrew/opt/openssl -DUSE_NGTCP2=ON -DCURL_BROTLI=OFF -DCURL_ZSTD=OFF -DCURL_USE_LIBSSH2=OFF
-              -DCMAKE_C_STANDARD=90 -DCURL_ENABLE_NTLM=ON
+              -DCMAKE_C_STANDARD=90 -DCURL_ENABLE_NTLM=ON -DUSE_PROXY_HTTP3=ON
 
-          - name: 'OpenSSL SecTrust'
+          - name: 'OpenSSL SecTrust krb5'
             compiler: clang
             install: libnghttp3 libngtcp2
             install_steps: pytest
-            configure: --enable-debug --with-openssl=/opt/homebrew/opt/openssl --with-ngtcp2 --with-apple-sectrust --enable-ntlm
+            configure: --enable-debug --with-openssl=/opt/homebrew/opt/openssl --with-ngtcp2 --with-apple-sectrust --enable-ntlm --enable-proxy-http3 --with-gssapi
 
           - name: 'OpenSSL event-based'
             compiler: clang
@@ -293,13 +293,14 @@ jobs:
             install: openssl@4 libnghttp3 libngtcp2 gsasl
             generate: >-
               -DOPENSSL_ROOT_DIR=/opt/homebrew/opt/openssl@4 -DUSE_ECH=ON -DCURL_USE_GSASL=ON -DUSE_APPLE_IDN=ON -DUSE_NGTCP2=ON -DCURL_DISABLE_VERBOSE_STRINGS=ON
-              -DUSE_APPLE_SECTRUST=ON -DCURL_ENABLE_NTLM=ON
+              -DUSE_APPLE_SECTRUST=ON -DCURL_ENABLE_NTLM=ON -DUSE_PROXY_HTTP3=ON
 
           - name: 'MultiSSL AppleIDN clang-tidy +examples'
             image: macos-26
             compiler: clang
             install: llvm gnutls nettle libressl krb5 mbedtls gsasl rustls-ffi libssh fish
             install_steps: skiprun
+            CFLAGS: -Wunused-macros
             chkprefill: _chkprefill
             generate: >-
               -DCURL_USE_OPENSSL=ON -DOPENSSL_ROOT_DIR=/opt/homebrew/opt/libressl -DCURL_DEFAULT_SSL_BACKEND=openssl
@@ -316,6 +317,7 @@ jobs:
             compiler: clang
             install: llvm libnghttp3 libngtcp2 openldap krb5
             install_steps: skipall
+            CFLAGS: -Wunused-macros
             generate: >-
               -DCURL_USE_OPENSSL=ON -DOPENSSL_ROOT_DIR=/opt/homebrew/opt/openssl -DUSE_NGTCP2=ON
               -DLDAP_INCLUDE_DIR=/opt/homebrew/opt/openldap/include
@@ -324,7 +326,7 @@ jobs:
               -DCURL_USE_GSSAPI=ON -DGSS_ROOT_DIR=/opt/homebrew/opt/krb5
               -DCURL_BROTLI=ON -DCURL_ZSTD=ON
               -DCURL_CLANG_TIDY=ON -DCLANG_TIDY=/opt/homebrew/opt/llvm/bin/clang-tidy
-              -DCURL_ENABLE_NTLM=ON
+              -DCURL_ENABLE_NTLM=ON -DUSE_PROXY_HTTP3=ON
 
           - name: 'LibreSSL openldap krb5 c-ares +examples'
             compiler: clang
@@ -345,16 +347,17 @@ jobs:
           - name: 'mbedTLS !ldap brotli zstd MultiSSL AppleIDN'
             compiler: llvm@18
             install: brotli mbedtls zstd
-            install_steps: codeset-test
+            install_steps: codeset-test1
             generate: -DCURL_USE_MBEDTLS=ON -DCURL_DISABLE_LDAP=ON -DCURL_DEFAULT_SSL_BACKEND=mbedtls -DCURL_USE_OPENSSL=ON -DUSE_APPLE_IDN=ON -DCURL_ENABLE_NTLM=ON
 
           - name: 'GnuTLS !ldap krb5 +examples'
             compiler: clang
             install: gnutls nettle krb5
+            install_steps: codeset-test2
             generate: >-
               -DENABLE_DEBUG=ON -DCURL_USE_GNUTLS=ON -DCURL_USE_OPENSSL=OFF
               -DCURL_USE_GSSAPI=ON -DGSS_ROOT_DIR=/opt/homebrew/opt/krb5
-              -DCURL_DISABLE_LDAP=ON -DUSE_SSLS_EXPORT=ON -DCURL_ENABLE_NTLM=ON
+              -DCURL_DISABLE_LDAP=ON -DUSE_SSLS_EXPORT=ON
 
           - name: 'aws-lc +analyzer'
             compiler: gcc-15
@@ -371,21 +374,21 @@ jobs:
 
           - name: 'OpenSSL torture 1'
             compiler: clang
-            install: openssl@4 libnghttp3
+            install: openssl@4
             install_steps: torture
             generate: -DENABLE_DEBUG=ON -DBUILD_SHARED_LIBS=OFF -DENABLE_THREADED_RESOLVER=OFF -DOPENSSL_ROOT_DIR=/opt/homebrew/opt/openssl@4 -DUSE_ECH=ON -DCURL_ENABLE_NTLM=ON
             tflags: '-t --shallow=25 --min=480 1 to 500'
 
           - name: 'OpenSSL torture 2'
             compiler: clang
-            install: openssl@4 libnghttp3
+            install: openssl@4
             install_steps: torture
             generate: -DENABLE_DEBUG=ON -DBUILD_SHARED_LIBS=OFF -DENABLE_THREADED_RESOLVER=OFF -DOPENSSL_ROOT_DIR=/opt/homebrew/opt/openssl@4 -DUSE_ECH=ON -DCURL_ENABLE_NTLM=ON
             tflags: '-t --shallow=25 --min=730 501 to 1250'
 
           - name: 'OpenSSL torture 3'
             compiler: clang
-            install: openssl@4 libnghttp3
+            install: openssl@4
             install_steps: torture
             generate: -DENABLE_DEBUG=ON -DBUILD_SHARED_LIBS=OFF -DENABLE_THREADED_RESOLVER=OFF -DOPENSSL_ROOT_DIR=/opt/homebrew/opt/openssl@4 -DUSE_ECH=ON -DCURL_ENABLE_NTLM=ON
             tflags: '-t --shallow=25 --min=628 1251 to 9999'
@@ -413,7 +416,7 @@ jobs:
           # shellcheck disable=SC2181
           while [[ $? == 0 ]]; do
             for i in 1 2 3; do
-              if brew update && brew install pkgconf libpsl libssh2 ${INSTALL_PACKAGES} ${MATRIX_INSTALL}; then
+              if brew install pkgconf libpsl libssh2 ${INSTALL_PACKAGES} ${MATRIX_INSTALL}; then
                 break 2
               else
                 echo "Error: wait to try again: $i"
@@ -445,6 +448,7 @@ jobs:
 
       - name: 'configure'
         env:
+          CFLAGS: '${{ matrix.build.CFLAGS }}'
           MATRIX_CHKPREFILL: '${{ matrix.build.chkprefill }}'
           MATRIX_CONFIGURE: '${{ matrix.build.configure }}'
           MATRIX_GENERATE: '${{ matrix.build.generate }}'
@@ -479,7 +483,6 @@ jobs:
               false
             fi
           else
-            export CFLAGS
             if [[ "${MATRIX_COMPILER}" = 'llvm'* ]]; then
               options+=" --target=$(uname -m)-apple-darwin"
             fi
@@ -558,11 +561,20 @@ jobs:
             TFLAGS+=' --buildinfo'  # only test-ci sets this by default, set it manually for test-torture
           fi
           source ~/venv/bin/activate
-          if [[ "${MATRIX_INSTALL_STEPS}" = *'codeset-test'* ]]; then
+          if [[ "${MATRIX_INSTALL_STEPS}" = *'codeset-test1'* ]]; then
             locale || true
-            export LC_ALL=C
+            unset LANG
+            unset LC_ALL
+            unset LC_COLLATE
+            unset LC_MESSAGES
+            unset LC_MONETARY
+            unset LC_TIME
             export LC_CTYPE=C
             export LC_NUMERIC=fr_FR.UTF-8
+          elif [[ "${MATRIX_INSTALL_STEPS}" = *'codeset-test2'* ]]; then
+            locale || true
+            unset LC_ALL
+            export LC_TIME=fr_FR
           fi
           rm -f ~/.curlrc
           if [ "${MATRIX_BUILD}" = 'cmake' ]; then
@@ -646,7 +658,7 @@ jobs:
           # Reduce build combinations, by dropping less interesting ones
           - { image: macos-26, compiler: 'gcc-13' }
           - { compiler: 'gcc-14' , build: cmake }
-          # Reduce autotools to just one job that is also build with cmake
+          # Reduce autotools to only one job that is also build with cmake
           - { compiler: 'gcc-13' , build: autotools }
           - { compiler: 'gcc-14' , build: autotools }
           - { compiler: 'gcc-15' , build: autotools }
@@ -662,7 +674,7 @@ jobs:
           # shellcheck disable=SC2181
           while [[ $? == 0 ]]; do
             for i in 1 2 3; do
-              if brew update && brew install automake libtool; then
+              if brew install automake libtool; then
                 break 2
               else
                 echo "Error: wait to try again: $i"

@@ -49,7 +49,7 @@ jobs:
       - name: 'maketgz'
         run: SOURCE_DATE_EPOCH=1711526400 ./scripts/maketgz 99.98.97
 
-      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: 'release-tgz'
           path: 'curl-99.98.97.tar.gz'
@@ -268,7 +268,7 @@ jobs:
       matrix:
         image: [ubuntu-24.04-arm, macos-latest, windows-2022]
     steps:
-      - uses: msys2/setup-msys2@cafece8e6baf9247cf9b1bf95097b0b983cc558d # v2.31.0
+      - uses: msys2/setup-msys2@e9898307ac31d1a803454791be09ab9973336e1c # v2.31.1
         if: ${{ contains(matrix.image, 'windows') }}
         with:
           msystem: mingw64
@@ -285,22 +285,24 @@ jobs:
           if [[ "${MATRIX_IMAGE}" = *'windows'* ]]; then
             cd ~
             curl --disable --fail --silent --show-error --connect-timeout 15 --max-time 60 --retry 3 --retry-connrefused \
-              --location "https://github.com/Kitware/CMake/releases/download/v${OLD_CMAKE_VERSION}/cmake-${OLD_CMAKE_VERSION}-win64-x64.zip" --output pkg.bin
+              --location --proto-redir =https "https://github.com/Kitware/CMake/releases/download/v${OLD_CMAKE_VERSION}/cmake-${OLD_CMAKE_VERSION}-win64-x64.zip" --output pkg.bin
             sha256sum pkg.bin && sha256sum pkg.bin | grep -qwF -- "${OLD_CMAKE_SHA256_WIN_INTEL}" && unzip -q pkg.bin && rm -f pkg.bin
             printf '%s' ~/cmake-"${OLD_CMAKE_VERSION}"-win64-x64/bin/cmake.exe > ~/old-cmake-path.txt
           elif [[ "${MATRIX_IMAGE}" = *'ubuntu'* ]]; then
+            sudo find /etc/apt/sources.list.d -type f -not -name 'ubuntu.sources' -delete -print
             sudo sed -i 's/priority:1/priority:9/' /etc/apt/apt-mirrors.txt; cat /etc/apt/apt-mirrors.txt
+            sudo apt-get -o Dpkg::Use-Pty=0 update
             sudo apt-get -o Dpkg::Use-Pty=0 install libpsl-dev libssl-dev
             cd ~
             curl --disable --fail --silent --show-error --connect-timeout 15 --max-time 60 --retry 3 --retry-connrefused \
-              --location "https://github.com/Kitware/CMake/releases/download/v${OLD_CMAKE_VERSION}/cmake-${OLD_CMAKE_VERSION}-Linux-aarch64.tar.gz" --output pkg.bin
+              --location --proto-redir =https "https://github.com/Kitware/CMake/releases/download/v${OLD_CMAKE_VERSION}/cmake-${OLD_CMAKE_VERSION}-Linux-aarch64.tar.gz" --output pkg.bin
             sha256sum pkg.bin | tee /dev/stderr | grep -qwF -- "${OLD_CMAKE_SHA256_LINUX_ARM}" && tar -xzf pkg.bin && rm -f pkg.bin
             printf '%s' ~/cmake-"${OLD_CMAKE_VERSION}"-Linux-aarch64/bin/cmake > ~/old-cmake-path.txt
           else
             brew install libpsl openssl
             cd ~
             curl --disable --fail --silent --show-error --connect-timeout 15 --max-time 60 --retry 3 --retry-connrefused \
-              --location "https://github.com/Kitware/CMake/releases/download/v${OLD_CMAKE_VERSION}/cmake-${OLD_CMAKE_VERSION}-macos-universal.tar.gz" --output pkg.bin
+              --location --proto-redir =https "https://github.com/Kitware/CMake/releases/download/v${OLD_CMAKE_VERSION}/cmake-${OLD_CMAKE_VERSION}-macos-universal.tar.gz" --output pkg.bin
             sha256sum pkg.bin | tee /dev/stderr | grep -qwF -- "${OLD_CMAKE_SHA256_MACOS_UNI}" && tar -xzf pkg.bin && rm -f pkg.bin
             printf '%s' ~/cmake-"${OLD_CMAKE_VERSION}"-macos-universal/CMake.app/Contents/bin/cmake > ~/old-cmake-path.txt
           fi
@@ -367,3 +369,41 @@ jobs:
             export TEST_CMAKE_FLAGS='-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc -DOPENSSL_ROOT_DIR=C:/msys64/mingw64'
           fi
           ./tests/cmake/test.sh find_package ${TESTOPTS} -DCURL_USE_OPENSSL=ON
+
+  verify-tarball-downloads:
+    name: 'Verify tarball downloads'
+    runs-on: ubuntu-slim
+    timeout-minutes: 2
+    steps:
+      - name: 'download and import GPG key'
+        env:
+          CURL_GPG_ID: 27EDEAF22F3ABCEB50DB9A125CC908FDB71E12C2
+        run: |
+          for keyserver in \
+            https://keyserver.ubuntu.com/ \
+            https://pgpkeys.eu/ \
+          ; do
+            echo "--- Downloading from ${keyserver}..."
+            if curl --disable --fail --silent --show-error --connect-timeout 15 --max-time 60 --retry 3 --retry-connrefused \
+               "${keyserver}pks/lookup?op=get&options=mr&exact=on&search=0x${CURL_GPG_ID}" \
+               | gpg --batch --keyserver-options timeout=15 --display-charset utf-8 --keyid-format 0xlong --import --status-fd 1 2>&1; then
+              break
+            fi
+          done
+
+      - name: 'download and verify tarballs'
+        run: |
+          echo "--- Detecting latest curl tarball version..."
+          curl_version="$(curl --disable --fail --silent --show-error --connect-timeout 15 --max-time 60 --retry 3 --retry-connrefused https://curl.se/info.json \
+            | jq --raw-output .Version)"
+
+          for suffix in .tar.bz2 .tar.gz .tar.xz .zip; do
+            echo "--- Downloading ${curl_version} ${suffix}..."
+            curl --disable --fail --silent --show-error --connect-timeout 15 --max-time 60 --retry 3 --retry-connrefused \
+              --output pkg.bin "https://curl.se/download/curl-${curl_version}${suffix}" \
+              --output pkg.sig "https://curl.se/download/curl-${curl_version}${suffix}.asc"
+            echo "--- Verifying ${curl_version} ${suffix}..."
+            gpg --batch --keyserver-options timeout=15 --display-charset utf-8 --keyid-format 0xlong --verify-options show-primary-uid-only \
+              --verify pkg.sig pkg.bin 2>&1
+            echo '---'
+          done
