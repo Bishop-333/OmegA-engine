@@ -36,7 +36,7 @@ and one exported function: Perform
 
 #include "vm_local.h"
 
-opcode_info_t ops[ OP_MAX ] =
+const opcode_info_t ops[ OP_MAX ] =
 {
 	// size, stack, nargs, flags
 	{ 0, 0, 0, 0 }, // undef
@@ -1146,6 +1146,7 @@ static void VM_Fixup( instruction_t *buf, int instructionCount )
 VM_LoadInstructions
 
 loads instructions in structured format
+performs basic consistency checks
 =================
 */
 const char *VM_LoadInstructions( const byte *code_pos, int codeLength, int instructionCount, instruction_t *buf )
@@ -1165,7 +1166,7 @@ const char *VM_LoadInstructions( const byte *code_pos, int codeLength, int instr
 	// load instructions and perform some initial calculations/checks
 	for ( i = 0; i < instructionCount; i++, ci++, op1 = op0 ) {
 		op0 = *code_pos;
-		if ( op0 < 0 || op0 >= OP_MAX ) {
+		if ( (unsigned) op0 >= OP_MAX ) {
 			sprintf( errBuf, "bad opcode %02X at offset %d", op0, (int)(code_pos - code_start) );
 			return errBuf;
 		}
@@ -1197,6 +1198,16 @@ const char *VM_LoadInstructions( const byte *code_pos, int codeLength, int instr
 
 		ci->opStack = opStack;
 		opStack += ops[ op0 ].stack;
+
+		// opstack checks
+		if ( opStack < 0 ) {
+			sprintf( errBuf, "opStack underflow at %i", i );
+			return errBuf;
+		}
+		if ( opStack >= PROC_OPSTACK_SIZE * 4 ) {
+			sprintf( errBuf, "opStack overflow at %i", i );
+			return errBuf;
+		}
 	}
 
 	return NULL;
@@ -1243,22 +1254,6 @@ const char *VM_CheckInstructions( instruction_t *buf,
 	int startp, endp;
 	int safe_stores;
 	int unsafe_stores;
-
-	ci = buf;
-	opStack = 0;
-
-	// opstack checks
-	for ( i = 0; i < instructionCount; i++, ci++ ) {
-		opStack += ops[ ci->op ].stack;
-		if ( opStack < 0 ) {
-			sprintf( errBuf, "opStack underflow at %i", i );
-			return errBuf;
-		}
-		if ( opStack >= PROC_OPSTACK_SIZE * 4 ) {
-			sprintf( errBuf, "opStack overflow at %i", i );
-			return errBuf;
-		}
-	}
 
 	ci = buf;
 	pstack = 0;
@@ -1346,9 +1341,11 @@ const char *VM_CheckInstructions( instruction_t *buf,
 			continue;
 		}
 
-		// proc opstack will carry max.possible opstack value
-		if ( proc && ci->opStack > proc->opStack )
+		// proc opStack will carry max.used opStack value
+		// to be checked against vm->opStackTop on function entry
+		if ( proc && ci->opStack > proc->opStack ) {
 			proc->opStack = ci->opStack;
+		}
 
 		// function return
 		if ( op0 == OP_LEAVE ) {
@@ -1358,7 +1355,7 @@ const char *VM_CheckInstructions( instruction_t *buf,
 				sprintf( errBuf, "bad programStack %i at %i", v, i );
 				return errBuf;
 			}
-			// bad opStack before return
+			// bad opStack before return: either void (OP_PUSH) or real value must be present
 			if ( ci->opStack != 4 ) {
 				v = ci->opStack;
 				sprintf( errBuf, "bad opStack %i at %i", v, i );
@@ -1440,6 +1437,10 @@ const char *VM_CheckInstructions( instruction_t *buf,
 					proc->swtch = 1;
 				else
 					ci->swtch = 1;
+			}
+			// mark next instruction as jump target too
+			if ( i < instructionCount-1 ) {
+				buf[i+1].jused = 1;
 			}
 			continue;
 		}
