@@ -876,19 +876,17 @@ static void mov_sx( uint32_t dst, uint32_t src )
 }
 
 
-static uint32_t clone_rx( uint32_t reg )
+static uint32_t split_rx( uint32_t reg )
 {
 	const uint32_t rx = alloc_rx( R5 );
-	mov_rx( rx, reg );
 	unmask_rx( reg );
 	return rx;
 }
 
 
-static uint32_t clone_sx( uint32_t reg )
+static uint32_t split_sx( uint32_t reg )
 {
 	const uint32_t sx = alloc_sx( F5 );
-	mov_sx( sx, reg );
 	unmask_sx( reg );
 	return sx;
 }
@@ -2203,10 +2201,10 @@ __recompile:
 								// stores of different sizes). Zero-extend a *copy* so
 								// the in-place reduction can't clobber that value -
 								// mirrors the clone-on-alias guard in finish_rx().
-								mask_rx( rx[0] );            // clone_rx unmasks the source
-								rx[0] = clone_rx( rx[0] );   // new masked reg = copy
-								emit( PPC_CLRLDI( rx[0], rx[0], bits ) ); // (unsigned) zero-extend copy
-								set_rx_ext( rx[0], need );
+								rx[1] = split_rx( rx[0] );
+								emit( PPC_CLRLDI( rx[1], rx[0], bits ) ); // (unsigned) zero-extend copy
+								set_rx_ext( rx[1], need );
+								rx[0] = rx[1]; // remap rx[0] to the copy
 							} else {
 								// sole owner: zero-extend in place and update the cache
 								emit( PPC_CLRLDI( rx[0], rx[0], bits ) ); // RX = (unsigned) RX

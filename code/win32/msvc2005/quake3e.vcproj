@@ -67,7 +67,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="comctl32.lib winmm.lib wsock32.lib ws2_32.lib ..\..\libcurl\windows\vs2005\lib32\libcurl_a_debug.lib"
+				AdditionalDependencies="comctl32.lib winmm.lib wsock32.lib ws2_32.lib iphlpapi.lib ..\..\libcurl\windows\vs2005\lib32\libcurl_a_debug.lib"
 				OutputFile="$(OutDir)\quake3e-debug.exe"
 				LinkIncremental="2"
 				GenerateDebugInformation="true"
@@ -154,7 +154,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="comctl32.lib winmm.lib wsock32.lib ws2_32.lib crypt32.lib ..\..\libcurl\windows\vs2005\lib64\libcurl_a_debug.lib"
+				AdditionalDependencies="comctl32.lib winmm.lib wsock32.lib ws2_32.lib iphlpapi.lib crypt32.lib ..\..\libcurl\windows\vs2005\lib64\libcurl_a_debug.lib"
 				OutputFile="$(OutDir)\quake3e-debug.x64.exe"
 				LinkIncremental="2"
 				GenerateDebugInformation="true"
@@ -233,7 +233,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/DYNAMICBASE"
-				AdditionalDependencies="comctl32.lib winmm.lib wsock32.lib ws2_32.lib ..\..\libcurl\windows\vs2005\lib32\libcurl_a.lib"
+				AdditionalDependencies="comctl32.lib winmm.lib wsock32.lib ws2_32.lib iphlpapi.lib ..\..\libcurl\windows\vs2005\lib32\libcurl_a.lib"
 				OutputFile="$(OutDir)\quake3e.exe"
 				GenerateMapFile="true"
 				MapFileName="$(IntDir)\quake3e.map"
@@ -313,7 +313,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/DYNAMICBASE"
-				AdditionalDependencies="comctl32.lib winmm.lib wsock32.lib ws2_32.lib crypt32.lib ..\..\libcurl\windows\vs2005\lib64\libcurl_a.lib"
+				AdditionalDependencies="comctl32.lib winmm.lib wsock32.lib ws2_32.lib iphlpapi.lib crypt32.lib ..\..\libcurl\windows\vs2005\lib64\libcurl_a.lib"
 				OutputFile="$(OutDir)\quake3e.x64.exe"
 				GenerateMapFile="true"
 				MapFileName="$(IntDir)\quake3e.x64.map"

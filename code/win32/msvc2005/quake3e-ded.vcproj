@@ -66,7 +66,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="comctl32.lib winmm.lib wsock32.lib ws2_32.lib"
+				AdditionalDependencies="comctl32.lib winmm.lib wsock32.lib ws2_32.lib iphlpapi.lib"
 				OutputFile="$(OutDir)\quake3e.ded-debug.exe"
 				LinkIncremental="2"
 				GenerateDebugInformation="true"
@@ -152,7 +152,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="comctl32.lib winmm.lib wsock32.lib ws2_32.lib"
+				AdditionalDependencies="comctl32.lib winmm.lib wsock32.lib ws2_32.lib iphlpapi.lib"
 				OutputFile="$(OutDir)\quake3de.ded-debug.x64.exe"
 				LinkIncremental="2"
 				GenerateDebugInformation="true"
@@ -230,7 +230,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/DYNAMICBASE"
-				AdditionalDependencies="comctl32.lib winmm.lib wsock32.lib ws2_32.lib"
+				AdditionalDependencies="comctl32.lib winmm.lib wsock32.lib ws2_32.lib iphlpapi.lib"
 				OutputFile="$(OutDir)\quake3e.ded.exe"
 				GenerateMapFile="true"
 				MapFileName="$(IntDir)\quake3e.ded.map"
@@ -309,7 +309,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/DYNAMICBASE"
-				AdditionalDependencies="comctl32.lib winmm.lib wsock32.lib ws2_32.lib"
+				AdditionalDependencies="comctl32.lib winmm.lib wsock32.lib ws2_32.lib iphlpapi.lib"
 				OutputFile="$(OutDir)\quake3e.ded.x64.exe"
 				GenerateMapFile="true"
 				MapFileName="$(IntDir)\quake3e.ded.x64.map"

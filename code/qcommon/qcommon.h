@@ -177,7 +177,11 @@ typedef enum {
 } netsrc_t;
 
 
-#define NET_ADDRSTRMAXLEN 48	// maximum length of an IPv6 address string including trailing '\0'
+#ifdef USE_IPV6
+#define NET_ADDRSTRMAXLEN 64	// maximum length of an IPv6 address string including trailing '\0'
+#else
+#define NET_ADDRSTRMAXLEN 16	// maximum length of an IPv4 address string including trailing '\0'
+#endif
 
 typedef struct {
 	netadrtype_t	type;

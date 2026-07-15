@@ -1578,7 +1578,7 @@ static qboolean ParseCondition( const char **text, resultType *res )
 	for ( ;; )
 	{
 		rval_str[0] = '\0';
-		rval_type = TK_GENEGIC;
+		rval_type = TK_GENERIC;
 
 		// expect l-value at least
 		token = COM_ParseComplex( text, qfalse );

@@ -218,18 +218,19 @@ static const char *AAS_ValidateAASData(void)
 	}
 
 	for (i = 0; i < aasworld.numareasettings; i++) {
+		int v;
 		if (CHECK_RANGE(aasworld.areasettings[i].firstreachablearea,
 						aasworld.areasettings[i].numreachableareas,
 						aasworld.reachabilitysize))
 			return "areasettings: bad reachable areas";
-		c = aasworld.areasettings[i].cluster;
-		if (c & 0x80000000) {
-			if (-c >= aasworld.numportals)
+		v = aasworld.areasettings[i].cluster;
+		if (v < 0) {
+			if (-v >= aasworld.numportals)
 				return "areasettings: bad portal";
 		} else {
-			if (c >= aasworld.numclusters)
+			if (v >= aasworld.numclusters)
 				return "areasettings: bad cluster";
-			if ((unsigned)aasworld.areasettings[i].clusterareanum >= (c ? aasworld.clusters[c].numareas : 1))
+			if ((unsigned)aasworld.areasettings[i].clusterareanum >= (v ? aasworld.clusters[c].numareas : 1))
 				return "areasettings: bad clusterareanum";
 		}
 	}
@@ -249,12 +250,12 @@ static const char *AAS_ValidateAASData(void)
 		if ((unsigned)aasworld.nodes[i].planenum >= aasworld.numplanes)
 			return "nodes: bad planenum";
 		for (j = 0; j < 2; j++) {
-			c = aasworld.nodes[i].children[j];
-			if (c & 0x80000000) {
-				if (-c >= aasworld.numareasettings)
+			const int v = aasworld.nodes[i].children[j];
+			if ( v < 0 ) {
+				if (-v >= aasworld.numareasettings)
 					return "nodes: bad areasetting";
 			} else {
-				if (c >= aasworld.numnodes)
+				if (v >= aasworld.numnodes)
 					return "nodes: bad node";
 			}
 		}
@@ -442,7 +443,7 @@ static char *AAS_LoadAASLump(fileHandle_t fp, long offset, unsigned length, long
 	//allocate memory
 	buf = (char *) GetClearedHunkMemory(length);
 	//read the data
-	if (botimport.FS_Read(buf, length, fp) != length) {
+	if (botimport.FS_Read(buf, length, fp) != (int)length) {
 		AAS_Error("can't read AAS file\n");
 		AAS_DumpAASData();
 		botimport.FS_FCloseFile(fp);
