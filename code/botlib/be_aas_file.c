@@ -230,7 +230,7 @@ static const char *AAS_ValidateAASData(void)
 		} else {
 			if (v >= aasworld.numclusters)
 				return "areasettings: bad cluster";
-			if ((unsigned)aasworld.areasettings[i].clusterareanum >= (v ? aasworld.clusters[c].numareas : 1))
+			if ((unsigned)aasworld.areasettings[i].clusterareanum >= (v ? aasworld.clusters[v].numareas : 1))
 				return "areasettings: bad clusterareanum";
 		}
 	}
