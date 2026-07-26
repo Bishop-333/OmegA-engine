@@ -5,3 +5,4 @@ output/
 *.user
 cmake-*
 .idea
+.DS_Store
