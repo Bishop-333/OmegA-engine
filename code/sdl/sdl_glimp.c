@@ -57,6 +57,10 @@ cvar_t *r_availableModes;
 cvar_t *r_stereoEnabled;
 cvar_t *in_nograb;
 
+#ifdef __APPLE__
+cvar_t *r_metalHUD;
+#endif
+
 float displayAspect = 0.0f;
 
 /*
@@ -750,6 +754,14 @@ static rserr_t GLimp_StartDriverAndSetMode( int mode, const char *modeFS, qboole
 		int minor = SDL_VERSIONNUM_MINOR(version);
 		int micro = SDL_VERSIONNUM_MICRO(version);
 
+#ifdef __APPLE__
+		if ( r_metalHUD->integer ) {
+			setenv( "MTL_HUD_ENABLED", "1", 1 );
+		} else {
+			unsetenv( "MTL_HUD_ENABLED" );
+		}
+#endif
+
 		if ( !SDL_Init( SDL_INIT_VIDEO ) )
 		{
 			Com_Printf( "SDL_Init( SDL_INIT_VIDEO ) FAILED (%s)\n", SDL_GetError() );
@@ -809,6 +821,11 @@ void GLimp_Init( glconfig_t *config )
 	r_swapInterval = Cvar_Get( "r_swapInterval", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	r_stereoEnabled = Cvar_Get( "r_stereoEnabled", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	Cvar_SetDescription( r_stereoEnabled, "Enable stereo rendering for techniques like shutter glasses." );
+
+#ifdef __APPLE__
+	r_metalHUD = Cvar_Get( "r_metalHUD", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	Cvar_SetDescription( r_metalHUD, "Adds a real-time overlay that displays common graphics performance information." );
+#endif
 
 	// Create the window and set up the context
 	err = GLimp_StartDriverAndSetMode( r_mode->integer, r_modeFullscreen->string, r_fullscreen->integer, qfalse );
@@ -902,6 +919,11 @@ void VKimp_Init( glconfig_t *config )
 	r_swapInterval = Cvar_Get( "r_swapInterval", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	r_stereoEnabled = Cvar_Get( "r_stereoEnabled", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	Cvar_SetDescription( r_stereoEnabled, "Enable stereo rendering for techniques like shutter glasses." );
+
+#ifdef __APPLE__
+	r_metalHUD = Cvar_Get( "r_metalHUD", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	Cvar_SetDescription( r_metalHUD, "Adds a real-time overlay that displays common graphics performance information." );
+#endif
 
 	// feedback to renderer configuration
 	glw_state.config = config;
