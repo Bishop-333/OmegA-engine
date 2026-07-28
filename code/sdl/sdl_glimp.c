@@ -755,10 +755,12 @@ static rserr_t GLimp_StartDriverAndSetMode( int mode, const char *modeFS, qboole
 		int micro = SDL_VERSIONNUM_MICRO(version);
 
 #ifdef __APPLE__
-		if ( r_metalHUD->integer ) {
-			setenv( "MTL_HUD_ENABLED", "1", 1 );
-		} else {
-			unsetenv( "MTL_HUD_ENABLED" );
+		if ( vulkan ) {
+			if ( r_metalHUD->integer ) {
+				setenv( "MTL_HUD_ENABLED", "1", 1 );
+			} else {
+				unsetenv( "MTL_HUD_ENABLED" );
+			}
 		}
 #endif
 
@@ -821,11 +823,6 @@ void GLimp_Init( glconfig_t *config )
 	r_swapInterval = Cvar_Get( "r_swapInterval", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	r_stereoEnabled = Cvar_Get( "r_stereoEnabled", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	Cvar_SetDescription( r_stereoEnabled, "Enable stereo rendering for techniques like shutter glasses." );
-
-#ifdef __APPLE__
-	r_metalHUD = Cvar_Get( "r_metalHUD", "1", CVAR_ARCHIVE | CVAR_LATCH );
-	Cvar_SetDescription( r_metalHUD, "Adds a real-time overlay that displays common graphics performance information." );
-#endif
 
 	// Create the window and set up the context
 	err = GLimp_StartDriverAndSetMode( r_mode->integer, r_modeFullscreen->string, r_fullscreen->integer, qfalse );
