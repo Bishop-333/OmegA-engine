@@ -884,7 +884,27 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 
 	case UI_FS_GETFILELIST:
 		VM_CHECKBOUNDS( uivm, args[3], args[4] );
-		return FS_GetFileList( VMA(1), VMA(2), VMA(3), args[4] );
+		{
+			char *buffer = VMA(3);
+			int bufSize = args[4];
+			int i, total = 0;
+
+			if ( strstr(VMA(2), DEMOEXT) ) {
+				buffer[0] = '\0';
+				for ( i = 0; demo_protocols[i]; i++ ) {
+					int nFiles = FS_GetFileList( VMA(1), va(".%s%d", DEMOEXT, demo_protocols[i]), buffer, bufSize );
+					while (nFiles--) {
+						int len = strlen( buffer ) + 1;
+						bufSize -= len;
+						buffer += len;
+						total++;
+					}
+				}
+				return total;
+			}
+
+			return FS_GetFileList( VMA(1), VMA(2), buffer, bufSize );
+		}
 
 	case UI_R_REGISTERMODEL:
 		return re.RegisterModel( VMA(1) );
