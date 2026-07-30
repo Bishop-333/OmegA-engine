@@ -23,6 +23,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "q_shared.h"
 #include "qcommon.h"
+
+#ifdef TRACY_ENABLE
+#include "tracy/TracyC.h"
+#endif
+
 #include <setjmp.h>
 #ifndef _WIN32
 #include <netinet/in.h>
@@ -4260,6 +4265,10 @@ Com_Frame
 */
 void Com_Frame( qboolean noDelay ) {
 
+#ifdef TRACY_ENABLE
+	TracyCZone(ctx_comframe, 1);
+#endif
+
 #ifndef DEDICATED
 	static int bias = 0;
 #endif
@@ -4492,6 +4501,11 @@ void Com_Frame( qboolean noDelay ) {
 	}
 
 	com_frameNumber++;
+
+#ifdef TRACY_ENABLE
+	TracyCZoneEnd(ctx_comframe);
+	TracyCFrameMark;
+#endif
 }
 
 

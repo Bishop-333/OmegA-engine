@@ -22,6 +22,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "tr_local.h"
 
+#ifdef TRACY_ENABLE
+#include "tracy/TracyC.h"
+#endif
+
 static int			r_firstSceneDrawSurf;
 #ifdef USE_PMLIGHT
 static int			r_firstSceneLitSurf;
@@ -387,6 +391,10 @@ void RE_RenderScene( const refdef_t *fd ) {
 	viewParms_t		parms;
 	int				startTime;
 
+#ifdef TRACY_ENABLE
+	TracyCZone(ctx_renderscene, 1);
+#endif
+
 	if ( !tr.registered ) {
 		return;
 	}
@@ -565,4 +573,8 @@ void RE_RenderScene( const refdef_t *fd ) {
 	r_firstScenePoly = r_numpolys;
 
 	tr.frontEndMsec += ri.Milliseconds() - startTime;
+
+#ifdef TRACY_ENABLE
+	TracyCZoneEnd(ctx_renderscene);
+#endif
 }

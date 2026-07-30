@@ -45,6 +45,8 @@ USE_ZLIB_NG      = 1
 USE_SYSTEM_ZLIB  = 0
 USE_LOCAL_HEADERS= 0
 
+USE_TRACY        = 1
+
 USE_OGG_VORBIS    = 1
 USE_SYSTEM_OGG    = 0
 USE_SYSTEM_VORBIS = 0
@@ -1030,6 +1032,11 @@ $(echo_cmd) "CC $<"
 $(Q)$(CC) $(CFLAGS) -o $@ -c $<
 endef
 
+define DO_CXX
+$(echo_cmd) "CXX $<"
+$(Q)$(CXX) $(CXXFLAGS) -o $@ -c $<
+endef
+
 define DO_CC_QVM
 $(echo_cmd) "CC_QVM $<"
 $(Q)$(CC) $(CFLAGS) -fno-fast-math -o $@ -c $<
@@ -1039,6 +1046,12 @@ define DO_REND_CC
 $(echo_cmd) "REND_CC $<"
 $(Q)$(CC) $(CFLAGS) $(RENDCFLAGS) -o $@ -c $<
 endef
+
+define DO_REND_CXX
+$(echo_cmd) "REND_CXX $<"
+$(Q)$(CXX) $(CXXFLAGS) $(RENDCFLAGS) -o $@ -c $<
+endef
+
 
 define DO_REF_STR
 $(echo_cmd) "REF_STR $<"
@@ -1344,6 +1357,18 @@ ifneq ($(USE_RENDERER_DLOPEN), 0)
     $(B)/rendv/q_math.o
 endif
 
+ifeq ($(USE_TRACY),1)
+  Q3REND1OBJ += $(B)/rend1/TracyClient.o
+  Q3RENDVOBJ += $(B)/rendv/TracyClient.o
+  ifeq ($(COMPILE_PLATFORM),darwin)
+    LDFLAGS += -lc++
+    CLIENT_LDFLAGS += -lc++
+  else
+    LDFLAGS += -lstdc++
+    CLIENT_LDFLAGS += -lstdc++
+  endif
+endif
+
 JPGOBJ = \
   $(B)/client/jpeg/jaricom.o \
   $(B)/client/jpeg/jcapimin.o \
@@ -1570,6 +1595,18 @@ endif
 ifeq ($(USE_FLAC),1)
   Q3OBJ += $(FLACOBJ) \
     $(B)/client/snd_codec_flac.o
+endif
+
+ifeq ($(USE_TRACY),1)
+  Q3OBJ += $(B)/client/TracyClient.o
+  BASE_CFLAGS += -DTRACY_ENABLE -Icode/thirdparty/tracy/public
+  CXX ?= c++
+  CXXFLAGS += -std=c++11 -DTRACY_ENABLE -Icode/thirdparty/tracy/public
+  ifeq ($(COMPILE_PLATFORM),darwin)
+    CLIENT_LDFLAGS += -lc++
+  else
+    CLIENT_LDFLAGS += -lstdc++
+  endif
 endif
 
 ifeq ($(USE_OPENAL),1)
@@ -1831,6 +1868,9 @@ $(B)/client/%.o: $(ADIR)/%.s
 $(B)/client/%.o: $(CDIR)/%.c
 	$(DO_CC)
 
+$(B)/client/TracyClient.o: code/thirdparty/tracy/public/TracyClient.cpp
+	$(DO_CXX)
+
 $(B)/client/%.o: $(SDIR)/%.c
 	$(DO_CC)
 
@@ -1878,6 +1918,12 @@ $(B)/rendv/%.o: $(RCDIR)/%.c
 
 $(B)/rendv/%.o: $(CMDIR)/%.c
 	$(DO_REND_CC)
+
+$(B)/rendv/TracyClient.o: code/thirdparty/tracy/public/TracyClient.cpp
+	$(DO_REND_CXX)
+
+$(B)/rend1/TracyClient.o: code/thirdparty/tracy/public/TracyClient.cpp
+	$(DO_REND_CXX)
 
 $(B)/client/%.o: $(UDIR)/%.c
 	$(DO_CC)
