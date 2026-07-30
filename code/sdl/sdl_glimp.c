@@ -55,6 +55,7 @@ static PFN_vkGetInstanceProcAddr qvkGetInstanceProcAddr;
 
 cvar_t *r_availableModes;
 cvar_t *r_stereoEnabled;
+cvar_t *r_highDPI;
 cvar_t *in_nograb;
 
 #ifdef __APPLE__
@@ -466,12 +467,10 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 		flags |= SDL_WINDOW_BORDERLESS;
 	}
 
-#ifdef __APPLE__
-		if ( r_fullscreen->integer == 2 || r_modeFullscreen->integer == -2 || ( !r_modeFullscreen->string[0] && r_mode->integer == -2 ) )
-		{
-			flags |= SDL_WINDOW_HIGH_PIXEL_DENSITY;
-		}
-#endif
+	if ( r_highDPI->integer )
+	{
+		flags |= SDL_WINDOW_HIGH_PIXEL_DENSITY;
+	}
 
 	colorBits = r_colorbits->value;
 
@@ -819,10 +818,13 @@ void GLimp_Init( glconfig_t *config )
 
 	r_allowSoftwareGL = Cvar_Get( "r_allowSoftwareGL", "0", CVAR_LATCH );
 	r_allowResize = Cvar_Get( "r_allowResize", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	Cvar_SetDescription( r_allowResize, "Allow/disallow user resizing of the window." );
 
 	r_swapInterval = Cvar_Get( "r_swapInterval", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	r_stereoEnabled = Cvar_Get( "r_stereoEnabled", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	Cvar_SetDescription( r_stereoEnabled, "Enable stereo rendering for techniques like shutter glasses." );
+	r_highDPI = Cvar_Get( "r_highDPI", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	Cvar_SetDescription( r_highDPI, "Enable native pixel density matching for the display, otherwise pixel size will match window size." );
 
 	// Create the window and set up the context
 	err = GLimp_StartDriverAndSetMode( r_mode->integer, r_modeFullscreen->string, r_fullscreen->integer, qfalse );
@@ -916,6 +918,8 @@ void VKimp_Init( glconfig_t *config )
 	r_swapInterval = Cvar_Get( "r_swapInterval", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	r_stereoEnabled = Cvar_Get( "r_stereoEnabled", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	Cvar_SetDescription( r_stereoEnabled, "Enable stereo rendering for techniques like shutter glasses." );
+	r_highDPI = Cvar_Get( "r_highDPI", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	Cvar_SetDescription( r_highDPI, "Enable native pixel density matching for the display, otherwise pixel size will match window size." );
 
 #ifdef __APPLE__
 	r_metalHUD = Cvar_Get( "r_metalHUD", "1", CVAR_ARCHIVE | CVAR_LATCH );
