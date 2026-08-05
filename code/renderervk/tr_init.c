@@ -2039,6 +2039,9 @@ Touch all images to make sure they are resident
 =============
 */
 static void RE_EndRegistration( void ) {
+	R_ProcessAsyncImages();
+	R_ShutdownAsyncWorker();
+
 #ifdef USE_VULKAN
 	vk_wait_idle();
 	// command buffer is not in recording state at this stage

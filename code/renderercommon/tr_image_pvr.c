@@ -295,7 +295,7 @@ void R_LoadPVR(const char *name, byte **pic, int *width, int *height)
 
 	// check magic identifier
 	if (memcmp(ptr, "PVRT", 4) != 0)
-		ri.Error(ERR_DROP, "LoadPVR: magic identifier does not match expected (%s)", name);
+		{ ri.Printf( PRINT_WARNING, "LoadPVR: magic identifier does not match expected (%s)", name ); goto fail; }
 
 	// fix up header
 	pvr = (pvr_t *)ptr;
@@ -328,7 +328,7 @@ void R_LoadPVR(const char *name, byte **pic, int *width, int *height)
 		}
 		default:
 		{
-			ri.Error(ERR_DROP, "LoadPVR: unsupported pixel type 0x%02x (%s)", pixel_type, name);
+			{ ri.Printf( PRINT_WARNING, "LoadPVR: unsupported pixel type 0x%02x (%s)", pixel_type, name ); goto fail; }
 			break;
 		}
 	}
@@ -368,7 +368,7 @@ void R_LoadPVR(const char *name, byte **pic, int *width, int *height)
 		}
 		default:
 		{
-			ri.Error(ERR_DROP, "LoadPVR: unsupported image type 0x%02x (%s)", image_type, name);
+			{ ri.Printf( PRINT_WARNING, "LoadPVR: unsupported image type 0x%02x (%s)", image_type, name ); goto fail; }
 			break;
 		}
 	}
@@ -386,4 +386,7 @@ void R_LoadPVR(const char *name, byte **pic, int *width, int *height)
 		*width = pvr->width;
 	if (height)
 		*height = pvr->height;
+
+fail:
+	if (!*pic && buffer) ri.FS_FreeFile(buffer);
 }

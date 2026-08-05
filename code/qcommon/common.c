@@ -23,6 +23,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "q_shared.h"
 #include "qcommon.h"
+#include <SDL3/SDL_mutex.h>
+#include <SDL3/SDL_thread.h>
+
+static SDL_Mutex *com_allocMutex = NULL;
+SDL_ThreadID mainThreadID = 0;
+
+
 #include <setjmp.h>
 #ifndef _WIN32
 #include <netinet/in.h>
@@ -1315,6 +1322,8 @@ void Z_Free( void *ptr )
 #endif
 	}
 
+	if ( com_allocMutex ) SDL_LockMutex( com_allocMutex );
+
 	block = (memblock_t *)((byte *)ptr - sizeof( memblock_t ));
 
 #ifdef USE_ZONE_ID
@@ -1329,6 +1338,7 @@ void Z_Free( void *ptr )
 
 #ifdef USE_STATIC_TAGS
 	if ( block->tag == TAG_STATIC ) {
+		if ( com_allocMutex ) SDL_UnlockMutex( com_allocMutex );
 		return;
 	}
 #endif
@@ -1386,6 +1396,7 @@ void Z_Free( void *ptr )
 #ifdef USE_MULTI_SEGMENT
 	InsertFree( zone, block );
 #endif
+	if ( com_allocMutex ) SDL_UnlockMutex( com_allocMutex );
 }
 
 
@@ -1450,6 +1461,8 @@ void *Z_TagMalloc( size_t size, memtag_t tag ) {
 	memzone_t	*zone;
 	size_t		extra;
 
+	if ( com_allocMutex ) SDL_LockMutex( com_allocMutex );
+
 	if ( size > INT_MAX ) {
 		Com_Error( ERR_FATAL, "Z_TagMalloc: %"PRIz"u > INT_MAX", size );
 	}
@@ -1500,6 +1513,7 @@ void *Z_TagMalloc( size_t size, memtag_t tag ) {
 			Com_Error( ERR_FATAL, "Z_Malloc: failed on allocation of %u bytes from the %s zone",
 				size, zone->name );
 #endif
+			if ( com_allocMutex ) SDL_UnlockMutex( com_allocMutex );
 			return NULL;
 		}
 		if ( rover->tag != TAG_FREE ) {
@@ -1546,6 +1560,8 @@ void *Z_TagMalloc( size_t size, memtag_t tag ) {
 	// marker for memory trash testing
 	*(int *)((byte *)base + base->size - 4) = TRASH_ID;
 #endif
+
+	if ( com_allocMutex ) SDL_UnlockMutex( com_allocMutex );
 
 	return (void *)(base + 1);
 }
@@ -1602,6 +1618,8 @@ void Z_CheckHeap( void )
 	const memblock_t *block;
 	const memzone_t *zone;
 
+	if ( com_allocMutex ) SDL_LockMutex( com_allocMutex );
+
 	zone = mainzone;
 	for ( block = zone->blocklist.next; ; ) {
 		if ( block->next == &zone->blocklist ) {
@@ -1628,6 +1646,7 @@ void Z_CheckHeap( void )
 		}
 		block = block->next;
 	}
+	if ( com_allocMutex ) SDL_UnlockMutex( com_allocMutex );
 }
 
 
@@ -3778,6 +3797,9 @@ void Com_Init( char *commandLine ) {
 	const char *s;
 	int	qport;
 	int	startTime;
+
+	com_allocMutex = SDL_CreateMutex();
+	mainThreadID = SDL_GetCurrentThreadID();
 
 	// get the initial time base
 	Sys_Milliseconds();

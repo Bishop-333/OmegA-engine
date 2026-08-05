@@ -171,6 +171,8 @@ void R_LoadPCX ( const char *filename, byte **pic, int *width, int *height)
 
 	*pic = out;
 
-	ri.FS_FreeFile (pcx);
-	ri.Free (pic8);
+fail:
+	if (!*pic && pcx) ri.FS_FreeFile(pcx);
+	if (*pic) ri.FS_FreeFile (pcx);
+	if (pic8) ri.Free (pic8);
 }

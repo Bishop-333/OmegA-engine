@@ -29,6 +29,41 @@ static unsigned char s_gammatable[256];
 static unsigned char s_gammatable_linear[256];
 #endif
 
+#include <SDL3/SDL_thread.h>
+#include <SDL3/SDL_mutex.h>
+#include <SDL3/SDL_timer.h>
+
+#define MAX_ASYNC_JOBS 8192
+
+typedef struct {
+	char name[MAX_QPATH];
+	imgFlags_t flags;
+	image_t *image;
+} asyncImageJob_t;
+
+typedef struct {
+	image_t *image;
+	byte *pic;
+	int width;
+	int height;
+	char localName[MAX_QPATH];
+	imgFlags_t flags;
+} asyncImageCompleted_t;
+
+static asyncImageJob_t asyncJobs[MAX_ASYNC_JOBS];
+static int numAsyncJobs = 0;
+static int asyncJobIndex = 0;
+
+static asyncImageCompleted_t completedJobs[MAX_ASYNC_JOBS];
+static int numCompletedJobs = 0;
+static int processedCompletedJobs = 0;
+
+static SDL_Mutex *asyncMutex = NULL;
+static SDL_Thread *asyncThreads[4] = {NULL};
+static qboolean asyncQuit = qfalse;
+static qboolean asyncActive = qfalse;
+
+
 GLint	gl_filter_min = GL_LINEAR_MIPMAP_NEAREST;
 GLint	gl_filter_max = GL_LINEAR;
 
@@ -1250,6 +1285,151 @@ static const char *R_LoadImage( const char *name, byte **pic, int *width, int *h
 }
 
 
+static int SDLCALL R_AsyncImageWorker(void *data) {
+	while (!asyncQuit) {
+		asyncImageJob_t job;
+		qboolean hasJob = qfalse;
+
+		SDL_LockMutex(asyncMutex);
+		if (asyncJobIndex < numAsyncJobs) {
+			job = asyncJobs[asyncJobIndex++];
+			hasJob = qtrue;
+		}
+		SDL_UnlockMutex(asyncMutex);
+
+		if (hasJob) {
+			byte *pic;
+			int width, height;
+			const char *localName;
+
+			localName = R_LoadImage(job.name, &pic, &width, &height);
+
+			SDL_LockMutex(asyncMutex);
+			if (numCompletedJobs < MAX_ASYNC_JOBS) {
+				asyncImageCompleted_t *comp = &completedJobs[numCompletedJobs++];
+				comp->image = job.image;
+				comp->pic = pic;
+				comp->width = width;
+				comp->height = height;
+				comp->flags = job.flags;
+				if (localName) {
+					Q_strncpyz(comp->localName, localName, sizeof(comp->localName));
+				} else {
+					comp->localName[0] = '\0';
+				}
+			} else {
+				if (pic) ri.Free(pic); // Should not happen
+			}
+			SDL_UnlockMutex(asyncMutex);
+		} else {
+			SDL_Delay(2);
+		}
+	}
+	return 0;
+}
+
+void R_InitAsyncWorker(void) {
+	int i;
+	if (asyncActive) return;
+	asyncMutex = SDL_CreateMutex();
+	asyncQuit = qfalse;
+	numAsyncJobs = 0;
+	asyncJobIndex = 0;
+	numCompletedJobs = 0;
+	processedCompletedJobs = 0;
+	for (i = 0; i < 4; i++) {
+		asyncThreads[i] = SDL_CreateThread(R_AsyncImageWorker, "AsyncImageWorker", NULL);
+	}
+	asyncActive = qtrue;
+}
+
+void R_ShutdownAsyncWorker(void) {
+	int i;
+	if (!asyncActive) return;
+	asyncQuit = qtrue;
+	for (i = 0; i < 4; i++) {
+		if (asyncThreads[i]) {
+			SDL_WaitThread(asyncThreads[i], NULL);
+			asyncThreads[i] = NULL;
+		}
+	}
+	if (asyncMutex) {
+		SDL_DestroyMutex(asyncMutex);
+		asyncMutex = NULL;
+	}
+	asyncActive = qfalse;
+}
+
+void R_ProcessAsyncImages(void) {
+	if (!asyncActive) return;
+	
+	while (processedCompletedJobs < numAsyncJobs) {
+		asyncImageCompleted_t comp;
+		qboolean hasComp = qfalse;
+		
+		SDL_LockMutex(asyncMutex);
+		if (processedCompletedJobs < numCompletedJobs) {
+			comp = completedJobs[processedCompletedJobs++];
+			hasComp = qtrue;
+		}
+		SDL_UnlockMutex(asyncMutex);
+		
+		if (hasComp) {
+			if (comp.pic) {
+				// We need to apply grey scale if needed
+				if ( r_mapGreyScale->value > 0 ) {
+					byte *img;
+					int i;
+					for ( i = 0, img = comp.pic; i < comp.width * comp.height; i++, img += 4 ) {
+						if ( r_mapGreyScale->integer ) {
+							byte luma = LUMA( img[0], img[1], img[2] );
+							img[0] = luma;
+							img[1] = luma;
+							img[2] = luma;
+						} else {
+							float luma = LUMA( img[0], img[1], img[2] );
+							img[0] = LERP( img[0], luma, r_mapGreyScale->value );
+							img[1] = LERP( img[1], luma, r_mapGreyScale->value );
+							img[2] = LERP( img[2], luma, r_mapGreyScale->value );
+						}
+					}
+				}
+
+				comp.image->width = comp.width;
+				comp.image->height = comp.height;
+
+#ifdef USE_VULKAN
+				if ( comp.flags & IMGFLAG_CLAMPTOBORDER )
+					comp.image->wrapClampMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+				else if ( comp.flags & IMGFLAG_CLAMPTOEDGE )
+					comp.image->wrapClampMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+				else
+					comp.image->wrapClampMode = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+				comp.image->handle = VK_NULL_HANDLE;
+				comp.image->view = VK_NULL_HANDLE;
+
+				upload_vk_image( comp.image, comp.pic );
+#endif
+				ri.Free( comp.pic );
+			} else {
+				// Failed to load, keep default image
+			}
+		} else {
+			SDL_Delay(2);
+		}
+	}
+	
+	// Reset queues for the next map load
+	SDL_LockMutex(asyncMutex);
+	Com_Printf("R_ProcessAsyncImages: Loaded %d images asynchronously.\n", processedCompletedJobs);
+	numAsyncJobs = 0;
+	asyncJobIndex = 0;
+	numCompletedJobs = 0;
+	processedCompletedJobs = 0;
+	SDL_UnlockMutex(asyncMutex);
+}
+
 /*
 ===============
 R_FindImageFile
@@ -1306,6 +1486,37 @@ image_t	*R_FindImageFile( const char *name, imgFlags_t flags )
 	//
 	// load the pic from disk
 	//
+	if ( tr.mapLoading && asyncActive && tr.defaultImage ) {
+		int namelen = strlen(name) + 1;
+		image = ri.Hunk_Alloc( sizeof( *image ) + namelen, h_low );
+		image->imgName = (char *)( image + 1 );
+		strcpy( image->imgName, name );
+		image->imgName2 = image->imgName; 
+		
+		image->next = hashTable[ hash ];
+		hashTable[ hash ] = image;
+		tr.images[ tr.numImages++ ] = image;
+		image->flags = flags;
+		
+#ifdef USE_VULKAN
+		image->handle = tr.defaultImage->handle;
+		image->view = tr.defaultImage->view;
+		image->descriptor = tr.defaultImage->descriptor;
+		image->wrapClampMode = tr.defaultImage->wrapClampMode;
+#endif
+
+		SDL_LockMutex(asyncMutex);
+		if (numAsyncJobs < MAX_ASYNC_JOBS) {
+			asyncImageJob_t *job = &asyncJobs[numAsyncJobs++];
+			Q_strncpyz(job->name, name, sizeof(job->name));
+			job->flags = flags;
+			job->image = image;
+		}
+		SDL_UnlockMutex(asyncMutex);
+		
+		return image;
+	}
+
 	localName = R_LoadImage( name, &pic, &width, &height );
 	if ( pic == NULL ) {
 		return NULL;
@@ -1775,12 +1986,23 @@ void R_DeleteTextures( void ) {
 
 #ifdef USE_VULKAN
 	vk_wait_idle();
+	{
+		VkImage defaultImageHandle = VK_NULL_HANDLE;
+		if ( tr.defaultImage ) {
+			defaultImageHandle = tr.defaultImage->handle;
+		}
+		for ( i = 0; i < tr.numImages; i++ ) {
+			image_t *img = tr.images[ i ];
+			
+			if ( defaultImageHandle && img != tr.defaultImage && img->handle == defaultImageHandle ) {
+				img->handle = VK_NULL_HANDLE;
+				img->view = VK_NULL_HANDLE;
+			}
 
-	for ( i = 0; i < tr.numImages; i++ ) {
-		image_t *img = tr.images[ i ];
-		vk_destroy_image_resources( &img->handle, &img->view );
+			vk_destroy_image_resources( &img->handle, &img->view );
 
-		// img->descriptor will be released with pool reset
+			// img->descriptor will be released with pool reset
+		}
 	}
 #else
 	for ( i = 0; i < tr.numImages; i++ ) {

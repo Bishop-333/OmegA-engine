@@ -31,6 +31,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "q_shared.h"
 #include "qcommon.h"
+#include <SDL3/SDL_mutex.h>
+#include <SDL3/SDL_thread.h>
+
+extern SDL_ThreadID mainThreadID;
+
+static SDL_Mutex *fs_mutex = NULL;
+
 #include "unzip.h"
 
 /*
@@ -2125,7 +2132,10 @@ int FS_ReadFile( const char *qpath, void **buffer ) {
 		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
 	}
 
+	if ( fs_mutex ) SDL_LockMutex( fs_mutex );
+
 	if ( qpath == NULL || qpath[0] == '\0' ) {
+		if ( fs_mutex ) SDL_UnlockMutex( fs_mutex );
 		Com_Error( ERR_FATAL, "FS_ReadFile with empty name" );
 	}
 
@@ -2142,34 +2152,43 @@ int FS_ReadFile( const char *qpath, void **buffer ) {
 			r = FS_Read( &len, sizeof( len ), com_journalDataFile );
 			if ( r != sizeof( len ) ) {
 				if (buffer != NULL) *buffer = NULL;
+				if ( fs_mutex ) SDL_UnlockMutex( fs_mutex );
 				return -1;
 			}
 			// if the file didn't exist when the journal was created
 			if (!len) {
 				if (buffer == NULL) {
+					if ( fs_mutex ) SDL_UnlockMutex( fs_mutex );
 					return 1;			// hack for old journal files
 				}
 				*buffer = NULL;
+				if ( fs_mutex ) SDL_UnlockMutex( fs_mutex );
 				return -1;
 			}
 			if (buffer == NULL) {
+				if ( fs_mutex ) SDL_UnlockMutex( fs_mutex );
 				return len;
 			}
 
-			buf = Hunk_AllocateTempMemory(len+1);
+			if ( SDL_GetCurrentThreadID() != mainThreadID ) {
+				buf = Z_Malloc(len+1);
+			} else {
+				buf = Hunk_AllocateTempMemory(len+1);
+				fs_loadCount++;
+				fs_loadStack++;
+			}
 			*buffer = buf;
 
 			r = FS_Read( buf, len, com_journalDataFile );
 			if ( r != len ) {
 				Com_Error( ERR_FATAL, "Read from journalDataFile failed" );
 			}
-
-			fs_loadCount++;
-			fs_loadStack++;
+			if ( fs_mutex ) SDL_LockMutex( fs_mutex );
 
 			// guarantee that it will have a trailing 0 for string operations
 			buf[len] = '\0';
 
+			if ( fs_mutex ) SDL_UnlockMutex( fs_mutex );
 			return len;
 		} else if ( com_journal->integer == 1 ) {
 			isConfig = qtrue;
@@ -2189,6 +2208,7 @@ int FS_ReadFile( const char *qpath, void **buffer ) {
 			FS_Write( &len, sizeof( len ), com_journalDataFile );
 			FS_Flush( com_journalDataFile );
 		}
+		if ( fs_mutex ) SDL_UnlockMutex( fs_mutex );
 		return -1;
 	}
 
@@ -2199,21 +2219,31 @@ int FS_ReadFile( const char *qpath, void **buffer ) {
 			FS_Flush( com_journalDataFile );
 		}
 		FS_FCloseFile( h );
+		if ( fs_mutex ) SDL_UnlockMutex( fs_mutex );
 		return len;
 	}
 
-	buf = Hunk_AllocateTempMemory( len + 1 );
+	if ( SDL_GetCurrentThreadID() != mainThreadID ) {
+		buf = Z_Malloc(len + 1);
+	} else {
+		buf = Hunk_AllocateTempMemory( len + 1 );
+		fs_loadCount++;
+		fs_loadStack++;
+	}
 
 	if ( FS_Read( buf, len, h ) != len ) {
-		Hunk_FreeTempMemory( buf );
+		if ( SDL_GetCurrentThreadID() != mainThreadID ) {
+			Z_Free(buf);
+		} else {
+			fs_loadStack--;
+			Hunk_FreeTempMemory( buf );
+		}
 		FS_FCloseFile( h );
+		if ( fs_mutex ) SDL_UnlockMutex( fs_mutex );
 		return -1;
 	}
 
 	*buffer = buf;
-
-	fs_loadCount++;
-	fs_loadStack++;
 
 	// guarantee that it will have a trailing 0 for string operations
 	buf[ len ] = '\0';
@@ -2226,6 +2256,7 @@ int FS_ReadFile( const char *qpath, void **buffer ) {
 		FS_Write( buf, len, com_journalDataFile );
 		FS_Flush( com_journalDataFile );
 	}
+	if ( fs_mutex ) SDL_UnlockMutex( fs_mutex );
 	return len;
 }
 
@@ -2242,14 +2273,22 @@ void FS_FreeFile( void *buffer ) {
 	if ( !buffer ) {
 		Com_Error( ERR_FATAL, "FS_FreeFile( NULL )" );
 	}
-	fs_loadStack--;
+	if ( fs_mutex ) SDL_LockMutex( fs_mutex );
+	
+	if ( SDL_GetCurrentThreadID() != mainThreadID ) {
+		Z_Free(buffer);
+	} else {
+		fs_loadStack--;
 
-	Hunk_FreeTempMemory( buffer );
+		Hunk_FreeTempMemory( buffer );
 
-	// if all of our temp files are free, clear all of our space
-	if ( fs_loadStack == 0 ) {
-		Hunk_ClearTempMemory();
+		// if all of our temp files are free, clear all of our space
+		if ( fs_loadStack == 0 ) {
+			Hunk_ClearTempMemory();
+		}
 	}
+	
+	if ( fs_mutex ) SDL_UnlockMutex( fs_mutex );
 }
 
 
@@ -5295,7 +5334,11 @@ is resetting due to a game change
 ================
 */
 void FS_InitFilesystem( void ) {
-	// allow command line parms to override our defaults
+	fileHandle_t	f;
+	
+	fs_mutex = SDL_CreateMutex();
+
+	// clear file overrides our defaults
 	// we have to specially handle this, because normal command
 	// line variable sets don't happen until after the filesystem
 	// has already been initialized

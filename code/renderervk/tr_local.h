@@ -1539,9 +1539,14 @@ void	R_SkinList_f( void );
 void	R_InitFogTable( void );
 float	R_FogFactor( float s, float t );
 void	R_InitImages( void );
+void	R_ShutdownImages( void );
 void	R_DeleteTextures( void );
 int		R_SumOfUsedImages( void );
 void	R_InitSkins( void );
+void	R_InitAsyncWorker( void );
+void	R_ProcessAsyncImages( void );
+void	R_ShutdownAsyncWorker( void );
+image_t	*R_FindImageFile( const char *name, imgFlags_t flags );
 skin_t	*R_GetSkinByHandle( qhandle_t hSkin );
 
 int R_ComputeLOD( trRefEntity_t *ent );

@@ -71,7 +71,7 @@ void R_LoadTGA ( const char *name, byte **pic, int *width, int *height)
 
 	if(length < 18)
 	{
-		ri.Error( ERR_DROP, "LoadTGA: header too short (%s)", name );
+		{ ri.Printf( PRINT_WARNING, "LoadTGA: header too short (%s)", name ); goto fail; }
 	}
 
 	buf_p = buffer.b;
@@ -104,17 +104,17 @@ void R_LoadTGA ( const char *name, byte **pic, int *width, int *height)
 		&& targa_header.image_type!=10
 		&& targa_header.image_type != 3 )
 	{
-		ri.Error (ERR_DROP, "LoadTGA: Only type 2 (RGB), 3 (gray), and 10 (RGB) TGA images supported");
+		{ ri.Printf( PRINT_WARNING, "LoadTGA: Only type 2 (RGB), 3 (gray), and 10 (RGB) TGA images supported" ); goto fail; }
 	}
 
 	if ( targa_header.colormap_type != 0 )
 	{
-		ri.Error( ERR_DROP, "LoadTGA: colormaps not supported" );
+		{ ri.Printf( PRINT_WARNING, "LoadTGA: colormaps not supported" ); goto fail; }
 	}
 
 	if ( ( targa_header.pixel_size != 32 && targa_header.pixel_size != 24 ) && targa_header.image_type != 3 )
 	{
-		ri.Error (ERR_DROP, "LoadTGA: Only 32 or 24 bit images supported (no colormaps)");
+		{ ri.Printf( PRINT_WARNING, "LoadTGA: Only 32 or 24 bit images supported (no colormaps)" ); goto fail; }
 	}
 
 	columns = targa_header.width;
@@ -123,7 +123,7 @@ void R_LoadTGA ( const char *name, byte **pic, int *width, int *height)
 
 	if(!columns || !rows || numPixels > 0x7FFFFFFF || numPixels / columns / 4 != rows)
 	{
-		ri.Error (ERR_DROP, "LoadTGA: %s has an invalid image size", name);
+		{ ri.Printf( PRINT_WARNING, "LoadTGA: %s has an invalid image size", name ); goto fail; }
 	}
 
 
@@ -132,7 +132,7 @@ void R_LoadTGA ( const char *name, byte **pic, int *width, int *height)
 	if (targa_header.id_length != 0)
 	{
 		if (buf_p + targa_header.id_length > end)
-			ri.Error( ERR_DROP, "LoadTGA: header too short (%s)", name );
+			{ ri.Printf( PRINT_WARNING, "LoadTGA: header too short (%s)", name ); goto fail; }
 
 		buf_p += targa_header.id_length;  // skip TARGA image comment
 	}
@@ -141,7 +141,7 @@ void R_LoadTGA ( const char *name, byte **pic, int *width, int *height)
 	{
 		if ( buf_p + columns * rows * targa_header.pixel_size / 8 > end )
 		{
-			ri.Error( ERR_DROP, "LoadTGA: file truncated (%s)", name );
+			{ ri.Printf( PRINT_WARNING, "LoadTGA: file truncated (%s)", name ); goto fail; }
 		}
 		// Uncompressed RGB or gray scale image
 		switch ( targa_header.pixel_size ) {
@@ -190,7 +190,7 @@ void R_LoadTGA ( const char *name, byte **pic, int *width, int *height)
 				}
 				break;
 			default:
-				ri.Error( ERR_DROP, "LoadTGA: illegal pixel_size '%d' in file '%s'", targa_header.pixel_size, name );
+				{ ri.Printf( PRINT_WARNING, "LoadTGA: illegal pixel_size '%d' in file '%s'", targa_header.pixel_size, name ); goto fail; }
 				break;
 		}
 	}
@@ -201,12 +201,12 @@ void R_LoadTGA ( const char *name, byte **pic, int *width, int *height)
 			pixbuf = targa_rgba + row*columns*4;
 			for(column=0; column<columns; ) {
 				if(buf_p + 1 > end)
-					ri.Error (ERR_DROP, "LoadTGA: file truncated (%s)", name);
+					{ ri.Printf( PRINT_WARNING, "LoadTGA: file truncated (%s)", name ); goto fail; }
 				packetHeader= *buf_p++;
 				packetSize = 1 + (packetHeader & 0x7f);
 				if (packetHeader & 0x80) {        // run-length packet
 					if(buf_p + targa_header.pixel_size/8 > end)
-						ri.Error (ERR_DROP, "LoadTGA: file truncated (%s)", name);
+						{ ri.Printf( PRINT_WARNING, "LoadTGA: file truncated (%s)", name ); goto fail; }
 					switch (targa_header.pixel_size) {
 						case 24:
 								blue = *buf_p++;
@@ -221,7 +221,7 @@ void R_LoadTGA ( const char *name, byte **pic, int *width, int *height)
 								alphabyte = *buf_p++;
 								break;
 						default:
-							ri.Error( ERR_DROP, "LoadTGA: illegal pixel_size '%d' in file '%s'", targa_header.pixel_size, name );
+							{ ri.Printf( PRINT_WARNING, "LoadTGA: illegal pixel_size '%d' in file '%s'", targa_header.pixel_size, name ); goto fail; }
 							red = green = blue = alphabyte = 0; // silence compiler warning
 							break;
 					}
@@ -245,7 +245,7 @@ void R_LoadTGA ( const char *name, byte **pic, int *width, int *height)
 				else {                            // non run-length packet
 
 					if(buf_p + targa_header.pixel_size/8*packetSize > end)
-						ri.Error (ERR_DROP, "LoadTGA: file truncated (%s)", name);
+						{ ri.Printf( PRINT_WARNING, "LoadTGA: file truncated (%s)", name ); goto fail; }
 					for(j=0;j<packetSize;j++) {
 						switch (targa_header.pixel_size) {
 							case 24:
@@ -268,7 +268,7 @@ void R_LoadTGA ( const char *name, byte **pic, int *width, int *height)
 									*pixbuf++ = alphabyte;
 									break;
 							default:
-								ri.Error( ERR_DROP, "LoadTGA: illegal pixel_size '%d' in file '%s'", targa_header.pixel_size, name );
+								{ ri.Printf( PRINT_WARNING, "LoadTGA: illegal pixel_size '%d' in file '%s'", targa_header.pixel_size, name ); goto fail; }
 								break;
 						}
 						column++;
@@ -317,5 +317,7 @@ void R_LoadTGA ( const char *name, byte **pic, int *width, int *height)
 
   *pic = targa_rgba;
 
-  ri.FS_FreeFile (buffer.v);
+fail:
+  if (!*pic && buffer.b) ri.FS_FreeFile(buffer.v);
+  if (*pic) ri.FS_FreeFile (buffer.v);
 }
