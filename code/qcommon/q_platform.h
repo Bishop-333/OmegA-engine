@@ -29,6 +29,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define idx64 0
 #define arm32 0
 #define arm64 0
+#define riscv64 0
 
 // ============================== Win32 ====================================
 
@@ -136,6 +137,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #undef arm64
 #define arm64 1
 #endif // __arm64__
+
+#if defined (__riscv) && (__riscv_xlen == 64)
+#define ARCH_STRING "riscv64"
+#define Q3_LITTLE_ENDIAN
+#undef riscv64
+#define riscv64 1
+#endif // __riscv
 
 #if defined (__PPC64__)
 #if defined (__LITTLE_ENDIAN__) || defined (__LITTLE_ENDIAN)
