@@ -922,7 +922,7 @@ void VKimp_Init( glconfig_t *config )
 	Cvar_SetDescription( r_highDPI, "Enable native pixel density matching for the display, otherwise pixel size will match window size." );
 
 #ifdef __APPLE__
-	r_metalHUD = Cvar_Get( "r_metalHUD", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	r_metalHUD = Cvar_Get( "r_metalHUD", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	Cvar_SetDescription( r_metalHUD, "Adds a real-time overlay that displays common graphics performance information." );
 #endif
 
