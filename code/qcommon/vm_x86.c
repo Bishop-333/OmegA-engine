@@ -194,7 +194,17 @@ typedef enum {
 	MOP_SUB,
 	MOP_BAND,
 	MOP_BOR,
-	MOP_BXOR
+	MOP_BXOR,
+	MOP_EQ,
+	MOP_NE,
+	MOP_LTI,
+	MOP_LEI,
+	MOP_GTI,
+	MOP_GEI,
+	MOP_LTU,
+	MOP_LEU,
+	MOP_GTU,
+	MOP_GEU,
 } macro_op_t;
 #endif
 
@@ -1198,6 +1208,16 @@ static void emit_comiss( uint32_t base, uint32_t reg )
 	emit_op_reg( 0x0F, 0x2F, reg, base );
 }
 
+static void emit_ucomiss_mem( uint32_t xmmreg, int32_t offset )
+{
+	emit_op_reg_offset( 0x0F, 0x2E, xmmreg, offset );
+}
+
+static void emit_comiss_mem( uint32_t xmmreg, int32_t offset )
+{
+	emit_op_reg_offset( 0x0F, 0x2F, xmmreg, offset );
+}
+
 static void emit_load_sx( uint32_t xmmreg, uint32_t base, int32_t offset )
 {
 	Emit1( 0xF3 );
@@ -1277,7 +1297,6 @@ static void emit_add_sx_mem( uint32_t reg, uint32_t base, int32_t offset )
 	Emit1( 0xF3 );
 	emit_op_reg_base_offset( 0x0F, 0x58, reg, base, offset );
 }
-
 static void emit_sub_sx_mem( uint32_t reg, uint32_t base, int32_t offset )
 {
 	Emit1( 0xF3 );
@@ -1296,6 +1315,30 @@ static void emit_div_sx_mem( uint32_t reg, uint32_t base, int32_t offset )
 	emit_op_reg_base_offset( 0x0F, 0x5E, reg, base, offset );
 }
 #endif
+
+static void emit_add_sx_mem( uint32_t xmmreg, int32_t offset )
+{
+	Emit1( 0xF3 );
+	emit_op_reg_offset( 0x0F, 0x58, xmmreg, offset );
+}
+
+static void emit_sub_sx_mem( uint32_t xmmreg, int32_t offset )
+{
+	Emit1( 0xF3 );
+	emit_op_reg_offset( 0x0F, 0x5C, xmmreg, offset );
+}
+
+static void emit_mul_sx_mem( uint32_t xmmreg, int32_t offset )
+{
+	Emit1( 0xF3 );
+	emit_op_reg_offset( 0x0F, 0x59, xmmreg, offset );
+}
+
+static void emit_div_sx_mem( uint32_t xmmreg, int32_t offset )
+{
+	Emit1( 0xF3 );
+	emit_op_reg_offset( 0x0F, 0x5E, xmmreg, offset );
+}
 
 static void emit_cvtsi2ss( uint32_t xmmreg, uint32_t intreg )
 {
@@ -1470,7 +1513,11 @@ static void mov_sx_imm32( uint32_t reg, uint32_t imm32 )
 		const int v = VM_SearchLiteral( imm32 );
 		if ( v >= 0 ) {
 #if idx64
-			emit_load_sx_mem( reg, litBase + v * sizeof( uint32_t ) - compiledOfs  - 8);
+			int offset = compiledOfs;	// save original code position
+			emit_load_sx_mem( reg, 0 );	// estimate instruction length
+			offset = compiledOfs - offset;
+			compiledOfs -= offset;		// restore original code position
+			emit_load_sx_mem( reg, litBase + v * sizeof( uint32_t ) - compiledOfs  - offset );
 #else
 			emit_load_sx_mem( reg, litBase + v * sizeof( uint32_t ) );
 #endif
@@ -2277,6 +2324,23 @@ static qboolean VarIsReferenced( const var_addr_t *v, const instruction_t *i, in
 }
 
 
+static qboolean VM_FindSameConst( const instruction_t *base, int offset ) {
+	const instruction_t *next = base + offset;
+	while ( !next->jused ) {
+		if ( next->op == OP_CALL || next->op == OP_JUMP || next->op == OP_LEAVE ) {
+			// OP_CALL invalidates registers
+			// OP_JUMP flushes whole opStack and registers
+			break;
+		}
+		if ( next->op == OP_CONST && next->value == base->value ) {
+			return qtrue;
+		}
+		next++;
+	}
+	return qfalse;
+}
+
+
 static qboolean ConstOptimize( vm_t *vm, instruction_t *ci, instruction_t *ni )
 {
 	var_addr_t var;
@@ -2540,24 +2604,111 @@ static qboolean ConstOptimize( vm_t *vm, instruction_t *ci, instruction_t *ni )
 			ip += 1; // OP_cond
 			return qtrue;
 		}
-
+#ifdef USE_LITERAL_POOL
+		case OP_EQF:
+		case OP_NEF:
+		case OP_LTF:
+		case OP_LEF:
+		case OP_GTF:
+		case OP_GEF: {
+			int32_t v, offset;
+			int sx;
+			if ( !HasSSEFP() ) {
+				return qfalse;
+			}
+			v = VM_SearchLiteral( ci->value ); // literal index
+			if ( v < 0 ) {
+				return qfalse;
+			}
+			if ( VM_FindSameConst( ni, 1 ) ) {
+				return qfalse;
+			}
+			sx = load_sx_opstack( R_XMM0 | RCONST ); dec_opstack(); // xmm0 = *opstack; opstack -= 4
+			flush_nonvolatile();
+#if idx64
+			offset = compiledOfs;		// save original code position
+			emit_comiss_mem( sx, 0 );	// estimate instruction length
+			offset = compiledOfs - offset;
+			compiledOfs -= offset;		// restore original code position
+			offset = litBase + v * sizeof( uint32_t ) - compiledOfs - offset;
+#else
+			offset = litBase + v * sizeof( uint32_t );
+#endif
+			if ( ni->op == OP_EQF || ni->op == OP_NEF ) {
+				emit_ucomiss_mem( sx, offset );	// ucomiss xmm0, dword ptr [offset]
+			} else {
+				emit_comiss_mem( sx, offset );	// comiss xmm0, dword ptr [offset]
+			}
+			unmask_sx( sx );
+			EmitJump( ni, ni->op, ni->value ); // jcc
+			ip += 1; // OP_cond
+			return qtrue;
+		}
+		case OP_ADDF:
+		case OP_SUBF:
+		case OP_MULF:
+		case OP_DIVF: {
+			int32_t v, offset;
+			int sx;
+			if ( !HasSSEFP() ) {
+				return qfalse;
+			}
+			v = VM_SearchLiteral( ci->value ); // literal index
+			if ( v < 0 ) {
+				return qfalse;
+			}
+			if ( VM_FindSameConst( ni, 1 ) ) {
+				return qfalse;
+			}
+			sx = load_sx_opstack( R_XMM0 );
+#if idx64
+			offset = compiledOfs;		// save original code position
+			emit_add_sx_mem( sx, 0 );	// estimate instruction length
+			offset = compiledOfs - offset;
+			compiledOfs -= offset;		// restore original code position
+			offset = litBase + v * sizeof( uint32_t ) - compiledOfs - offset;
+#else
+			offset = litBase + v * sizeof( uint32_t );
+#endif
+			switch ( ni->op ) {
+				case OP_ADDF: emit_add_sx_mem( sx, offset ); break;
+				case OP_SUBF: emit_sub_sx_mem( sx, offset ); break;
+				case OP_MULF: emit_mul_sx_mem( sx, offset ); break;
+				case OP_DIVF: emit_div_sx_mem( sx, offset ); break;
+			}
+			store_sx_opstack( sx );				// *opstack = xmm0
+			ip += 1; // OP_CONST
+			return qtrue;
+		}
+#endif
 	}
 	return qfalse;
 }
-#endif
+#endif // CONST_OPTIMIZE
 
 
 #ifdef MACRO_OPTIMIZE
 /*
 =================
-VM_FindSameInst
+VM_FindSameLoad4
 
-Search for the same base instruction ahead
+Search for the same base instruction ahead till next instruction block
 =================
 */
 static qboolean VM_FindSameLoad4( const instruction_t *base, int offset ) {
 	const instruction_t *next = base + offset;
 	while ( !next->jused ) {
+		if ( next->op == OP_CALL || next->op == OP_JUMP || next->op == OP_LEAVE ) {
+			// OP_CALL invalidates registers
+			// OP_JUMP flushes whole opStack and registers
+			break;
+		}
+		if ( next->op == OP_STORE1 || next->op == OP_STORE2 || next->op == OP_STORE4 ) {
+			if ( !next->safe ) {
+				// dynamic store invalidates register mappings
+				break;
+			}
+		}
 		if ( next->op == base->op && next->value == base->value ) {
 			if ( !(next + 1)->jused && (next + 1)->op == OP_LOAD4 ) {
 				return qtrue;
@@ -2567,23 +2718,26 @@ static qboolean VM_FindSameLoad4( const instruction_t *base, int offset ) {
 	}
 	return qfalse;
 }
-#endif
 
 
 /*
 =================
-VM_FindMOps
+VM_IsMopSequence
 
-Search for known macro-op sequences
+Search for particular macro-op sequence:
+
+OP_LOCAL|OP_CONST + OP_LOCAL|OP_CONST + OP_LOAD4 + OP_CONST + OP_XXX + OP_STORE4
 =================
 */
-#ifdef MACRO_OPTIMIZE
-
-static int VM_IsMopSequence( const  instruction_t *i )
+static int VM_IsMopSequence( const instruction_t *i )
 {
 	int n;
 
-	// OP_LOCAL|OP_CONST + OP_LOCAL|OP_CONST + OP_LOAD4 + OP_CONST + OP_XXX + OP_STORE4
+	for ( n = 1; n < 6; n++ ) {
+		if ( (i + n)->jused ) {
+			return OP_UNDEF;
+		}
+	}
 
 	if ( i->op != OP_LOCAL && i->op != OP_CONST ) {
 		return OP_UNDEF;
@@ -2621,21 +2775,86 @@ static int VM_IsMopSequence( const  instruction_t *i )
 }
 
 
+/*
+=================
+VM_IsMopSequence2
+
+Search for particular macro-op sequence:
+
+OP_LOCAL|OP_CONST + OP_LOAD4 + OP_CONST + OP_COND
+=================
+*/
+static int VM_IsMopSequence2( const instruction_t *i )
+{
+	int n;
+
+	for ( n = 1; n < 4; n++ ) {
+		if ( (i + n)->jused ) {
+			return OP_UNDEF;
+		}
+	}
+
+	if ( i->op != OP_LOCAL && i->op != OP_CONST ) {
+		return OP_UNDEF;
+	}
+	if ( (i + 1)->op != OP_LOAD4 || (i + 2)->op != OP_CONST ) {
+		return OP_UNDEF;
+	}
+
+	switch ( (i + 3)->op ) {
+		default:
+			return OP_UNDEF;
+		case OP_EQ:
+			return MOP_EQ;
+		case OP_NE:
+			return MOP_NE;
+		case OP_LTI:
+			return MOP_LTI;
+		case OP_LEI:
+			return MOP_LEI;
+		case OP_GTI:
+			return MOP_GTI;
+		case OP_GEI:
+			return MOP_GEI;
+		case OP_LTU:
+			return MOP_LTU;
+		case OP_LEU:
+			return MOP_LEU;
+		case OP_GTU:
+			return MOP_GTU;
+		case OP_GEU:
+			return MOP_GEU;
+	}
+}
+
+
 static void VM_FindMOps( instruction_t *buf, int instructionCount )
 {
 	instruction_t *i;
-	int n;
+	int n, v;
 
 	i = buf;
 	n = 0;
 
 	while ( n < instructionCount )
 	{
-		int v = VM_IsMopSequence( i );
+		// search for LOCAL|CONST + LOCAL|CONST + LOAD4 + CONST + OP_XXX + STORE4:
+		v = VM_IsMopSequence( i );
 		if ( v != OP_UNDEF && !VM_FindSameLoad4( i, 6 ) ) {
+			i->origOp = i->op; // save original opcode
 			i->op = v;
 			i += 6;
 			n += 6;
+			continue;
+		}
+
+		// search for LOCAL|CONST + LOAD4 + CONST + COND:
+		v = VM_IsMopSequence2( i );
+		if ( v != OP_UNDEF && !VM_FindSameLoad4( i, 4 ) ) {
+			i->origOp = i->op; // save original opcode
+			i->op = v;
+			i += 4;
+			n += 4;
 			continue;
 		}
 
@@ -2652,60 +2871,91 @@ EmitMOPs
 */
 static qboolean EmitMOPs( vm_t *vm, instruction_t *ci, macro_op_t op )
 {
-	uint32_t reg_base;
+	instruction_t *ni;
+	uint32_t reg, reg_base;
 	var_addr_t var;
-	int n;
+	int cnst;
 
-	if ( (ci + 1 )->op == OP_LOCAL )
+	if ( ci->origOp == OP_LOCAL ) {
 		reg_base = R_PROCBASE;
-	else
+	} else {
 		reg_base = R_DATABASE;
+	}
 
 	var.base = reg_base;
 	var.addr = ci->value;
 	var.size = 4;
 
-	wipe_var_range( &var );
+	if ( find_rx_var( &reg, &var ) ) {
+		// reject optimization if an address is already present in some register
+		ci->op = ci->origOp; // recover original opcode
+		return qfalse;
+	}
 
 	switch ( op )
 	{
 		//[var] += CONST
 		case MOP_ADD:
-			n = inst[ ip + 2 ].value;
-			emit_op_mem_imm( X_ADD, reg_base, ci->value, n );
+			cnst = inst[ ip + 2 ].value;
+			emit_op_mem_imm( X_ADD, reg_base, ci->value, cnst );
 			ip += 5;
-			return qtrue;
+			break;
 
 		//[var] -= CONST
 		case MOP_SUB:
-			n = inst[ ip + 2 ].value;
-			emit_op_mem_imm( X_SUB, reg_base, ci->value, n );
+			cnst = inst[ ip + 2 ].value;
+			emit_op_mem_imm( X_SUB, reg_base, ci->value, cnst );
 			ip += 5;
-			return qtrue;
+			break;
 
 		//[var] &= CONST
 		case MOP_BAND:
-			n = inst[ ip + 2 ].value;
-			emit_op_mem_imm( X_AND, reg_base, ci->value, n );
+			cnst = inst[ ip + 2 ].value;
+			emit_op_mem_imm( X_AND, reg_base, ci->value, cnst );
 			ip += 5;
-			return qtrue;
+			break;
 
 		//[var] |= CONST
 		case MOP_BOR:
-			n = inst[ ip + 2 ].value;
-			emit_op_mem_imm( X_OR, reg_base, ci->value, n );
+			cnst = inst[ ip + 2 ].value;
+			emit_op_mem_imm( X_OR, reg_base, ci->value, cnst );
 			ip += 5;
-			return qtrue;
+			break;
 
 		//[var] ^= CONST
 		case MOP_BXOR:
-			n = inst[ ip + 2 ].value;
-			emit_op_mem_imm( X_XOR, reg_base, ci->value, n );
+			cnst = inst[ ip + 2 ].value;
+			emit_op_mem_imm( X_XOR, reg_base, ci->value, cnst );
 			ip += 5;
-			return qtrue;
+			break;
+
+		//if ([var] OP_cond CONST)
+		case MOP_EQ:
+		case MOP_NE:
+		case MOP_LTI:
+		case MOP_LEI:
+		case MOP_GTI:
+		case MOP_GEI:
+		case MOP_LTU:
+		case MOP_LEU:
+		case MOP_GTU:
+		case MOP_GEU:
+			cnst = inst[ ip + 1 ].value;	// OP_CONST
+			ni = inst + ip + 2;				// OP_cond
+			flush_nonvolatile();
+			emit_op_mem_imm( X_CMP, reg_base, ci->value, cnst );
+			EmitJump( ni, ni->op, ni->value );	// jcc
+			ip += 3;
+			break;
+
+		default:
+			Com_Error( ERR_FATAL, "%s: bad opcode %02X", __func__, ci->op );
+			return qfalse;
 	}
 
-	return qfalse;
+	wipe_var_range( &var );
+
+	return qtrue;
 }
 #endif // MACRO_OPTIMIZE
 
@@ -2792,7 +3042,11 @@ qboolean VM_Compile( vm_t *vm, vmHeader_t *header ) {
 
 #if JUMP_OPTIMIZE
 	for ( i = 0; i < header->instructionCount; i++ ) {
+#ifdef MACRO_OPTIMIZE
+		if ( inst[i].op < OP_MAX && ops[inst[i].op].flags & JUMP ) {
+#else
 		if ( ops[inst[i].op].flags & JUMP ) {
+#endif
 			int d = inst[i].value - i;
 			// we can correctly calculate backward jump offsets even at initial pass
 			// but for forward jumps we do some estimation
@@ -3527,8 +3781,20 @@ __compile:
 			case MOP_BAND:
 			case MOP_BOR:
 			case MOP_BXOR:
-				if ( !EmitMOPs( vm, ci, ci->op ) )
-					Com_Error( ERR_FATAL, "VM_CompileX86: bad opcode %02X", ci->op );
+			case MOP_EQ:
+			case MOP_NE:
+			case MOP_LTI:
+			case MOP_LEI:
+			case MOP_GTI:
+			case MOP_GEI:
+			case MOP_LTU:
+			case MOP_LEU:
+			case MOP_GTU:
+			case MOP_GEU:
+				if ( !EmitMOPs( vm, ci, ci->op ) ) {
+ 					// optimization was rejected, reswitch
+					ip--;
+				}
 				break;
 #endif
 			default:
@@ -3670,6 +3936,9 @@ __compile:
 			Com_Printf( S_COLOR_WARNING "%s(%s): VirtualProtect failed\n", __func__, vm->name );
 			return qfalse;
 		}
+		if ( !FlushInstructionCache( GetCurrentProcess(), vm->codeBase.ptr, vm->codeSize ) ) {
+			Com_Printf( S_COLOR_WARNING "%s(%s): FlushInstructionCache failed\n", __func__, vm->name );
+		}
 	}
 #endif
 
@@ -3699,8 +3968,9 @@ static void *VM_Alloc_Compiled( vm_t *vm, int codeLength, int tableLength )
 		return NULL;
 	}
 #elif _WIN32
-	// allocate memory with EXECUTE permissions under windows.
-	ptr = VirtualAlloc( NULL, length, MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+	// Allocate memory with READ-WRITE permissions under windows.
+	// It will be changed to READ-EXECUTE after compilation.
+	ptr = VirtualAlloc( NULL, length, MEM_COMMIT, PAGE_READWRITE );
 	if ( !ptr ) {
 		Com_Error( ERR_FATAL, "VM_CompileX86: VirtualAlloc failed" );
 		return NULL;
