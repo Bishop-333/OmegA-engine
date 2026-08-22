@@ -3,7 +3,7 @@
 <component type="desktop-application">
   <id>io.github.bishop_333.omega</id>
   <metadata_license>CC0-1.0</metadata_license>
-  <project_license>GPL-2.0-or-later</project_license>
+  <project_license>GPL-3.0-or-later</project_license>
   <provides>
     <id>omega.desktop</id>
   </provides>

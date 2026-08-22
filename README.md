@@ -4,7 +4,7 @@
 
 # OmegA-engine
 [![build](../../workflows/build/badge.svg)](../../actions?query=workflow%3Abuild)
-![License](https://img.shields.io/badge/License-GPLv2-blue.svg)
+![License](https://img.shields.io/badge/License-GPLv3-blue.svg)
 &nbsp;&nbsp;&nbsp;
 ![Linux](https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black)
 ![Windows](https://img.shields.io/badge/Windows-0078D6?&logo=windows&logoColor=white)
