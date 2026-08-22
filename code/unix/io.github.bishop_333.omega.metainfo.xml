@@ -3,7 +3,7 @@
 <component type="desktop-application">
   <id>io.github.bishop_333.omega</id>
   <metadata_license>CC0-1.0</metadata_license>
-  <project_license>GPL-2.0</project_license>
+  <project_license>GPL-2.0-or-later</project_license>
   <provides>
     <id>omega.desktop</id>
   </provides>
@@ -31,6 +31,7 @@
     </p>
   </description>
   <url type="homepage">https://www.moddb.com/mods/openarena-omega/</url>
+  <url type="bugtracker">https://github.com/Bishop-333/OmegA-engine/issues</url>
   <screenshots>
     <screenshot type="default">
       <image>https://media.moddb.com/images/mods/1/53/52713/rpg3dm2.png</image>
@@ -48,6 +49,6 @@
     <content_attribute id="social-chat">intense</content_attribute>
   </content_rating>
   <releases>
-    <release version="3.4.0" date="2025-06-25"/>
+    <release version="3.4.0" date="2026-06-25"/>
   </releases>
 </component>
