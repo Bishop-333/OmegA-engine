@@ -59,9 +59,15 @@ CPUID_EX PROC
 CPUID_EX ENDP
 
 ; input: RCX - &fpucw
-Q_fpucw PROC
+Q_GetFPUCW PROC
 	fnstcw word ptr [rcx]
 	ret
-Q_fpucw ENDP
+Q_GetFPUCW ENDP
+
+; input: RCX - &fpucw
+Q_SetFPUCW PROC
+	fldcw word ptr [rcx]
+	ret
+Q_SetFPUCW ENDP
 
 END

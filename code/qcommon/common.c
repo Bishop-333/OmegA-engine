@@ -3779,23 +3779,34 @@ static void Com_SetAffinityMask( const char *str )
 #if id386
 /*
 =================
-Q_fpucw
+Q_GetFPUCW
 =================
 */
-void Q_fpucw( unsigned short *cw )
+void Q_GetFPUCW( unsigned short *cw )
 {
 	__asm {
 		mov ecx, cw;
 		fnstcw [ecx];
 	}
 }
+void Q_SetFPUCW( unsigned short *cw )
+{
+	__asm {
+		mov ecx, cw;
+		fldcw [ecx];
+	}
+}
 #else // idx64
 // .asm versions
 #endif // idx64
 #else // GCC/clang
-void Q_fpucw( unsigned short *cw )
+void Q_GetFPUCW( unsigned short *cw )
 {
 	asm volatile("fnstcw %0" : "=m" (*cw));
+}
+void Q_SetFPUCW( unsigned short *cw )
+{
+	asm volatile("fldcw %0" : "=m" (*cw));
 }
 #endif // GCC/clang
 #endif // USE_X87
@@ -4047,11 +4058,13 @@ void Com_Init( char *commandLine ) {
 
 #ifdef USE_X87
 	// initialize x87 FPU control words:
-	Q_fpucw( (unsigned short*) &x87_cw_orig );
+	Q_GetFPUCW( (unsigned short*) &x87_cw_orig );
 	x87_cw_orig |= 0x003F; // set all exception mask bits
-	x87_cw_orig = (x87_cw_orig & 0xF0FF) | 0x0200; // round to nearest, enforce double precision
-	x87_cw_rint = (x87_cw_orig & 0xF0FF) | 0x0000; // round to nearest, single precision
+	x87_cw_orig = (x87_cw_orig & 0xFCFF) | 0x0200; // default rounding, *enforced* double precision
+	x87_cw_rint = (x87_cw_orig & 0xFCFF) | 0x0000; // default rounding, single precision
 	x87_cw_cvfi = (x87_cw_orig & 0xF0FF) | 0x0C00; // round to zero, single precision
+	// this is mostly for MINGW/GCC to reset extended precision:
+	Q_SetFPUCW( (unsigned short*) &x87_cw_orig );
 #endif
 
 #ifdef USE_AFFINITY_MASK

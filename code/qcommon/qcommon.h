@@ -977,7 +977,8 @@ extern	int	CPU_Flags;
 #endif
 
 #ifdef USE_X87
-void Q_fpucw( unsigned short *cw );
+void Q_GetFPUCW( unsigned short *cw );
+void Q_SetFPUCW( unsigned short *cw );
 extern int32_t x87_cw_orig;	// double precision, round to nearest - global/syscalls
 extern int32_t x87_cw_rint;	// single precision, round to nearest - qvm/snapvector
 extern int32_t x87_cw_cvfi;	// single precision, truncate to zero - ftol()

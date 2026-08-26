@@ -1250,7 +1250,6 @@ static void store_sx_opstack( uint32_t reg )
 static void store_st_opstack( instruction_t *ref )
 {
 	opstack_t* it = opstackv + opstack;
-	int i, c;
 
 #ifdef DEBUG_VM
 	if ( opstack <= 0 )
@@ -1268,12 +1267,6 @@ static void store_st_opstack( instruction_t *ref )
 
 	if ( ref->flush ) {
 		flush_item( it );
-	}
-
-	for ( c = 0, i = 1; i <= opstack; i++ ) {
-		if ( opstackv[i].type == TYPE_ST ) {
-			c++;
-		}
 	}
 }
 #endif // USE_X87
