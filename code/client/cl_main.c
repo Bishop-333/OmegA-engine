@@ -3628,53 +3628,82 @@ video [filename]
 static void CL_Video_f( void )
 {
 	char filename[ MAX_OSPATH ];
+	char pipeFormat[ MAX_CVAR_VALUE_STRING ];
 	const char *ext;
 	qboolean pipe;
 	int i;
 
-	if( !clc.demoplaying )
-	{
-		Com_Printf( "The %s command can only be used when playing back demos\n", Cmd_Argv( 0 ) );
+	if ( !clc.demoplaying ) {
+		Com_Printf( S_COLOR_WARNING "The %s command can only be used when playing back demos\n", Cmd_Argv( 0 ) );
 		return;
 	}
 
 	pipe = ( Q_stricmp( Cmd_Argv( 0 ), "video-pipe" ) == 0 );
 
-	if ( pipe )
-		ext = "mp4";
-	else
-		ext = "avi";
+	if ( pipe ) {
+		char *e;
+		ext = "mp4"; // default pipe extension
 
-	if ( Cmd_Argc() == 2 )
-	{
+		if ( !CL_ValidatePipeFormat( cl_aviPipeFormat->string ) ) {
+			Com_Printf( S_COLOR_ERROR "Invalid video-pipe format: %s\n", cl_aviPipeFormat->string );
+			return;
+		}
+
+		// search for an extension after '|' char, pipe format will be cut at this point
+		Q_strncpyz( pipeFormat, cl_aviPipeFormat->string, sizeof( pipeFormat ) );
+		e = strchr( pipeFormat, '|' );
+		if ( e != NULL ) {
+			// terminate format string at this point
+			*e++ = '\0';
+			// skip leading whitespaces
+			while ( *e != '\0' && *e <= ' ' ) {
+				e++;
+			}
+			// non-zero extension found
+			if ( *e != '\0' && *e > ' ' ) {
+				int len = (int)strlen( e ) - 1;
+				// re-assign extension
+				ext = e;
+				// strip trailing whitespaces
+				while ( len > 0 && e[ len ] <= ' ' ) {
+					--len;
+				}
+				e[len + 1] = '\0';
+			}
+		}
+	} else {
+		ext = "avi";
+	}
+
+	if ( Cmd_Argc() == 2 ) {
 		// explicit filename
 		Com_sprintf( filename, sizeof( filename ), "videos/%s", Cmd_Argv( 1 ) );
 
 		// override video file extension
-		if ( pipe )
-		{
-			char *sep = strrchr( filename, '/' ); // last path separator
+		if ( pipe ) {
 			char *e = strrchr( filename, '.' );
+			char *sep = strrchr( filename, PATH_SEP ); // last path separator
+
+			if ( !sep ) {
+				sep = strrchr( filename, PATH_SEP_FOREIGN );
+			}
 
 			if ( e && e > sep && *(e+1) != '\0' ) {
 				ext = e + 1;
 				*e = '\0';
 			}
 		}
-	}
-	else
-	{
+	} else {
 		 // scan for a free filename
-		for ( i = 0; i <= 9999; i++ )
-		{
+		for ( i = 0; i <= 9999; i++ ) {
 			Com_sprintf( filename, sizeof( filename ), "videos/video%04d.%s", i, ext );
-			if ( !FS_FileExists( filename ) )
+			if ( !FS_FileExists( filename ) ) {
 				break; // file doesn't exist
+			}
 		}
 
-		if ( i > 9999 )
-		{
-			Com_Printf( S_COLOR_RED "ERROR: no free file names to create video\n" );
+		if ( i > 9999 ) {
+			Com_Printf( S_COLOR_ERROR "ERROR: no free file names to create video\n" );
 			return;
 		}
 
@@ -3682,14 +3711,13 @@ static void CL_Video_f( void )
 		Com_sprintf( filename, sizeof( filename ), "videos/video%04d", i );
 	}
 
-
 	clc.aviSoundFrameRemainder = 0.0f;
 	clc.aviVideoFrameRemainder = 0.0f;
 
 	Q_strncpyz( clc.videoName, filename, sizeof( clc.videoName ) );
 	clc.videoIndex = 0;
 
-	CL_OpenAVIForWriting( va( "%s.%s", clc.videoName, ext ), pipe, qfalse );
+	CL_OpenAVIForWriting( va( "%s.%s", clc.videoName, ext ), pipe ? pipeFormat : NULL, qfalse );
 }
 
 
