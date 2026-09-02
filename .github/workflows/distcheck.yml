@@ -8,10 +8,12 @@ name: 'dist'
   push:
     branches:
       - master
+      - 'curl-*'
       - '*/ci'
   pull_request:
     branches:
       - master
+      - 'curl-*'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
@@ -22,6 +24,7 @@ permissions: {}
 env:
   CURL_TEST_MIN: 1500
   DO_NOT_TRACK: '1'
+  HOMEBREW_NO_INSTALL_CLEANUP: '1'
   MAKEFLAGS: -j 5
 
 jobs:
@@ -30,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -214,7 +217,7 @@ jobs:
     timeout-minutes: 5
     needs: maketgz-and-verify-in-tree
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -230,7 +233,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -266,9 +269,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [ubuntu-24.04-arm, macos-latest, windows-2022]
+        image: [ubuntu-26.04-arm, macos-latest, windows-2022]
     steps:
-      - uses: msys2/setup-msys2@e9898307ac31d1a803454791be09ab9973336e1c # v2.31.1
+      - uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2.32.0
         if: ${{ contains(matrix.image, 'windows') }}
         with:
           msystem: mingw64
@@ -277,7 +280,7 @@ jobs:
           cache: false
           path-type: inherit
           install: >-
-            mingw-w64-x86_64-zlib mingw-w64-x86_64-zstd mingw-w64-x86_64-libpsl mingw-w64-x86_64-libssh2 mingw-w64-x86_64-nghttp2 mingw-w64-x86_64-openssl
+            perl mingw-w64-x86_64-zlib mingw-w64-x86_64-zstd mingw-w64-x86_64-libpsl mingw-w64-x86_64-libssh2 mingw-w64-x86_64-nghttp2 mingw-w64-x86_64-openssl
 
       - name: 'install prereqs'
         timeout-minutes: 3
@@ -307,7 +310,7 @@ jobs:
             printf '%s' ~/cmake-"${OLD_CMAKE_VERSION}"-macos-universal/CMake.app/Contents/bin/cmake > ~/old-cmake-path.txt
           fi
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
