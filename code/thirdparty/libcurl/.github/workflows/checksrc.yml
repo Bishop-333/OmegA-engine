@@ -10,6 +10,7 @@ name: 'Source'
   push:
     branches:
       - master
+      - 'curl-*'
       - '*/ci'
     paths-ignore:
       - '.circleci/**'
@@ -18,6 +19,7 @@ name: 'Source'
   pull_request:
     branches:
       - master
+      - 'curl-*'
     paths-ignore:
       - '.circleci/**'
       - 'appveyor.*'
@@ -31,13 +33,14 @@ permissions: {}
 
 env:
   DO_NOT_TRACK: '1'
+  HOMEBREW_NO_INSTALL_CLEANUP: '1'
 
 jobs:
   checksrc:
     name: 'checksrc'
     runs-on: ubuntu-slim
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -46,9 +49,9 @@ jobs:
 
   linters:
     name: 'spellcheck, linters, REUSE'
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -65,6 +68,35 @@ jobs:
           source ~/venv/bin/activate
           reuse lint
 
+      - name: 'cmakelint'
+        run: |
+          source ~/venv/bin/activate
+          scripts/cmakelint.sh
+
+      - name: 'cmake options in documentation'
+        run: scripts/cmakeopts.sh
+
+      - name: 'labelercheck'
+        run: .github/scripts/labelercheck.sh
+
+      - name: 'perlcheck'
+        run: scripts/perlcheck.sh
+
+      - name: 'ruff'
+        run: |
+          source ~/venv/bin/activate
+          scripts/pythonlint.sh
+
+      - name: 'pyrefly'
+        run: |
+          source ~/venv/bin/activate
+          cd tests/http/
+          pyrefly check --python-version=3.8 --preset=basic --check-unannotated-defs --summary
+
+      - name: filter off code from all C and H files
+        run: |
+          git ls-files -z '**.[ch]' | xargs -0 -r -n1 ./.github/scripts/c-strip
+
       - name: 'codespell'
         run: |
           source ~/venv/bin/activate
@@ -79,25 +111,11 @@ jobs:
           typos --version
           .github/scripts/typos.sh
 
-      - name: 'cmakelint'
-        run: |
-          source ~/venv/bin/activate
-          scripts/cmakelint.sh
-
-      - name: 'perlcheck'
-        run: |
-          scripts/perlcheck.sh
-
-      - name: 'ruff'
-        run: |
-          source ~/venv/bin/activate
-          scripts/pythonlint.sh
-
   pytype:
     name: 'pytype'
     runs-on: ubuntu-24.04-arm  # pytype is discontinued and requires python 3.8-3.12
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -128,7 +146,7 @@ jobs:
           sudo apt-get -o Dpkg::Use-Pty=0 update
           sudo apt-get -o Dpkg::Use-Pty=0 install pmccabe
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -151,7 +169,7 @@ jobs:
           sudo apt-get -o Dpkg::Use-Pty=0 update
           sudo apt-get -o Dpkg::Use-Pty=0 install libxml2-utils
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -160,16 +178,20 @@ jobs:
 
   miscchecks:
     name: 'misc checks'
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 5
     steps:
       - name: 'install prereqs'
         timeout-minutes: 2
         run: /home/linuxbrew/.linuxbrew/bin/brew install actionlint shellcheck zizmor
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: 'zizmor/actionlint (prepare)'
+        # Replace custom bash-like shell designators with the standard one to make linters process them
+        run: sed -i.bak -E 's/shell\x3a .+ zizmor\x3a ignore.+$/shell\x3a bash/g' .github/workflows/*.yml
 
       - name: 'zizmor GHA'
         env:
