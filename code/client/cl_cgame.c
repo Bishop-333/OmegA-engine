@@ -366,8 +366,15 @@ Just adds default parameters that cgame doesn't need to know about
 */
 static void CL_CM_LoadMap( const char *mapname ) {
 	int		checksum;
+	void	*buf;
 
-	CM_LoadMap( mapname, qtrue, &checksum );
+	Hunk_AllocPreference( h_low );
+
+	buf = CM_LoadMap( mapname, 1, &checksum );
+	if ( buf ) {
+		// we need this memory for a renderer module later
+		// Hunk_FreeTempMemory( buf );
+	}
 }
 
 

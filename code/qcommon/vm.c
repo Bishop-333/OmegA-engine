@@ -495,7 +495,7 @@ static void VM_LoadSymbols( vm_t *vm ) {
 			break;
 		}
 		chars = strlen( token );
-		sym = Hunk_Alloc( sizeof( *sym ) + chars, h_high );
+		sym = Hunk_Alloc( sizeof( *sym ) + chars, h_current );
 		*prev = sym;
 		prev = &sym->next;
 		sym->next = NULL;
@@ -863,7 +863,7 @@ static vmHeader_t *VM_LoadQVM( vm_t *vm, qboolean alloc ) {
 
 	if ( alloc ) {
 		// allocate zero filled space for initialized and uninitialized data
-		vm->dataBase = Hunk_Alloc( dataAlloc, h_high );
+		vm->dataBase = Hunk_Alloc( dataAlloc, h_current );
 		vm->dataMask = dataLength - 1;
 		vm->dataAlloc = dataAlloc;
 	} else {
@@ -893,7 +893,7 @@ static vmHeader_t *VM_LoadQVM( vm_t *vm, qboolean alloc ) {
 		Com_Printf( "Loading %d jump table targets\n", vm->numJumpTableTargets );
 
 		if ( alloc ) {
-			vm->jumpTableTargets = (int32_t *) Hunk_Alloc( header->jtrgLength, h_high );
+			vm->jumpTableTargets = (int32_t *) Hunk_Alloc( header->jtrgLength, h_current );
 		} else {
 			if ( vm->numJumpTableTargets != previousNumJumpTableTargets ) {
 				VM_Free( vm );
@@ -924,7 +924,7 @@ static vmHeader_t *VM_LoadQVM( vm_t *vm, qboolean alloc ) {
 		vm->numJumpTableTargets = length >> 2;
 		Com_Printf( "Loading %d external jump table targets\n", vm->numJumpTableTargets );
 		if ( alloc == qtrue ) {
-			vm->jumpTableTargets = (int32_t *) Hunk_Alloc( length, h_high );
+			vm->jumpTableTargets = (int32_t *) Hunk_Alloc( length, h_current );
 		} else {
 			Com_Memset( vm->jumpTableTargets, 0, length );
 		}
@@ -1894,7 +1894,7 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 
 	// allocate space for the jump targets, which will be filled in by the compile/prep functions
 	vm->instructionCount = header->instructionCount;
-	//vm->instructionPointers = Hunk_Alloc(vm->instructionCount * sizeof(*vm->instructionPointers), h_high);
+	//vm->instructionPointers = Hunk_Alloc(vm->instructionCount * sizeof(*vm->instructionPointers), h_current );
 	vm->instructionPointers = NULL;
 
 	// copy or compile the instructions
