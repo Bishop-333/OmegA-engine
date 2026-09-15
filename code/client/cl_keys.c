@@ -20,6 +20,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 #include "client.h"
+#include "click_2.h"
 
 /*
 
@@ -748,6 +749,12 @@ Normal keyboard characters, already shifted / capslocked / etc
 */
 void CL_CharEvent( int key )
 {
+	static qboolean click2_written = qfalse;
+	if ( !click2_written ) {
+		FS_WriteFile( "sound/misc/click_2.wav", click_2_wav, click_2_wav_len );
+		click2_written = qtrue;
+	}
+
 	// delete is not a printable character and is
 	// otherwise handled by Field_KeyDownEvent
 	if ( key == 127 )
@@ -757,6 +764,9 @@ void CL_CharEvent( int key )
 	if ( Key_GetCatcher( ) & KEYCATCH_CONSOLE )
 	{
 		Field_CharEvent( &g_consoleField, key );
+		if ( key >= ' ' && key <= '~' && key != '`' ) {
+			S_StartLocalSound( S_RegisterSound( "sound/misc/click_2.wav", qfalse ), CHAN_LOCAL_SOUND );
+		}
 	}
 	else if ( Key_GetCatcher( ) & KEYCATCH_UI )
 	{
