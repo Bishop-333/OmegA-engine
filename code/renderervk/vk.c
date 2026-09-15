@@ -727,15 +727,19 @@ static void vk_create_render_passes( void )
 	attachments[1].samples = vkSamples;
 	attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; // Need empty depth buffer before use
 	attachments[1].stencilLoadOp = glConfig.stencilBits ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	if ( r_bloom->integer ) {
-		attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE; // keep it for post-bloom pass
+	if ( vk.fboActive && (r_bloom->integer || r_ssao->integer) ) {
+		attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE; // keep it for post-bloom / SSAO pass
 		attachments[1].stencilStoreOp = glConfig.stencilBits ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+	} else if ( r_bloom->integer ) {
+		attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		attachments[1].stencilStoreOp = glConfig.stencilBits ? VK_ATTACHMENT_STORE_OP_STORE : VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 	} else {
 		attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 	}
-	attachments[1].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-	attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 	colorRef0.attachment = 0;
 	colorRef0.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -2456,6 +2460,14 @@ void vk_update_attachment_descriptors( void ) {
 
 		qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
 
+		if ( vk.depth_sampled_image_view )
+		{
+			info.imageView = vk.depth_sampled_image_view;
+			info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+			desc.dstSet = vk.depth_descriptor;
+			qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+		}
+
 		// screenmap
 		sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
 		sd.max_lod_1_0 = qfalse;
@@ -2541,6 +2553,7 @@ void vk_init_descriptors( void )
 		alloc.pSetLayouts = &vk.set_layout_sampler;
 
 		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.color_descriptor ) );
+		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.depth_descriptor ) );
 
 		if ( r_bloom->integer )
 		{
@@ -3472,6 +3485,8 @@ static void create_depth_attachment( uint32_t width, uint32_t height, VkSampleCo
 	create_desc.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 	if ( allowTransient ) {
 		create_desc.usage |= VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
+	} else if ( vk.fboActive ) {
+		create_desc.usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
 	}
 	create_desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	create_desc.queueFamilyIndexCount = 0;
@@ -3547,18 +3562,39 @@ static void vk_create_attachments( void )
 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &vk.msaa_image, &vk.msaa_image_view, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, qtrue );
 		}
 
-		if ( r_ext_supersample->integer ) {
-			// capture buffer
-			usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-			create_color_attachment( gls.captureWidth, gls.captureHeight, VK_SAMPLE_COUNT_1_BIT, vk.capture_format,
-				usage, &vk.capture.image, &vk.capture.image_view, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, qfalse );
-		}
+		// capture buffer
+		usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+		create_color_attachment( gls.captureWidth, gls.captureHeight, VK_SAMPLE_COUNT_1_BIT, vk.capture_format,
+			usage, &vk.capture.image, &vk.capture.image_view, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, qfalse );
 	} // if ( vk.fboActive )
 
 	//vk_alloc_attachments();
 
 	create_depth_attachment( glConfig.vidWidth, glConfig.vidHeight, vkSamples, &vk.depth_image, &vk.depth_image_view,
-		(vk.fboActive && r_bloom->integer) ? qfalse : qtrue );
+		(vk.fboActive && (r_bloom->integer || r_ssao->integer)) ? qfalse : qtrue );
+
+	if ( vk.fboActive )
+	{
+		VkImageViewCreateInfo view_info;
+		view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		view_info.pNext = NULL;
+		view_info.flags = 0;
+		view_info.image = vk.depth_image;
+		view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		view_info.format = vk.depth_format;
+		view_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		view_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		view_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		view_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+		view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		view_info.subresourceRange.baseMipLevel = 0;
+		view_info.subresourceRange.levelCount = 1;
+		view_info.subresourceRange.baseArrayLayer = 0;
+		view_info.subresourceRange.layerCount = 1;
+
+		VK_CHECK( qvkCreateImageView( vk.device, &view_info, NULL, &vk.depth_sampled_image_view ) );
+		SET_OBJECT_NAME( vk.depth_sampled_image_view, "depth sampled image view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+	}
 
 	vk_alloc_attachments();
 
@@ -4226,7 +4262,7 @@ void vk_initialize( void )
 		uint32_t i, maxSets;
 
 		pool_size[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		pool_size[0].descriptorCount = MAX_DRAWIMAGES + 1 + 1 + 1 + VK_NUM_BLOOM_PASSES * 2; // color, screenmap, bloom descriptors
+		pool_size[0].descriptorCount = MAX_DRAWIMAGES + 1 + 1 + 1 + 1 + VK_NUM_BLOOM_PASSES * 2; // color, depth, screenmap, bloom descriptors
 
 		pool_size[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 		pool_size[1].descriptorCount = NUM_COMMAND_BUFFERS;
@@ -4316,12 +4352,16 @@ void vk_initialize( void )
 
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_post_process ) );
 
+		desc.setLayoutCount = 2; // set 0: color, set 1: depth
+		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_gamma ) );
+
 		desc.setLayoutCount = VK_NUM_BLOOM_PASSES;
 
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_blend ) );
 
 		SET_OBJECT_NAME( vk.pipeline_layout, "pipeline layout - main", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
 		SET_OBJECT_NAME( vk.pipeline_layout_post_process, "pipeline layout - post-processing", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
+		SET_OBJECT_NAME( vk.pipeline_layout_gamma, "pipeline layout - gamma ssao", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
 		SET_OBJECT_NAME( vk.pipeline_layout_blend, "pipeline layout - blend", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
 	}
 
@@ -4404,6 +4444,11 @@ static void vk_destroy_attachments( void )
 	qvkDestroyImageView( vk.device, vk.depth_image_view, NULL );
 	vk.depth_image = VK_NULL_HANDLE;
 	vk.depth_image_view = VK_NULL_HANDLE;
+
+	if ( vk.depth_sampled_image_view ) {
+		qvkDestroyImageView( vk.device, vk.depth_sampled_image_view, NULL );
+		vk.depth_sampled_image_view = VK_NULL_HANDLE;
+	}
 
 	if ( vk.screenMap.color_image ) {
 		qvkDestroyImage( vk.device, vk.screenMap.color_image, NULL );
@@ -4566,6 +4611,7 @@ void vk_shutdown( refShutdownCode_t code )
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout, NULL);
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_storage, NULL);
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_post_process, NULL);
+	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_gamma, NULL);
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_blend, NULL);
 
 #ifdef USE_VBO
@@ -5160,10 +5206,22 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 		float gamma;
 		float overbright;
 		float greyscale;
-		float bloom_threshold;
-		float bloom_intensity;
-		int bloom_threshold_mode;
-		int bloom_modulate;
+		union {
+			float bloom_threshold;
+			int enable_ssao;
+		};
+		union {
+			float bloom_intensity;
+			float ssao_radius;
+		};
+		union {
+			int bloom_threshold_mode;
+			float ssao_strength;
+		};
+		union {
+			int bloom_modulate;
+			float ssao_bias;
+		};
 		int dither;
 		int depth_r;
 		int depth_g;
@@ -5193,7 +5251,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			pipeline = &vk.capture_pipeline;
 			fsmodule = vk.modules.gamma_fs;
 			renderpass = vk.render_pass.capture;
-			layout = vk.pipeline_layout_post_process;
+			layout = vk.pipeline_layout_gamma;
 			samples = VK_SAMPLE_COUNT_1_BIT;
 			pipeline_name = "capture buffer pipeline";
 			blend = qfalse;
@@ -5202,7 +5260,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			pipeline = &vk.gamma_pipeline;
 			fsmodule = vk.modules.gamma_fs;
 			renderpass = vk.render_pass.gamma;
-			layout = vk.pipeline_layout_post_process;
+			layout = vk.pipeline_layout_gamma;
 			samples = VK_SAMPLE_COUNT_1_BIT;
 			pipeline_name = "gamma-correction pipeline";
 			blend = qfalse;
@@ -5230,10 +5288,17 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	frag_spec_data.gamma = 1.0 / (r_gamma->value);
 	frag_spec_data.overbright = (float)(1 << tr.overbrightBits);
 	frag_spec_data.greyscale = r_greyscale->value;
-	frag_spec_data.bloom_threshold = r_bloom_threshold->value;
-	frag_spec_data.bloom_intensity = r_bloom_intensity->value;
-	frag_spec_data.bloom_threshold_mode = r_bloom_threshold_mode->integer;
-	frag_spec_data.bloom_modulate = r_bloom_modulate->integer;
+	if ( program_index == 1 ) {
+		frag_spec_data.bloom_threshold = r_bloom_threshold->value;
+		frag_spec_data.bloom_intensity = r_bloom_intensity->value;
+		frag_spec_data.bloom_threshold_mode = r_bloom_threshold_mode->integer;
+		frag_spec_data.bloom_modulate = r_bloom_modulate->integer;
+	} else {
+		frag_spec_data.enable_ssao = r_ssao->integer;
+		frag_spec_data.ssao_radius = r_ssao_radius->value;
+		frag_spec_data.ssao_strength = r_ssao_strength->value;
+		frag_spec_data.ssao_bias = r_ssao_bias->value;
+	}
 	frag_spec_data.dither = r_dither->integer;
 
 	if ( !vk_surface_format_color_depth( vk.present_format.format, &frag_spec_data.depth_r, &frag_spec_data.depth_g, &frag_spec_data.depth_b ) )
@@ -7540,7 +7605,10 @@ void vk_end_frame( void )
 			// render to capture FBO
 			vk_begin_render_pass( vk.render_pass.capture, vk.framebuffers.capture, qfalse, gls.captureWidth, gls.captureHeight );
 			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.capture_pipeline );
-			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
+			{
+				VkDescriptorSet dsets[2] = { vk.color_descriptor, vk.depth_descriptor };
+				qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_gamma, 0, 2, dsets, 0, NULL );
+			}
 
 			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 		}
@@ -7557,7 +7625,10 @@ void vk_end_frame( void )
 
 			vk_begin_render_pass( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qfalse, vk.renderWidth, vk.renderHeight );
 			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
-			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
+			{
+				VkDescriptorSet dsets[2] = { vk.color_descriptor, vk.depth_descriptor };
+				qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_gamma, 0, 2, dsets, 0, NULL );
+			}
 
 			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 		}

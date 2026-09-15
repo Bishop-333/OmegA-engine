@@ -92,6 +92,10 @@ cvar_t	*r_bloom_threshold;
 cvar_t	*r_bloom_intensity;
 cvar_t	*r_bloom_threshold_mode;
 cvar_t	*r_bloom_modulate;
+cvar_t	*r_ssao;
+cvar_t	*r_ssao_radius;
+cvar_t	*r_ssao_strength;
+cvar_t	*r_ssao_bias;
 cvar_t	*r_renderWidth;
 cvar_t	*r_renderHeight;
 cvar_t	*r_renderScale;
@@ -1767,6 +1771,26 @@ static void R_Register( void )
 	r_bloom_modulate = ri.Cvar_Get( "r_bloom_modulate", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_bloom_modulate, "Modulate extracted color:\n 0: off (color = color, i.e. no changes)\n 1: by itself (color = color * color)\n 2: by intensity (color = color * luma(color))" );
 	ri.Cvar_SetGroup( r_bloom_modulate, CVG_RENDERER );
+
+	r_ssao = ri.Cvar_Get( "r_ssao", "1", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_ssao, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_ssao, "Enables screen-space ambient occlusion (SSAO) post-processing effect. Requires \\r_fbo 1.\n 0: disabled\n 1: enabled\n 2: debug (visualize AO buffer directly)" );
+	ri.Cvar_SetGroup( r_ssao, CVG_RENDERER );
+
+	r_ssao_radius = ri.Cvar_Get( "r_ssao_radius", "24.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_ssao_radius, "1.0", "128.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_ssao_radius, "Radius of SSAO sampling effect." );
+	ri.Cvar_SetGroup( r_ssao_radius, CVG_RENDERER );
+
+	r_ssao_strength = ri.Cvar_Get( "r_ssao_strength", "1.2", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_ssao_strength, "0.1", "5.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_ssao_strength, "Intensity of SSAO darkening in crevices and corners." );
+	ri.Cvar_SetGroup( r_ssao_strength, CVG_RENDERER );
+
+	r_ssao_bias = ri.Cvar_Get( "r_ssao_bias", "0.08", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_ssao_bias, "0.0", "0.5", CV_FLOAT );
+	ri.Cvar_SetDescription( r_ssao_bias, "Depth bias for SSAO to prevent self-occlusion artifacts." );
+	ri.Cvar_SetGroup( r_ssao_bias, CVG_RENDERER );
 
 	if ( glConfig.vidWidth )
 		return;

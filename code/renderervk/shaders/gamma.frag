@@ -1,6 +1,7 @@
 #version 450
 
 layout(set = 0, binding = 0) uniform sampler2D texture0;
+layout(set = 1, binding = 0) uniform sampler2D texture_depth;
 
 layout(location = 0) in vec2 frag_tex_coord;
 
@@ -9,7 +10,10 @@ layout(location = 0) out vec4 out_color;
 layout(constant_id = 0) const float gamma = 1.0;
 layout(constant_id = 1) const float obScale = 2.0;
 layout(constant_id = 2) const float greyscale = 0.0;
-//
+layout(constant_id = 3) const int enable_ssao = 0;
+layout(constant_id = 4) const float ssao_radius = 24.0;
+layout(constant_id = 5) const float ssao_strength = 1.2;
+layout(constant_id = 6) const float ssao_bias = 0.08;
 layout(constant_id = 7) const int ditherMode = 0; // 0 - disabled, 1 - ordered
 layout(constant_id = 8) const int depth_r = 255;
 layout(constant_id = 9) const int depth_g = 255;
@@ -46,8 +50,72 @@ vec3 dither(vec3 color) {
 	return cDithered / depth;
 }
 
+const int SSAO_SAMPLES = 12;
+const vec2 ssao_samples[12] = vec2[](
+	vec2( 0.25,  0.00), vec2( 0.00,  0.25), vec2(-0.25,  0.00), vec2( 0.00, -0.25),
+	vec2( 0.42,  0.42), vec2(-0.42,  0.42), vec2(-0.42, -0.42), vec2( 0.42, -0.42),
+	vec2( 0.92,  0.38), vec2(-0.38,  0.92), vec2(-0.92, -0.38), vec2( 0.38, -0.92)
+);
+
+float computeSSAO(vec2 uv) {
+	float d = texture(texture_depth, uv).r;
+	if (d <= 0.0001) return 1.0;
+
+	float z = 4.0 / max(d, 0.00001);
+	vec3 pos = vec3((uv * 2.0 - 1.0) * z, z);
+
+	vec3 dX = dFdx(pos);
+	vec3 dY = dFdy(pos);
+	vec3 normal = cross(dY, dX);
+	float nLen = length(normal);
+	if (nLen < 0.0001) return 1.0;
+	normal /= nLen;
+	if (normal.z > 0.0) normal = -normal;
+
+	vec2 texSize = vec2(textureSize(texture_depth, 0));
+	float radiusPixels = clamp((ssao_radius * texSize.y * 0.75) / max(z, 1.0), 3.0, 64.0);
+	vec2 radiusUV = radiusPixels / texSize;
+
+	float occlusion = 0.0;
+	float validSamples = 0.0;
+
+	for (int i = 0; i < SSAO_SAMPLES; i++) {
+		vec2 sampleUV = clamp(uv + ssao_samples[i] * radiusUV, vec2(0.001), vec2(0.999));
+		float sD = texture(texture_depth, sampleUV).r;
+		if (sD <= 0.0001) continue;
+
+		float sZ = 4.0 / max(sD, 0.00001);
+		vec3 sPos = vec3((sampleUV * 2.0 - 1.0) * sZ, sZ);
+		vec3 diff = sPos - pos;
+		float dist = length(diff);
+
+		float NdotV = dot(normal, diff / max(dist, 0.001));
+		if (NdotV > ssao_bias) {
+			float rangeCheck = smoothstep(0.0, 1.0, (ssao_radius * 2.0) / (dist + 0.001));
+			occlusion += (NdotV - ssao_bias) * rangeCheck;
+		}
+		validSamples += 1.0;
+	}
+
+	if (validSamples < 1.0) return 1.0;
+	float factor = (occlusion / validSamples) * ssao_strength;
+	return clamp(1.0 - factor, 0.0, 1.0);
+}
+
 void main() {
 	vec3 base = texture(texture0, frag_tex_coord).rgb;
+
+	if ( enable_ssao == 2 )
+	{
+		float ao = computeSSAO(frag_tex_coord);
+		out_color = vec4(vec3(ao), 1.0);
+		return;
+	}
+	else if ( enable_ssao == 1 )
+	{
+		float ao = computeSSAO(frag_tex_coord);
+		base *= ao;
+	}
 
 	if ( greyscale == 1 )
 	{

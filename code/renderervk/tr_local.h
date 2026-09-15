@@ -1400,6 +1400,10 @@ extern	cvar_t	*r_skipBackEnd;
 extern	cvar_t	*r_greyscale;
 extern	cvar_t	*r_dither;
 extern	cvar_t	*r_presentBits;
+extern	cvar_t	*r_ssao;
+extern	cvar_t	*r_ssao_radius;
+extern	cvar_t	*r_ssao_strength;
+extern	cvar_t	*r_ssao_bias;
 
 extern	cvar_t	*r_ignoreGLErrors;
 

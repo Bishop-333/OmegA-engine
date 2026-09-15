@@ -394,9 +394,11 @@ typedef struct {
 	VkPipelineLayout pipeline_layout;			// default shaders
 	VkPipelineLayout pipeline_layout_storage;	// flare test shader layout
 	VkPipelineLayout pipeline_layout_post_process;	// post-processing
+	VkPipelineLayout pipeline_layout_gamma;		// post-processing with SSAO depth
 	VkPipelineLayout pipeline_layout_blend;		// post-processing
 
 	VkDescriptorSet color_descriptor;
+	VkDescriptorSet depth_descriptor;
 
 	VkImage color_image;
 	VkImageView color_image_view;
@@ -408,6 +410,7 @@ typedef struct {
 
 	VkImage depth_image;
 	VkImageView depth_image_view;
+	VkImageView depth_sampled_image_view;
 
 	VkImage msaa_image;
 	VkImageView msaa_image_view;
