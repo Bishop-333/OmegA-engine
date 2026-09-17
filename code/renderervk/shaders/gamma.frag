@@ -57,6 +57,11 @@ const vec2 ssao_samples[12] = vec2[](
 	vec2( 0.92,  0.38), vec2(-0.38,  0.92), vec2(-0.92, -0.38), vec2( 0.38, -0.92)
 );
 
+// Fonction de hachage rapide pour générer un bruit pseudo-aléatoire
+float hash(vec2 p) {
+	return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
 float computeSSAO(vec2 uv) {
 	float d = texture(texture_depth, uv).r;
 	if (d <= 0.0001) return 1.0;
@@ -76,11 +81,20 @@ float computeSSAO(vec2 uv) {
 	float radiusPixels = clamp((ssao_radius * texSize.y * 0.75) / max(z, 1.0), 3.0, 64.0);
 	vec2 radiusUV = radiusPixels / texSize;
 
+	// Génération d'une rotation aléatoire unique pour chaque pixel
+	float randomAngle = hash(gl_FragCoord.xy) * 3.14159265 * 2.0;
+	float s = sin(randomAngle);
+	float c = cos(randomAngle);
+	mat2 rot = mat2(c, -s, s, c);
+
 	float occlusion = 0.0;
 	float validSamples = 0.0;
 
 	for (int i = 0; i < SSAO_SAMPLES; i++) {
-		vec2 sampleUV = clamp(uv + ssao_samples[i] * radiusUV, vec2(0.001), vec2(0.999));
+		// On fait tourner l'échantillon fixe
+		vec2 offset = rot * ssao_samples[i];
+		vec2 sampleUV = clamp(uv + offset * radiusUV, vec2(0.001), vec2(0.999));
+		
 		float sD = texture(texture_depth, sampleUV).r;
 		if (sD <= 0.0001) continue;
 
@@ -114,6 +128,13 @@ void main() {
 	else if ( enable_ssao == 1 )
 	{
 		float ao = computeSSAO(frag_tex_coord);
+		
+		// Masque de luminance : on protège les pixels très clairs/émissifs
+		// Si la luminosité du pixel s'approche de 1.0, on annule l'effet du SSAO (ao = 1.0)
+		float luma = dot(base, sRGB);
+		float mask = smoothstep(0.5, 0.9, luma); 
+		ao = mix(ao, 1.0, mask);
+		
 		base *= ao;
 	}
 

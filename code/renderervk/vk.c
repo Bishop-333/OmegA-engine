@@ -5288,7 +5288,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	frag_spec_data.gamma = 1.0 / (r_gamma->value);
 	frag_spec_data.overbright = (float)(1 << tr.overbrightBits);
 	frag_spec_data.greyscale = r_greyscale->value;
-	if ( program_index == 1 ) {
+	if ( program_index == 1 || program_index == 2 ) {
 		frag_spec_data.bloom_threshold = r_bloom_threshold->value;
 		frag_spec_data.bloom_intensity = r_bloom_intensity->value;
 		frag_spec_data.bloom_threshold_mode = r_bloom_threshold_mode->integer;
