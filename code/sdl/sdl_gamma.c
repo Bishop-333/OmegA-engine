@@ -26,6 +26,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #	include <SDL3/SDL.h>
 #endif
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 #include "../client/client.h"
 #include "sdl_glw.h"
 

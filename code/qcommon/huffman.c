@@ -401,7 +401,8 @@ void Huff_Compress(msg_t *mbuf, int offset) {
 		Huff_addRef(&huff, (byte)ch);								/* Do update */
 	}
 
-	bloc += 8;												// next byte
+
+	bloc += 8; // next byte
 
 	mbuf->cursize = (bloc>>3) + offset;
 	Com_Memcpy(mbuf->data+offset, seq, (bloc>>3));
