@@ -64,7 +64,7 @@ USE_VULKAN_API   = 1
 USE_RENDERER_DLOPEN = 1
 
 # valid options: opengl, vulkan
-RENDERER_DEFAULT = opengl
+RENDERER_DEFAULT = vulkan
 
 QUAKE3           = 0
 
@@ -73,19 +73,17 @@ ifneq ($(QUAKE3),1)
   MOD_DEFAULT    = omega
 endif
 
+ifeq ($(USE_RENDERER_DLOPEN),1)
+  RENDERER_SUFFIX =
+else
+  RENDERER_SUFFIX = -$(RENDERER_DEFAULT)
+endif
+
 ifeq ($(QUAKE3),1)
-  ifeq ($(RENDERER_DEFAULT),vulkan)
-    CNAME        = q3-omega-vulkan
-  else
-    CNAME        = q3-omega
-  endif
+  CNAME          = q3-omega$(RENDERER_SUFFIX)
   DNAME          = q3-omgded
 else
-  ifeq ($(RENDERER_DEFAULT),vulkan)
-    CNAME        = omega-vulkan
-  else
-    CNAME        = omega
-  endif
+  CNAME          = omega$(RENDERER_SUFFIX)
   DNAME          = omgded
 endif
 
