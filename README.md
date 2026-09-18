@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="code/unix/quake3.png" alt="OmegA Logo">
+  <img src="code/unix/quake3.svg" alt="OmegA Logo" width="256">
 </p>
 
 # OmegA-engine
