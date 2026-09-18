@@ -3479,6 +3479,12 @@ static void CL_InitRef( void ) {
 	if ( !rendererLib )
 	{
 		Cvar_ForceReset( "cl_renderer" );
+		if ( Q_stricmp( cl_renderer->string, "opengl" ) ) {
+#ifdef USE_OPENGL_API
+			Com_Printf( "Failed to load \"%s\", falling back to OpenGL...\n", dllName );
+			Cvar_Set( "cl_renderer", "opengl" );
+#endif
+		}
 		Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_%s_" REND_ARCH_STRING DLL_EXT, cl_renderer->string );
 #ifdef __APPLE__
 		rendererLib = FS_LoadLibrary( dllName, qfalse );
