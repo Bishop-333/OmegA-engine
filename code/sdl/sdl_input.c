@@ -1319,23 +1319,28 @@ void HandleEvents( void )
 				}
 				break;
 
-			case SDL_EVENT_WINDOW_MINIMIZED:
-				gw_minimized = qtrue;
-				Cvar_SetValue( "com_minimized", 1 );
+			case SDL_EVENT_WINDOW_MOVED:
+				if ( gw_active && !gw_minimized && !glw_state.isFullscreen ) {
+					Cvar_SetIntegerValue( "vid_xpos", e.window.data1 );
+					Cvar_SetIntegerValue( "vid_ypos", e.window.data2 );
+				}
 				break;
+			// window states:
+			case SDL_EVENT_WINDOW_HIDDEN:
+			case SDL_EVENT_WINDOW_MINIMIZED:		gw_active = qfalse; gw_minimized = qtrue; break;
+			case SDL_EVENT_WINDOW_SHOWN:
 			case SDL_EVENT_WINDOW_RESTORED:
-			case SDL_EVENT_WINDOW_MAXIMIZED:
-				gw_minimized = qfalse;
-				Cvar_SetValue( "com_minimized", 0 );
-				break;
-			case SDL_EVENT_WINDOW_FOCUS_LOST:   Cvar_SetValue( "com_unfocused", 1 ); break;
-			case SDL_EVENT_WINDOW_FOCUS_GAINED: Cvar_SetValue( "com_unfocused", 0 ); break;
-			case SDL_EVENT_WINDOW_MOUSE_ENTER:
-				mouse_focus = qtrue;
-				break;
-			case SDL_EVENT_WINDOW_MOUSE_LEAVE:
-				mouse_focus = qfalse;
-				break;
+			case SDL_EVENT_WINDOW_MAXIMIZED:		gw_minimized = qfalse; break;
+			// keyboard focus:
+			case SDL_EVENT_WINDOW_FOCUS_LOST:	lastKeyDown = 0; Key_ClearStates(); IN_SyncModifiers(); gw_active = qfalse; break;
+			case SDL_EVENT_WINDOW_FOCUS_GAINED:	lastKeyDown = 0; Key_ClearStates(); IN_SyncModifiers(); gw_active = qtrue; gw_minimized = qfalse;
+														if ( re.SetColorMappings ) {
+															re.SetColorMappings();
+														}
+														break;
+			// mouse focus:
+			case SDL_EVENT_WINDOW_MOUSE_ENTER: mouse_focus = qtrue; break;
+			case SDL_EVENT_WINDOW_MOUSE_LEAVE: if ( glw_state.isFullscreen ) mouse_focus = qfalse; break;
 
 #if defined(PROTOCOL_HANDLER) && defined(__APPLE__)
 			case SDL_EVENT_DROP_FILE:
