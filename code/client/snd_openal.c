@@ -1361,7 +1361,14 @@ static void S_AL_SrcLoop( alSrcPriority_t priority, sfxHandle_t sfx,
 	curSource->entity = entityNum;
 	curSource->isLooping = qtrue;
 
-	curSource->curGain = s_volume->value * s_worldVolume->value;
+	if( priority == SRCPRI_AMBIENT )
+	{
+		curSource->curGain = s_alGain->value * s_volume->value * s_worldVolume->value;
+	}
+	else
+	{
+		curSource->curGain = s_alGain->value * s_volume->value;
+	}
 
 	if( S_AL_HearingThroughEntity( entityNum ) )
 	{
@@ -1457,8 +1464,13 @@ void S_AL_SrcUpdate( void )
 			continue;
 
 		// Update source parameters
-		if((s_alGain->modified) || (s_volume->modified))
-			curSource->curGain = s_alGain->value * s_volume->value;
+		if((s_alGain->modified) || (s_volume->modified) || (s_worldVolume->modified))
+		{
+			if(curSource->priority == SRCPRI_AMBIENT)
+				curSource->curGain = s_alGain->value * s_volume->value * s_worldVolume->value;
+			else
+				curSource->curGain = s_alGain->value * s_volume->value;
+		}
 		if((s_alRolloff->modified) && (!curSource->local))
 			qalSourcef(curSource->alSource, AL_ROLLOFF_FACTOR, s_alRolloff->value);
 		if(s_alMinDistance->modified)
@@ -2321,6 +2333,7 @@ void S_AL_Update( void )
 	s_musicVolume->modified = qfalse;
 	s_alMinDistance->modified = qfalse;
 	s_alRolloff->modified = qfalse;
+	s_worldVolume->modified = qfalse;
 }
 
 /*

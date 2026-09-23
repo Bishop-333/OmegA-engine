@@ -867,6 +867,12 @@ void S_AddLoopSounds( void ) {
 			left_total += left;
 			right_total += right;
 		}
+
+		if (!loop->kill) {
+			left_total = left_total * s_worldVolume->value;
+			right_total = right_total * s_worldVolume->value;
+		}
+
 		if (left_total == 0 && right_total == 0) {
 			continue;		// not audible
 		}
@@ -882,8 +888,8 @@ void S_AddLoopSounds( void ) {
 		}
 		
 		ch->master_vol = MASTER_VOL;
-		ch->leftvol = left_total * s_worldVolume->value;
-		ch->rightvol = right_total * s_worldVolume->value;
+		ch->leftvol = left_total;
+		ch->rightvol = right_total;
 		ch->thesfx = loop->sfx;
 		ch->doppler = loop->doppler;
 		ch->dopplerScale = loop->dopplerScale;
