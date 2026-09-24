@@ -116,6 +116,7 @@ cvar_t		*con_notifytime;
 cvar_t		*con_scale;
 cvar_t		*con_fps;
 cvar_t		*con_clock;
+cvar_t		*con_autoSuggest;
 cvar_t		*con_drawHelp;
 cvar_t		*con_anim;
 cvar_t		*con_fade;
@@ -586,6 +587,8 @@ void Con_Init( void )
 	Cvar_SetDescription( con_fps, "Enable/disable console fps display." );
 	con_clock = Cvar_Get( "con_clock", "1", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( con_clock, "Console clock.\n 1: 24-hour clock\n 2: 12-hour clock" );
+	con_autoSuggest = Cvar_Get( "con_autoSuggest", "1", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( con_autoSuggest, "Enable/disable inline suggestions." );
 	con_drawHelp = Cvar_Get( "con_drawHelp", "1", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( con_drawHelp, "Enable/disable automatic CVAR description display." );
 	con_anim = Cvar_Get( "con_anim", "1", CVAR_ARCHIVE_ND );
@@ -930,6 +933,54 @@ DRAWING
 */
 
 
+static const char *suggestQuery;
+static char suggestResult[MAX_STRING_CHARS];
+static const vec4_t darkTextColor = { 0.25f, 0.25f, 0.25f, 1.0f };
+
+/*
+================
+Con_FindSuggestion
+================
+*/
+static void Con_FindSuggestion( const char *name ) {
+	if ( !Q_stricmpn( name, suggestQuery, strlen( suggestQuery ) ) ) {
+		if ( suggestResult[0] == '\0' || Q_stricmp( name, suggestResult ) < 0 ) {
+			Q_strncpyz( suggestResult, name, sizeof( suggestResult ) );
+		}
+	}
+}
+
+/*
+================
+Con_DrawSuggestion
+================
+*/
+static void Con_DrawSuggestion( int y ) {
+	const char *cmd;
+	int cmdLen;
+	int x;
+
+	if ( con_autoSuggest->integer && g_consoleField.cursor == strlen( g_consoleField.buffer ) ) {
+		cmd = g_consoleField.buffer;
+		if ( *cmd == '\\' || *cmd == '/' ) {
+			cmd++;
+		}
+		if ( *cmd && !strchr( cmd, ' ' ) ) {
+			cmdLen = strlen( cmd );
+			suggestQuery = cmd;
+			suggestResult[0] = '\0';
+
+			Cmd_CommandCompletion( Con_FindSuggestion );
+			Cvar_CommandCompletion( Con_FindSuggestion );
+
+			if ( suggestResult[0] && strlen( suggestResult ) > cmdLen ) {
+				x = activeCon->xadjust + 2 * smallchar_width + ( g_consoleField.cursor - g_consoleField.scroll ) * smallchar_width;
+				SCR_DrawSmallStringExt( x, y, suggestResult + cmdLen, darkTextColor, qtrue, qtrue );
+			}
+		}
+	}
+}
+
 /*
 ================
 Con_DrawInput
@@ -952,6 +1003,8 @@ static void Con_DrawInput( void ) {
 
 	Field_Draw( &g_consoleField, activeCon->xadjust + 2 * smallchar_width, y,
 		SCREEN_WIDTH - 3 * smallchar_width, qtrue, qtrue );
+
+	Con_DrawSuggestion( y );
 }
 
 
@@ -1245,7 +1298,6 @@ static void Con_DrawSolidConsole( float frac ) {
 	char			buf[ MAX_CVAR_VALUE_STRING ], *v[4];
 	int			j;
 	int			margin;
-	vec4_t			darkTextColor;
 
 	lines = cls.glconfig.vidHeight * frac;
 	if ( lines <= 0 )
@@ -1347,9 +1399,6 @@ static void Con_DrawSolidConsole( float frac ) {
 
 	// draw console tabs (fX3)
 	margin = 13;
-
-	darkTextColor[0] = darkTextColor[1] = darkTextColor[2] = 0.25;
-	darkTextColor[3] = 1;
 
 	for ( j = 0; j < MAX_CONSOLES; j++ ) {
 		if ( con[j].active ) {
