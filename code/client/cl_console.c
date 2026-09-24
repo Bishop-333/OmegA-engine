@@ -961,6 +961,9 @@ static void Con_DrawSuggestion( int y ) {
 	int x;
 
 	if ( con_autoSuggest->integer && g_consoleField.cursor == strlen( g_consoleField.buffer ) ) {
+		if ( cls.state == CA_ACTIVE && *g_consoleField.buffer != '\\' && *g_consoleField.buffer != '/' ) {
+			return;
+		}
 		cmd = g_consoleField.buffer;
 		if ( *cmd == '\\' || *cmd == '/' ) {
 			cmd++;
@@ -1192,9 +1195,9 @@ static void Con_DrawHelp( int y, float conColorValue[4] ) {
 	int		i;
 	char	help[ MAX_CVAR_VALUE_STRING ];
 
-	if ( *g_consoleField.buffer == '\0' )
+	if ( cls.state == CA_ACTIVE && *g_consoleField.buffer != '\\' && *g_consoleField.buffer != '/' )
 		return;
-	
+
 	if ( activeCon->displayFrac == 0.0f || activeCon->displayFrac < activeCon->finalFrac )
 		return;
 
