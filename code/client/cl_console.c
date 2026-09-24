@@ -935,7 +935,7 @@ DRAWING
 
 static const char *suggestQuery;
 static char suggestResult[MAX_STRING_CHARS];
-static const vec4_t darkTextColor = { 0.25f, 0.25f, 0.25f, 1.0f };
+static const vec4_t darkTextColor = { 0.33f, 0.33f, 0.33f, 1.0f };
 
 /*
 ================
