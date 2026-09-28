@@ -935,7 +935,6 @@ DRAWING
 
 static const char *suggestQuery;
 static char suggestResult[MAX_STRING_CHARS];
-static const vec4_t darkTextColor = { 0.25f, 0.25f, 0.25f, 1.0f };
 
 /*
 ================
@@ -944,8 +943,10 @@ Con_FindSuggestion
 */
 static void Con_FindSuggestion( const char *name ) {
 	if ( !Q_stricmpn( name, suggestQuery, strlen( suggestQuery ) ) ) {
-		if ( suggestResult[0] == '\0' || Q_stricmp( name, suggestResult ) < 0 ) {
+		if ( suggestResult[0] == '\0' ) {
 			Q_strncpyz( suggestResult, name, sizeof( suggestResult ) );
+		} else if ( suggestResult[0] != '\1' && Q_stricmp( suggestResult, name ) != 0 ) {
+			suggestResult[0] = '\1';
 		}
 	}
 }
@@ -976,9 +977,9 @@ static void Con_DrawSuggestion( int y ) {
 			Cmd_CommandCompletion( Con_FindSuggestion );
 			Cvar_CommandCompletion( Con_FindSuggestion );
 
-			if ( suggestResult[0] && strlen( suggestResult ) > cmdLen ) {
+			if ( suggestResult[0] && suggestResult[0] != '\1' && strlen( suggestResult ) > cmdLen ) {
 				x = activeCon->xadjust + 2 * smallchar_width + ( g_consoleField.cursor - g_consoleField.scroll ) * smallchar_width;
-				SCR_DrawSmallStringExt( x, y, suggestResult + cmdLen, darkTextColor, qtrue, qtrue );
+				SCR_DrawSmallStringExt( x, y, suggestResult + cmdLen, colorDkGrey, qtrue, qtrue );
 			}
 		}
 	}
@@ -1411,7 +1412,7 @@ static void Con_DrawSolidConsole( float frac ) {
 				if ( con[j].notify ) {
 					SCR_DrawSmallStringExt( margin + 10, lines - smallchar_height, con[j].name, g_color_table[3], qfalse, qtrue );
 				} else {
-					SCR_DrawSmallStringExt( margin + 10, lines - smallchar_height, con[j].name, darkTextColor, qfalse, qtrue );
+					SCR_DrawSmallStringExt( margin + 10, lines - smallchar_height, con[j].name, colorDkGrey, qfalse, qtrue );
 				}
 			}
 			margin += strlen( con[j].name ) * smallchar_width + 20;
