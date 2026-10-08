@@ -517,6 +517,38 @@ struct
 } stick_state;
 
 
+static const struct {
+	int key;
+	const char *cmd;
+} default_gamepad_bindings[] = {
+	{ K_PAD0_A,                "+moveup" },
+	{ K_PAD0_B,                "+movedown" },
+	{ K_PAD0_X,                "+button2" },
+	{ K_PAD0_Y,                NULL },
+	{ K_PAD0_BACK,             "+scores" },
+	{ K_PAD0_GUIDE,            NULL },
+	{ K_PAD0_START,            NULL },
+	{ K_PAD0_LEFTSTICK_CLICK,  NULL },
+	{ K_PAD0_RIGHTSTICK_CLICK, "weapon 1; +attack" },
+	{ K_PAD0_LEFTSHOULDER,     "weapprev" },
+	{ K_PAD0_RIGHTSHOULDER,    "weapnext" },
+	{ K_PAD0_DPAD_UP,          "toggle cg_thirdperson" },
+	{ K_PAD0_DPAD_DOWN,        "+button3" },
+	{ K_PAD0_DPAD_LEFT,        NULL },
+	{ K_PAD0_DPAD_RIGHT,       NULL },
+	{ K_PAD0_LEFTSTICK_LEFT,   NULL },
+	{ K_PAD0_LEFTSTICK_RIGHT,  NULL },
+	{ K_PAD0_LEFTSTICK_UP,     NULL },
+	{ K_PAD0_LEFTSTICK_DOWN,   NULL },
+	{ K_PAD0_RIGHTSTICK_LEFT,  NULL },
+	{ K_PAD0_RIGHTSTICK_RIGHT, NULL },
+	{ K_PAD0_RIGHTSTICK_UP,    NULL },
+	{ K_PAD0_RIGHTSTICK_DOWN,  NULL },
+	{ K_PAD0_LEFTTRIGGER,      "+moveup" },
+	{ K_PAD0_RIGHTTRIGGER,     "+attack" }
+};
+
+
 /*
 ===============
 IN_InitJoystick
@@ -529,6 +561,7 @@ static void IN_InitJoystick( void )
 	int total = 0;
 	char buf[16384] = "";
 	SDL_JoystickID *joysticks = NULL;
+	SDL_JoystickID id;
 	const char *joystickName = NULL;
 
 	if (gamepad)
@@ -543,13 +576,13 @@ static void IN_InitJoystick( void )
 
 	if (!SDL_WasInit(SDL_INIT_GAMEPAD))
 	{
-		Com_DPrintf("Calling SDL_Init(SDL_INIT_GAMECONTROLLER)...\n");
+		Com_DPrintf("Calling SDL_Init(SDL_INIT_GAMEPAD)...\n");
 		if (!SDL_Init(SDL_INIT_GAMEPAD))
 		{
-			Com_DPrintf("SDL_Init(SDL_INIT_GAMECONTROLLER) failed: %s\n", SDL_GetError());
+			Com_DPrintf("SDL_Init(SDL_INIT_GAMEPAD) failed: %s\n", SDL_GetError());
 			return;
 		}
-		Com_DPrintf("SDL_Init(SDL_INIT_GAMECONTROLLER) passed.\n");
+		Com_DPrintf("SDL_Init(SDL_INIT_GAMEPAD) passed.\n");
 	}
 
 	joysticks = SDL_GetJoysticks(&total);
@@ -564,13 +597,13 @@ static void IN_InitJoystick( void )
 		i++;
 	}
 
-	SDL_free(joysticks);
-
 	cv = Cvar_Get( "in_availableJoysticks", buf, CVAR_ROM );
 	Cvar_SetDescription( cv, "List of available joysticks." );
+	Cvar_Set( "in_availableJoysticks", buf );
 
 	if( !in_joystick->integer ) {
 		Com_DPrintf( "Joystick is not active.\n" );
+		SDL_free(joysticks);
 		SDL_QuitSubSystem(SDL_INIT_GAMEPAD);
 		return;
 	}
@@ -580,20 +613,37 @@ static void IN_InitJoystick( void )
 	if( in_joystickNo->integer < 0 || in_joystickNo->integer >= total )
 		Cvar_Set( "in_joystickNo", "0" );
 
-	in_joystickUseAnalog = Cvar_Get( "in_joystickUseAnalog", "0", CVAR_ARCHIVE );
+	in_joystickUseAnalog = Cvar_Get( "in_joystickUseAnalog", "1", CVAR_ARCHIVE );
 	Cvar_SetDescription( in_joystickUseAnalog, "Do not translate joystick axis events to keyboard commands." );
 
-	stick = SDL_OpenJoystick( in_joystickNo->integer );
+	if( total <= 0 ) {
+		Com_DPrintf( "No joystick available.\n" );
+		SDL_free(joysticks);
+		return;
+	}
+
+	id = joysticks[in_joystickNo->integer];
+	SDL_free(joysticks);
+
+	stick = SDL_OpenJoystick( id );
 
 	if (stick == NULL) {
 		Com_DPrintf( "No joystick opened: %s\n", SDL_GetError() );
 		return;
 	}
 
-	if (SDL_IsGamepad(in_joystickNo->integer))
-		gamepad = SDL_OpenGamepad(in_joystickNo->integer);
+	if (SDL_IsGamepad(id))
+		gamepad = SDL_OpenGamepad(id);
 
-	joystickName = SDL_GetJoystickNameForID(in_joystickNo->integer);
+	if (gamepad)
+	{
+		for (i = 0; i < ARRAY_LEN(default_gamepad_bindings); i++) {
+			if (default_gamepad_bindings[i].cmd && !Key_GetBinding(default_gamepad_bindings[i].key))
+				Key_SetBinding( default_gamepad_bindings[i].key, default_gamepad_bindings[i].cmd );
+		}
+	}
+
+	joystickName = SDL_GetJoystickNameForID(id);
 	Com_DPrintf( "Joystick %d opened\n", in_joystickNo->integer );
 	Com_DPrintf( "Name:       %s\n", joystickName ? joystickName : "Unknown" );
 	Com_DPrintf( "Axes:       %d\n", SDL_GetNumJoystickAxes(stick) );
@@ -648,7 +698,45 @@ static qboolean KeyToAxisAndSign(int keynum, int *outAxis, int *outSign)
 	bind = Key_GetBinding(keynum);
 
 	if (!bind || *bind != '+')
-		return qfalse;
+	{
+		switch (keynum)
+		{
+			case K_PAD0_LEFTSTICK_UP:
+				*outAxis = j_forward_axis->integer;
+				*outSign = -1;
+				return qtrue;
+			case K_PAD0_LEFTSTICK_DOWN:
+				*outAxis = j_forward_axis->integer;
+				*outSign = 1;
+				return qtrue;
+			case K_PAD0_LEFTSTICK_LEFT:
+				*outAxis = j_side_axis->integer;
+				*outSign = -1;
+				return qtrue;
+			case K_PAD0_LEFTSTICK_RIGHT:
+				*outAxis = j_side_axis->integer;
+				*outSign = 1;
+				return qtrue;
+			case K_PAD0_RIGHTSTICK_UP:
+				*outAxis = j_pitch_axis->integer;
+				*outSign = -1;
+				return qtrue;
+			case K_PAD0_RIGHTSTICK_DOWN:
+				*outAxis = j_pitch_axis->integer;
+				*outSign = 1;
+				return qtrue;
+			case K_PAD0_RIGHTSTICK_LEFT:
+				*outAxis = j_yaw_axis->integer;
+				*outSign = -1;
+				return qtrue;
+			case K_PAD0_RIGHTSTICK_RIGHT:
+				*outAxis = j_yaw_axis->integer;
+				*outSign = 1;
+				return qtrue;
+			default:
+				return qfalse;
+		}
+	}
 
 	*outSign = 0;
 
@@ -720,6 +808,14 @@ static void IN_GamepadMove( void )
 
 	SDL_UpdateGamepads();
 
+	if (Key_GetCatcher() & KEYCATCH_UI)
+	{
+		int dx = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_LEFTX) / 4096;
+		int dy = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_LEFTY) / 4096;
+		if (dx || dy)
+			Com_QueueEvent(in_eventTime, SE_MOUSE, dx, dy, 0, NULL);
+	}
+
 	// check buttons
 	for (i = 0; i < SDL_GAMEPAD_BUTTON_COUNT; i++)
 	{
@@ -733,7 +829,10 @@ static void IN_GamepadMove( void )
 			} else
 #endif
 			{
-				Com_QueueEvent(in_eventTime, SE_KEY, K_PAD0_A + i, pressed, 0, NULL);
+				if (sdlButton == SDL_GAMEPAD_BUTTON_START)
+					Com_QueueEvent(in_eventTime, SE_KEY, K_ESCAPE, pressed, 0, NULL);
+				else
+					Com_QueueEvent(in_eventTime, SE_KEY, K_PAD0_A + i, pressed, 0, NULL);
 			}
 			stick_state.buttons[i] = pressed;
 		}
@@ -773,7 +872,7 @@ static void IN_GamepadMove( void )
 			int negKey = negMap[i];
 			int posKey = posMap[i];
 
-			if (in_joystickUseAnalog->integer)
+			if (in_joystickUseAnalog->integer && i < 4)
 			{
 				int posAxis = 0, posSign = 0, negAxis = 0, negSign = 0;
 
@@ -798,14 +897,14 @@ static void IN_GamepadMove( void )
 				// negative/neutral to positive -> keydown
 				if (posAnalog && axis > 0)
 				{
-					translatedAxes[posAxis] = axis * posSign;
+					translatedAxes[posAxis] = axis * posSign * 127 / 32767;
 					translatedAxesSet[posAxis] = qtrue;
 				}
 
 				// positive/neutral to negative -> keydown
 				if (negAnalog && axis < 0)
 				{
-					translatedAxes[negAxis] = -axis * negSign;
+					translatedAxes[negAxis] = -axis * negSign * 127 / 32767;
 					translatedAxesSet[negAxis] = qtrue;
 				}
 			}
@@ -1467,7 +1566,7 @@ void IN_Init( void )
 		" -1 - win32 mouse" );
 
 #ifdef USE_JOYSTICK
-	in_joystick = Cvar_Get( "in_joystick", "0", CVAR_ARCHIVE|CVAR_LATCH );
+	in_joystick = Cvar_Get( "in_joystick", "1", CVAR_ARCHIVE|CVAR_LATCH );
 	Cvar_SetDescription( in_joystick, "Whether or not joystick support is on." );
 	in_joystickThreshold = Cvar_Get( "joy_threshold", "0.15", CVAR_ARCHIVE );
 	Cvar_SetDescription( in_joystickThreshold, "Threshold of joystick moving distance." );
@@ -1483,10 +1582,10 @@ void IN_Init( void )
 	j_up =           Cvar_Get( "j_up",           "0", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( j_up, "Joystick up movement speed/direction." );
 
-	j_pitch_axis =   Cvar_Get( "j_pitch_axis",   "3", CVAR_ARCHIVE_ND );
+	j_pitch_axis =   Cvar_Get( "j_pitch_axis",   "5", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( j_pitch_axis,   "0", va("%i",MAX_JOYSTICK_AXIS-1), CV_INTEGER );
 	Cvar_SetDescription( j_pitch_axis, "Selects which joystick axis controls pitch." );
-	j_yaw_axis =     Cvar_Get( "j_yaw_axis",     "2", CVAR_ARCHIVE_ND );
+	j_yaw_axis =     Cvar_Get( "j_yaw_axis",     "4", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( j_yaw_axis,     "0", va("%i",MAX_JOYSTICK_AXIS-1), CV_INTEGER );
 	Cvar_SetDescription( j_yaw_axis, "Selects which joystick axis controls yaw." );
 	j_forward_axis = Cvar_Get( "j_forward_axis", "1", CVAR_ARCHIVE_ND );
@@ -1495,7 +1594,7 @@ void IN_Init( void )
 	j_side_axis =    Cvar_Get( "j_side_axis",    "0", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( j_side_axis,    "0", va("%i",MAX_JOYSTICK_AXIS-1), CV_INTEGER );
 	Cvar_SetDescription( j_side_axis, "Selects which joystick axis controls left/right." );
-	j_up_axis =      Cvar_Get( "j_up_axis",      "4", CVAR_ARCHIVE_ND );
+	j_up_axis =      Cvar_Get( "j_up_axis",      "2", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( j_up_axis,      "0", va("%i",MAX_JOYSTICK_AXIS-1), CV_INTEGER );
 	Cvar_SetDescription( j_up_axis, "Selects which joystick axis controls up/down." );
 #endif

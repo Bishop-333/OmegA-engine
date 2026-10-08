@@ -539,6 +539,24 @@ static void Message_Key( int key ) {
 
 /*
 ===================
+CL_TranslateGamepadToUIKey
+===================
+*/
+static int CL_TranslateGamepadToUIKey( int key ) {
+	switch ( key ) {
+		case K_PAD0_DPAD_UP:	return K_UPARROW;
+		case K_PAD0_DPAD_DOWN:	return K_DOWNARROW;
+		case K_PAD0_DPAD_LEFT:	return K_LEFTARROW;
+		case K_PAD0_DPAD_RIGHT:	return K_RIGHTARROW;
+		case K_PAD0_A:			return K_ENTER;
+		case K_PAD0_B:			return K_ESCAPE;
+		default:				return key;
+	}
+}
+
+
+/*
+===================
 CL_KeyDownEvent
 
 Called by CL_KeyEvent to handle a keypress
@@ -653,7 +671,7 @@ static void CL_KeyDownEvent( int key, unsigned time )
 		Console_Key( key );
 	} else if ( Key_GetCatcher( ) & KEYCATCH_UI ) {
 		if ( uivm ) {
-			VM_Call( uivm, 2, UI_KEY_EVENT, key, qtrue );
+			VM_Call( uivm, 2, UI_KEY_EVENT, CL_TranslateGamepadToUIKey( key ), qtrue );
 		}
 	} else if ( Key_GetCatcher( ) & KEYCATCH_CGAME ) {
 		if ( cgvm ) {
@@ -713,7 +731,7 @@ static void CL_KeyUpEvent( int key, unsigned time )
 
 	if ( Key_GetCatcher() & KEYCATCH_UI ) {
 		if ( uivm ) {
-			VM_Call( uivm, 2, UI_KEY_EVENT, key, qfalse );
+			VM_Call( uivm, 2, UI_KEY_EVENT, CL_TranslateGamepadToUIKey( key ), qfalse );
 		}
 	} else if ( Key_GetCatcher() & KEYCATCH_CGAME ) {
 		if ( cgvm ) {
