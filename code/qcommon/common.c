@@ -1797,6 +1797,7 @@ typedef struct {
 	int		permanent;
 	int		temp;
 	int		tempHighwater;
+	const char *name;
 } hunkUsed_t;
 
 typedef struct hunkblock_s {
@@ -2191,7 +2192,15 @@ static void Com_InitHunkMemory( void ) {
 
 	// cacheline align
 	s_hunkData = PADP( s_hunkData, 64 );
-	Hunk_Clear();
+	Com_Memset( &hunk_low, 0x0, sizeof( hunk_low ) );
+	Com_Memset( &hunk_high, 0x0, sizeof( hunk_high ) );
+	hunk_low.name = "low";
+	hunk_high.name = "high";
+	hunk_permanent = &hunk_low;
+	hunk_temp = &hunk_high;
+#ifdef HUNK_DEBUG
+	hunkblocks = NULL;
+#endif
 
 	Cmd_AddCommand( "meminfo", Com_Meminfo_f );
 #ifdef ZONE_DEBUG
@@ -2226,9 +2235,13 @@ Hunk_SetMark
 The server calls this after the level and game VM have been loaded
 ===================
 */
-void Hunk_SetMark( void ) {
-	//hunk_low.mark = hunk_low.permanent; // do not touch client side
-	hunk_high.mark = hunk_high.permanent;
+void Hunk_SetMark( ha_pref preference )
+{
+	if ( preference == h_low ) {
+		hunk_low.mark = hunk_low.permanent;
+	} else {
+		hunk_high.mark = hunk_high.permanent;
+	}
 }
 
 
@@ -2239,9 +2252,17 @@ Hunk_ClearToMark
 The client calls this before starting a vid_restart or snd_restart
 =================
 */
-void Hunk_ClearToMark( void ) {
-	hunk_low.permanent = hunk_low.temp = hunk_low.mark;
-	// hunk_high.permanent = hunk_high.temp = hunk_high.mark; // do not touch server side
+void Hunk_ClearToMark( ha_pref preference )
+{
+	hunkUsed_t *hunk;
+
+	if ( preference == h_low ) {
+		hunk = &hunk_low;
+	} else {
+		hunk = &hunk_high;
+	}
+
+	hunk->permanent = hunk->temp = hunk->mark;
 }
 
 
@@ -2250,16 +2271,27 @@ void Hunk_ClearToMark( void ) {
 Hunk_CheckMark
 =================
 */
-qboolean Hunk_CheckMark( void ) {
-	if( hunk_low.mark || hunk_high.mark ) {
+qboolean Hunk_CheckMark( ha_pref preference )
+{
+	hunkUsed_t *hunk;
+	if ( preference == h_low ) {
+		hunk = &hunk_low;
+	} else {
+		hunk = &hunk_low;
+	}
+
+	if( hunk->mark != 0  ) {
 		return qtrue;
 	}
+
 	return qfalse;
 }
+
 
 void CL_ShutdownCGame( void );
 void CL_ShutdownUI( void );
 void SV_ShutdownGameProgs( void );
+
 
 /*
 =================
@@ -2268,36 +2300,24 @@ Hunk_Clear
 The server calls this before shutting down or loading a new map
 =================
 */
-void Hunk_Clear( void ) {
+void Hunk_Clear( ha_pref preference )
+{
+	hunkUsed_t *hunk;
 
-#ifndef DEDICATED
-	CL_ShutdownCGame();
-	CL_ShutdownUI();
-#endif
-	SV_ShutdownGameProgs();
-#ifndef DEDICATED
-	CIN_CloseAllVideos();
-#endif
-	hunk_low.mark = 0;
-	hunk_low.permanent = 0;
-	hunk_low.temp = 0;
-	hunk_low.tempHighwater = 0;
+	if ( preference == h_low ) {
+		hunk = &hunk_low;
+	} else {
+		hunk = &hunk_high;
+	}
 
-	hunk_high.mark = 0;
-	hunk_high.permanent = 0;
-	hunk_high.temp = 0;
-	hunk_high.tempHighwater = 0;
+	if ( hunk->temp > hunk->permanent ) {
+		Com_Printf( S_COLOR_WARNING "Hunk_Clear(%s): non-zero temp %i\n", hunk->name, hunk->temp );
+	}
 
-	hunk_permanent = &hunk_low;
-	hunk_temp = &hunk_high;
-
-	Com_Printf( "Hunk_Clear: reset the hunk ok\n" );
-	VM_Clear();
-#ifdef HUNK_DEBUG
-	hunkblocks = NULL;
-#endif
-
-	FS_ResetLoadStack();
+	hunk->mark = 0;
+	hunk->permanent = 0;
+	hunk->temp = 0;
+	hunk->tempHighwater = 0;
 }
 
 
@@ -2305,7 +2325,7 @@ static void Hunk_SwapBanks( void ) {
 	// can't swap banks if there is any temp already allocated
 	if ( hunk_temp->temp != hunk_temp->permanent ) {
 		// we have hard preference so this is an error now
-		Com_Error( ERR_DROP, "cant' swap banks" );
+		Com_Error( ERR_DROP, "can't swap banks" );
 	} else {
 		// original code seems to select most recently touched/paged allocation for permanent storage
 		// we just stick to our preference for predictable allocation
@@ -3145,7 +3165,6 @@ void Com_GameRestart( int checksumFeed, qboolean clientRestart )
 		{
 			CL_Disconnect( qfalse );
 			CL_ShutdownAll();
-			CL_ClearMemory(); // Hunk_Clear(); // -EC-
 		}
 #endif
 
@@ -4529,18 +4548,17 @@ void Com_Frame( qboolean noDelay ) {
 		if ( !com_dedicated->integer ) {
 			SV_Shutdown( "dedicated set to 0" );
 			SV_RemoveDedicatedCommands();
-#ifndef DEDICATED
-			CL_Init();
-#endif
+#ifdef DEDICATED
 			Sys_ShowConsole( com_viewlog->integer, qfalse );
-#ifndef DEDICATED
+#else
+			CL_Init();
+			Sys_ShowConsole( com_viewlog->integer, qfalse );
 			gw_minimized = qfalse;
 			CL_StartHunkUsers();
 #endif
 		} else {
 #ifndef DEDICATED
 			CL_Shutdown( "", qfalse );
-			CL_ClearMemory();
 #endif
 			Sys_ShowConsole( 1, qtrue );
 			SV_AddDedicatedCommands();

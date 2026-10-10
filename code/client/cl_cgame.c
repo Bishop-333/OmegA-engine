@@ -399,6 +399,10 @@ void CL_ShutdownCGame( void ) {
 	VM_Free( cgvm );
 	cgvm = NULL;
 	FS_VM_CloseFiles( H_CGAME );
+
+	if ( !com_sv_running->integer ) {
+		CM_ClearMap();
+	}
 }
 
 

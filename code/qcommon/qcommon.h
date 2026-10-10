@@ -1141,10 +1141,10 @@ int Z_FreeTags( memtag_t tag );
 int Z_AvailableMemory( void );
 void Z_LogHeap( void );
 
-void Hunk_Clear( void );
-void Hunk_ClearToMark( void );
-void Hunk_SetMark( void );
-qboolean Hunk_CheckMark( void );
+void Hunk_Clear( ha_pref preference );
+void Hunk_ClearToMark( ha_pref preference );
+void Hunk_SetMark( ha_pref preference );
+qboolean Hunk_CheckMark( ha_pref preference );
 void Hunk_ClearTempMemory( void );
 void *Hunk_AllocateTempMemory( size_t size );
 void Hunk_FreeTempMemory( void *buf );
@@ -1207,9 +1207,6 @@ void CL_CDDialog( void );
 
 void CL_ShutdownAll( void );
 // shutdown all the client stuff
-
-void CL_ClearMemory( void );
-// clear memory
 
 void CL_FlushMemory( void );
 // dump all memory on an error
