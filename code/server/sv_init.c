@@ -436,8 +436,10 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	CL_ShutdownAll();
 #endif
 
-	// clear the whole hunk because we're (re)loading the server
-	Hunk_Clear();
+	// clear server-side hunk
+	Hunk_Clear( h_high );
+
+	FS_ResetLoadStack();
 
 	// clear collision map data
 	CM_ClearMap();
@@ -446,9 +448,6 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	Cvar_CheckRange( com_timescale, "0.001", NULL, CV_FLOAT );
 
 	Hunk_AllocPreference( h_high );
-
-	// Restart renderer?
-	// CL_StartHunkUsers( );
 
 	// init client structures and svs.numSnapshotEntities
 	if ( !Cvar_VariableIntegerValue( "sv_running" ) ) {
@@ -707,6 +706,8 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	}
 #endif
 
+	Hunk_SetMark( h_high );
+
 	Com_Printf ("-----------------------------------\n");
 
 	Sys_SetStatus( "Running map %s", mapname );
@@ -955,6 +956,8 @@ void SV_Shutdown( const char *finalmsg ) {
 	if ( sv_killserver->integer != 2 )
 		CL_Disconnect( qfalse );
 #endif
+
+	Hunk_Clear( h_high );
 
 	// clean some server cvars
 	Cvar_Set( "sv_referencedPaks", "" );
