@@ -40,11 +40,11 @@ if [ -n "${CMAKE_GENERATOR:-}" ]; then
   esac
 
   if [ "${APPVEYOR_BUILD_WORKER_IMAGE}" = 'Visual Studio 2026' ]; then
-    openssl_root_win="C:/OpenSSL-v36${openssl_suffix}"
+    openssl_root_win="C:/OpenSSL-v36${openssl_suffix}"  # manually bumped
   elif [ "${APPVEYOR_BUILD_WORKER_IMAGE}" = 'Visual Studio 2022' ]; then
-    openssl_root_win="C:/OpenSSL-v35${openssl_suffix}"
+    openssl_root_win="C:/OpenSSL-v35${openssl_suffix}"  # manually bumped
   elif [ "${APPVEYOR_BUILD_WORKER_IMAGE}" = 'Visual Studio 2019' ]; then
-    openssl_root_win="C:/OpenSSL-v30${openssl_suffix}"
+    openssl_root_win="C:/OpenSSL-v30${openssl_suffix}"  # manually bumped
   fi
   [ -n "${openssl_root_win:-}" ] && openssl_root="$(cygpath "${openssl_root_win}")"
 
@@ -73,7 +73,6 @@ if [ -n "${CMAKE_GENERATOR:-}" ]; then
     [[ "${CMAKE_GENERATE:-}" = *'-DCURL_USE_OPENSSL=ON'* ]] && options+=" -DOPENSSL_ROOT_DIR=${openssl_root_win}"
     # shellcheck disable=SC2086
     time cmake -B "_bld${_chkprefill}" \
-      -DENABLE_DEBUG=ON \
       -DCMAKE_UNITY_BUILD=ON -DCURL_WERROR=ON \
       -DCMAKE_VS_GLOBALS=TrackFileAccess=false \
       -DCURL_STATIC_CRT=ON \
@@ -105,13 +104,37 @@ else
   curl="build/${platdir}/${VC_VERSION}/${PRJ_CFG}/curl${binsuffix}.exe"
 fi
 
-find . \( -name '*.exe' -o -name '*.dll' -o -name '*.lib' -o -name '*.pdb' \) -print0 | grep -z curl | xargs -0 file --
-find . \( -name '*.exe' -o -name '*.dll' -o -name '*.lib' -o -name '*.pdb' \) -print0 | grep -z curl | xargs -0 stat -c '%10s bytes: %n' --
+find . \( -name '*.exe' -o -name '*.dll' -o -name '*.lib' -o -name '*.pdb' \) -print0 | grep -z curl | sort -z | xargs -0 file --
+find . \( -name '*.exe' -o -name '*.dll' -o -name '*.lib' -o -name '*.pdb' \) -print0 | grep -z curl | sort -z | xargs -0 stat -c '%10s bytes: %n' --
 
 if [ -z "${SKIP_RUN:-}" ]; then
   "${curl}" --disable --version
 else
   echo "Skip running curl.exe. Reason: ${SKIP_RUN}"
+fi
+
+# create artifact
+
+if [[ "${CREATE_ARTIFACT:-}" = 'true' ]]; then
+  cp -p /usr/ssl/certs/ca-bundle.crt curl-ca-bundle.crt
+  echo 'Checking that https works (it should find curl-ca-bundle.crt if needed)'
+  "${curl}" --disable --verbose --fail --silent --show-error --retry 6 --retry-all-errors --out-null https://curl.se/
+  if [ -n "${APPVEYOR_PULL_REQUEST_NUMBER:-}" ]; then
+    archive="curl_pr${APPVEYOR_PULL_REQUEST_NUMBER}_${APPVEYOR_PULL_REQUEST_HEAD_COMMIT}.zip"
+  else
+    archive="curl_${APPVEYOR_REPO_COMMIT}.zip"
+  fi
+  {
+    echo 'WARNING: Do not run this build unless the download link was provided by staff.'
+    echo 'Anyone can submit a PR with possibly malicious code to generate a build.'
+    echo "${archive}"
+  } > WARNING.txt
+  echo 'Finding curl module dependencies'
+  "${curl}" --dump-module-paths | grep -Fv 'C:\Windows' | tee > files.tmp
+  echo 'Creating artifact'
+  7z a "${archive}" -y -bb1 -bsp0 -mx9 -tzip -i@files.tmp curl-ca-bundle.crt WARNING.txt
+  rm files.tmp
+  appveyor PushArtifact "${archive}"
 fi
 
 # build tests
