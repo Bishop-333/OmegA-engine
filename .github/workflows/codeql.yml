@@ -34,16 +34,16 @@ concurrency:
   cancel-in-progress: true
 
 permissions: {}
+cache-mode: none
 
 env:
   DO_NOT_TRACK: '1'
-  HOMEBREW_NO_INSTALL_CLEANUP: '1'
 
 jobs:
   gha_python:
     if: ${{ github.repository_owner == 'curl' || github.event_name != 'schedule' }}
     name: 'GHA and Python'
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-26.04-arm
     permissions:
       security-events: write  # To create/update security events
     steps:
@@ -52,18 +52,18 @@ jobs:
           persist-credentials: false
 
       - name: 'initialize'
-        uses: github/codeql-action/init@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
+        uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           languages: actions, python
           queries: security-extended
 
       - name: 'perform analysis'
-        uses: github/codeql-action/analyze@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
+        uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
 
   c:
     if: ${{ github.repository_owner == 'curl' || github.event_name != 'schedule' }}
     name: 'C'
-    runs-on: ${{ matrix.platform == 'Linux' && 'ubuntu-26.04' || 'windows-2022' }}
+    runs-on: ${{ matrix.platform == 'Linux' && 'ubuntu-26.04-arm' || 'windows-2022' }}
     permissions:
       security-events: write  # To create/update security events
     strategy:
@@ -76,15 +76,10 @@ jobs:
       - name: 'install prereqs'
         if: ${{ matrix.platform == 'Linux' }}
         timeout-minutes: 2
-        run: |
-          sudo find /etc/apt/sources.list.d -type f -not -name 'ubuntu.sources' -delete -print
-          sudo sed -i 's/priority:1/priority:9/' /etc/apt/apt-mirrors.txt; cat /etc/apt/apt-mirrors.txt
-          sudo apt-get -o Dpkg::Use-Pty=0 update
-          sudo apt-get -o Dpkg::Use-Pty=0 install \
-            libpsl-dev libbrotli-dev libidn2-dev libssh2-1-dev libssh-dev \
-            libnghttp2-dev libldap-dev libkrb5-dev libgnutls28-dev libwolfssl-dev
-          /home/linuxbrew/.linuxbrew/bin/brew install ca-certificates || true
-          /home/linuxbrew/.linuxbrew/bin/brew install c-ares gsasl libnghttp3 libngtcp2 mbedtls rustls-ffi
+        uses: $/.github/actions/pkg-install
+        with:
+          apt: libpsl-dev libbrotli-dev libidn2-dev libssh2-1-dev libssh-dev libnghttp2-dev libldap-dev libkrb5-dev libgnutls28-dev libwolfssl-dev
+          brew: c-ares gsasl libnghttp3 libngtcp2 mbedtls rustls-ffi
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -96,7 +91,7 @@ jobs:
 
       - name: 'initialize'
         # https://github.com/github/codeql-action/blob/main/init/action.yml
-        uses: github/codeql-action/init@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
+        uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           languages: cpp
           build-mode: manual
@@ -143,4 +138,4 @@ jobs:
 
       - name: 'perform analysis'
         # https://github.com/github/codeql-action/blob/main/analyze/action.yml
-        uses: github/codeql-action/analyze@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
+        uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2

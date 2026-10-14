@@ -32,17 +32,18 @@ concurrency:
   cancel-in-progress: true
 
 permissions: {}
+cache-mode: write
 
 env:
   CURL_CI: github
-  CURL_TEST_MIN: 1800
+  CURL_TEST_MIN: 1900
   CURL_TEST_SSH_KEYALGO: ed25519
   DO_NOT_TRACK: '1'
-  OPENSSH_WINDOWS_VERSION: 10.0.0.0p2-Preview
+  OPENSSH_WINDOWS_VERSION: 10.0.0.0p2-Preview  # manually bumped
   OPENSSH_WINDOWS_SHA256_ARM64: 698c6aec31c1dd0fb996206e8741f4531a97355686b5431ef347d531b07fcd42
   OPENSSH_WINDOWS_SHA256_WIN64: 23f50f3458c4c5d0b12217c6a5ddfde0137210a30fa870e98b29827f7b43aba5
-  STUNNEL_VERSION: '5.80'
-  STUNNEL_SHA256: 25947bd268e2e670e1c7f915cefd54585aaa440d09eb20c6109cdbeaf3140bc4
+  # renovate: datasource=github-tags depName=mtrojnar/stunnel versioning=semver-coerced extractVersion=^stunnel-(?<version>.+)$
+  STUNNEL_VERSION: 5.82
 
 jobs:
   build-cache:
@@ -58,7 +59,7 @@ jobs:
         with:
           path: C:\my-stunnel
           key: ${{ runner.os }}-stunnel-${{ env.STUNNEL_VERSION }}-amd64
-          lookup-only: true
+          lookup-only: true  # requires cache read permission
 
       - name: 'install test prereqs (stunnel)'
         if: ${{ !steps.cache-stunnel.outputs.cache-hit }}
@@ -68,18 +69,19 @@ jobs:
           cd /c && mkdir my-stunnel && cd my-stunnel
           curl --disable --fail --silent --show-error --connect-timeout 15 --max-time 240 --retry 3 --retry-connrefused \
             "https://www.stunnel.org/archive/5.x/stunnel-${STUNNEL_VERSION}-win64-installer.exe" --output pkg.bin
-          sha256sum pkg.bin && sha256sum pkg.bin | grep -qwF -- "${STUNNEL_SHA256}" && 7z x -y pkg.bin >/dev/null && rm -f pkg.bin && ls -l && bin/tstunnel -version
+          sha256sum pkg.bin && 7z x -y pkg.bin >/dev/null && rm -f pkg.bin && ls -l && bin/tstunnel -version
 
   cygwin:
     name: "cygwin, ${{ matrix.build == 'cmake' && 'CM' || 'AM' }} ${{ matrix.platform }} ${{ matrix.name }}"
     needs: build-cache
     runs-on: windows-2022
     timeout-minutes: 10
+    cache-mode: read
     defaults:
       run:
         shell: D:\cygwin\bin\bash.exe '{0}'  # zizmor: ignore[misfeature]
     env:
-      CURL_TEST_MIN: 1850
+      CURL_TEST_MIN: 2040
       LDFLAGS: -s
       MAKEFLAGS: -j 5
       SHELLOPTS: 'igncr'
@@ -93,8 +95,8 @@ jobs:
               install: 'libssl-devel libssh2-devel' }
           - { name: 'openssl',
               build: 'cmake', platform: 'x86_64', tflags: '',
-              config: '-DENABLE_DEBUG=ON -DCURL_USE_OPENSSL=ON -DENABLE_THREADED_RESOLVER=OFF -DCURL_ENABLE_NTLM=ON',
-              install: 'libssl-devel libssh2-devel' }
+              config: '-DENABLE_DEBUG=ON -DCURL_USE_OPENSSL=ON -DENABLE_THREADED_RESOLVER=OFF -DCURL_DISABLE_HTTPSIG=OFF -DCURL_ENABLE_NTLM=ON',
+              install: 'libssl-devel libssh2-devel python3' }
       fail-fast: false
     steps:
       - uses: cygwin/cygwin-install-action@3f0a3f9f988f7e96b8c18098ae05eaec175f5b52 # v6.0.2
@@ -104,7 +106,7 @@ jobs:
           # https://cygwin.com/mirrors.html
           # Main mirror status: https://archlinux.org/mirrors/kernel.org/
           site: https://mirrors.kernel.org/sourceware/cygwin/
-          # https://cygwin.com/cgi-bin2/package-grep.cgi
+          # https://cygwin.com/packages/
           packages: >-
             ${{ matrix.build == 'autotools' && 'autoconf automake libtool make' || 'cmake ninja' }}
             gcc-core binutils perl pkgconf
@@ -181,8 +183,8 @@ jobs:
         timeout-minutes: 1
         run: |
           PATH=/usr/bin
-          find . \( -name '*.exe' -o -name '*.dll' -o -name '*.a' \) -print0 | grep -z curl | xargs -0 file --
-          find . \( -name '*.exe' -o -name '*.dll' -o -name '*.a' \) -print0 | grep -z curl | xargs -0 stat -c '%10s bytes: %n' --
+          find . \( -name '*.exe' -o -name '*.dll' -o -name '*.a' \) -print0 | grep -z curl | sort -z | xargs -0 file --
+          find . \( -name '*.exe' -o -name '*.dll' -o -name '*.a' \) -print0 | grep -z curl | sort -z | xargs -0 stat -c '%10s bytes: %n' --
           if [ "${MATRIX_BUILD}" = 'cmake' ]; then
             PATH="$PWD/bld/lib:$PATH"
           fi
@@ -216,9 +218,6 @@ jobs:
         run: |
           PATH=/usr/bin:/cygdrive/c/my-stunnel/bin
           TFLAGS="-j8 ${TFLAGS}"
-          if [ -x "$(cygpath "${SYSTEMROOT}/System32/curl.exe")" ]; then
-            TFLAGS+=" -ac $(cygpath "${SYSTEMROOT}/System32/curl.exe")"
-          fi
           if [ "${MATRIX_BUILD}" = 'cmake' ]; then
             PATH="$PWD/bld/lib:$PATH"
             cmake --build bld --verbose --target test-ci
@@ -252,6 +251,7 @@ jobs:
       LDFLAGS: -s
       MAKEFLAGS: -j 5
       MATRIX_BUILD: '${{ matrix.build }}'
+      MATRIX_ENV: '${{ matrix.env }}'
       MATRIX_OPENSSH: '${{ matrix.openssh }}'
       MATRIX_SYS: '${{ matrix.sys }}'
       MATRIX_TEST: '${{ matrix.test }}'
@@ -260,42 +260,31 @@ jobs:
         include:
           # MSYS
           - { name: '!proxy',
-              build: 'autotools', sys: 'msys'      , env: 'x86_64'       , tflags: '--min=1620',
-              config: '--enable-debug --with-openssl --disable-threaded-resolver --disable-proxy --enable-ntlm',
-              install: 'openssl-devel libssh2-devel' }
-          - { name: 'default',
-              build: 'autotools', sys: 'msys'      , env: 'x86_64'       , tflags: 'skiprun',
-              config: '--enable-debug --with-openssl --disable-threaded-resolver --enable-ntlm',
-              install: 'openssl-devel libssh2-devel' }
-          - { name: 'default',
-              build: 'cmake'    , sys: 'msys'      , env: 'x86_64'       , tflags: '',
-              config: '-DENABLE_DEBUG=ON -DENABLE_THREADED_RESOLVER=OFF -DCURL_ENABLE_NTLM=ON',
-              install: 'openssl-devel libssh2-devel' }
+              build: 'cmake'    , sys: 'msys'      , env: 'x86_64'       , tflags: 'skiprun',
+              config: '-DENABLE_DEBUG=ON -DENABLE_THREADED_RESOLVER=OFF -DCURL_DISABLE_PROXY=ON -DCURL_ENABLE_NTLM=ON' }
           - { name: 'default R',
               build: 'autotools', sys: 'msys'      , env: 'x86_64'       , tflags: '',
-              config: '--with-openssl --enable-ntlm', install: 'openssl-devel libssh2-devel' }
+              config: '--with-openssl --enable-httpsig --enable-ntlm',
+              install: 'diffutils' }  # for tests
           # MinGW
           - { name: 'default',
-              build: 'autotools', sys: 'mingw64'   , env: 'x86_64'       , tflags: 'skiprun',
-              config: '--enable-debug --with-openssl --disable-threaded-resolver --enable-static --without-zlib',
-              install: 'mingw-w64-x86_64-openssl mingw-w64-x86_64-libssh2' }
+              build: 'autotools', sys: 'clang64'   , env: 'clang-x86_64' , tflags: 'skiprun',
+              config: '--enable-debug --with-openssl --disable-threaded-resolver --enable-static --without-zlib' }
           - { name: 'wolfssl c-ares U',
               build: 'autotools', sys: 'ucrt64'    , env: 'ucrt-x86_64'  , tflags: '',
               config: '--enable-debug --with-wolfssl --enable-windows-unicode --enable-ares --enable-static --disable-shared --enable-ca-native --enable-ntlm',
-              install: 'mingw-w64-ucrt-x86_64-c-ares mingw-w64-ucrt-x86_64-nghttp3 mingw-w64-ucrt-x86_64-libssh2 mingw-w64-ucrt-x86_64-wolfssl' }
+              install: 'mingw-w64-ucrt-x86_64-wolfssl' }
           - { name: 'schannel c-ares U', type: 'Debug',
-              build: 'cmake'    , sys: 'mingw64'   , env: 'x86_64'       , tflags: '--min=1720',
+              build: 'cmake'    , sys: 'clang64'   , env: 'clang-x86_64' , tflags: '--min=1850',
               config: '-DENABLE_DEBUG=ON  -DBUILD_SHARED_LIBS=OFF -DCURL_USE_SCHANNEL=ON -DENABLE_UNICODE=ON -DENABLE_ARES=ON -DCURL_DROP_UNUSED=ON',
-              install: 'mingw-w64-x86_64-c-ares mingw-w64-x86_64-libssh2' }
+              install: 'mingw-w64-clang-x86_64-python' }  # for dict and telnet tests
           # MinGW torture
           - { name: 'schannel U torture 1', type: 'Debug',
               build: 'cmake'    , sys: 'ucrt64'    , env: 'ucrt-x86_64'  , tflags: '-t --shallow=13 --subset=0/2',
-              config: '-DENABLE_DEBUG=ON  -DBUILD_SHARED_LIBS=OFF -DCURL_USE_SCHANNEL=ON -DENABLE_UNICODE=ON -DENABLE_ARES=ON',
-              install: 'mingw-w64-ucrt-x86_64-c-ares mingw-w64-ucrt-x86_64-libssh2' }
+              config: '-DENABLE_DEBUG=ON  -DBUILD_SHARED_LIBS=OFF -DCURL_USE_SCHANNEL=ON -DENABLE_UNICODE=ON -DENABLE_ARES=ON' }
           - { name: 'schannel U torture 2', type: 'Debug',
-              build: 'cmake'    , sys: 'ucrt64'    , env: 'ucrt-x86_64'  , tflags: '-t --shallow=13 --subset=1/2 --min=885',
-              config: '-DENABLE_DEBUG=ON  -DBUILD_SHARED_LIBS=OFF -DCURL_USE_SCHANNEL=ON -DENABLE_UNICODE=ON -DENABLE_ARES=ON',
-              install: 'mingw-w64-ucrt-x86_64-c-ares mingw-w64-ucrt-x86_64-libssh2' }
+              build: 'cmake'    , sys: 'ucrt64'    , env: 'ucrt-x86_64'  , tflags: '-t --shallow=13 --subset=1/2',
+              config: '-DENABLE_DEBUG=ON  -DBUILD_SHARED_LIBS=OFF -DCURL_USE_SCHANNEL=ON -DENABLE_UNICODE=ON -DENABLE_ARES=ON' }
           # WARNING: libssh uses hard-coded world-writable paths (C:ProgramData/, /etc/..., ~/.ssh/)
           #          to read its configuration from, making it vulnerable to attacks on
           #          Windows. Do not use this component till there is a fix for these.
@@ -304,64 +293,76 @@ jobs:
           - { name: 'gnutls libssh', type: 'Debug', openssh: 'OpenSSH-Windows',
               build: 'cmake'    , sys: 'clang64'   , env: 'clang-x86_64' , tflags: '',
               config: '-DENABLE_DEBUG=ON  -DBUILD_SHARED_LIBS=OFF -DCURL_USE_GNUTLS=ON -DENABLE_UNICODE=OFF -DUSE_NGTCP2=ON -DCURL_USE_LIBSSH2=OFF -DCURL_USE_LIBSSH=ON -DCURL_ENABLE_NTLM=ON',
-              install: 'mingw-w64-clang-x86_64-gnutls mingw-w64-clang-x86_64-nghttp3 mingw-w64-clang-x86_64-ngtcp2 mingw-w64-clang-x86_64-libssh unzip' }
+              install: 'mingw-w64-clang-x86_64-gnutls mingw-w64-clang-x86_64-libssh unzip' }
           - { name: 'schannel R', type: 'Release', image: 'windows-11-arm',
               build: 'cmake'    , sys: 'clangarm64', env: 'clang-aarch64', tflags: 'skiprun',
-              config: '-DENABLE_DEBUG=OFF -DBUILD_SHARED_LIBS=ON  -DCURL_USE_SCHANNEL=ON -DENABLE_UNICODE=ON -DCURL_DROP_UNUSED=ON',
-              install: 'mingw-w64-clang-aarch64-libssh2' }
+              config: '-DENABLE_DEBUG=OFF -DBUILD_SHARED_LIBS=ON  -DCURL_USE_SCHANNEL=ON -DENABLE_UNICODE=ON -DCURL_DROP_UNUSED=ON' }
           - { name: 'openssl', type: 'Debug', chkprefill: '_chkprefill',
               build: 'cmake'    , sys: 'clang64'   , env: 'clang-x86_64' , tflags: 'skiprun',
-              config: '-DENABLE_DEBUG=ON  -DBUILD_SHARED_LIBS=OFF -DCURL_USE_OPENSSL=ON  -DENABLE_UNICODE=OFF -DUSE_NGTCP2=ON -DUSE_PROXY_HTTP3=ON',
-              install: 'mingw-w64-clang-x86_64-openssl mingw-w64-clang-x86_64-nghttp3 mingw-w64-clang-x86_64-ngtcp2 mingw-w64-clang-x86_64-libssh2' }
+              config: '-DENABLE_DEBUG=ON  -DBUILD_SHARED_LIBS=OFF -DCURL_USE_OPENSSL=ON  -DENABLE_UNICODE=OFF -DUSE_NGTCP2=ON -DUSE_PROXY_HTTP3=ON' }
           - { name: 'openssl', type: 'Release', test: 'uwp',
               build: 'cmake'    , sys: 'ucrt64'    , env: 'ucrt-x86_64'  , tflags: 'skiprun',
-              config: '-DBUILD_SHARED_LIBS=ON  -DCURL_USE_OPENSSL=ON',
-              install: 'mingw-w64-ucrt-x86_64-openssl mingw-w64-ucrt-x86_64-libssh2' }
+              config: '-DBUILD_SHARED_LIBS=ON  -DCURL_USE_OPENSSL=ON' }
           # { name: 'schannel', type: 'Release', test: 'uwp',
           #   build: 'autotools', sys: 'ucrt64'    , env: 'ucrt-x86_64'  , tflags: 'skiprun',
-          #   config: '--without-debug --with-schannel --disable-static',
-          #   install: 'mingw-w64-ucrt-x86_64-libssh2' }
+          #   config: '--without-debug --with-schannel --disable-static' }
           - { name: 'schannel dev debug', type: 'Debug', cppflags: '-DCURL_SCHANNEL_DEV_DEBUG', image: 'windows-2025',
-              build: 'cmake'    , sys: 'mingw64'   , env: 'x86_64'       , tflags: 'skiprun',
-              config: '-DENABLE_DEBUG=ON  -DBUILD_SHARED_LIBS=ON  -DCURL_USE_SCHANNEL=ON -DCURL_USE_WOLFSSL=ON -DENABLE_UNICODE=ON -DCMAKE_VERBOSE_MAKEFILE=ON -DCURL_DISABLE_HTTPSIG=OFF',
-              install: 'mingw-w64-x86_64-libssh2 mingw-w64-x86_64-wolfssl' }
-          - { name: 'MultiSSL R', type: 'Release',
-              build: 'cmake'    , sys: 'mingw32'   , env: 'i686'         , tflags: 'skiprun',
-              config: '-DENABLE_DEBUG=OFF -DBUILD_SHARED_LIBS=ON -DCURL_USE_GNUTLS=ON -DCURL_USE_OPENSSL=ON -DCURL_USE_SCHANNEL=ON -DENABLE_ARES=ON -DENABLE_UNICODE=ON',
-              install: 'mingw-w64-i686-c-ares mingw-w64-i686-gnutls mingw-w64-i686-libssh2 mingw-w64-i686-openssl' }
+              build: 'cmake'    , sys: 'ucrt64'    , env: 'ucrt-x86_64'  , tflags: 'skiprun',
+              config: '-DENABLE_DEBUG=ON  -DBUILD_SHARED_LIBS=ON  -DCURL_USE_SCHANNEL=ON -DCURL_USE_WOLFSSL=ON -DENABLE_UNICODE=ON -DCURL_DISABLE_HTTPSIG=OFF',
+              install: 'mingw-w64-ucrt-x86_64-wolfssl' }
       fail-fast: false
     steps:
       - name: 'preinstalled tools'
         shell: bash
         run: echo '::group::MSYS2 packages'; /c/msys64/usr/bin/pacman.exe -Q || true; echo '::endgroup::'
 
-      - uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2.32.0
+      - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2.33.0
         if: ${{ matrix.sys == 'msys' }}
         with:
           msystem: ${{ matrix.sys }}
           # https://packages.msys2.org/search
+          # Packages that are used by most jobs. They each inflate cache size and come with a per-job install overhead.
+          # Add individual package requirements to the matrix `install:` entry instead.
           install: >-
-            gcc
-            ${{ matrix.build }} ${{ matrix.build == 'autotools' && 'make' || 'ninja' }}
-            diffutils
-            zlib-devel
-            brotli-devel
-            libzstd-devel
-            libnghttp2-devel
-            libpsl-devel
-            ${{ matrix.install }}
+            gcc perl
+            zlib-devel brotli-devel libzstd-devel libpsl-devel libnghttp2-devel
+            openssl-devel libssh2-devel
 
-      - uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2.32.0
+      - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2.33.0
         if: ${{ matrix.sys != 'msys' }}
         with:
           msystem: ${{ matrix.sys }}
-          update: ${{ contains(matrix.install, 'wolfssl') && 'true' || 'false' }}
+          # Packages that are used by most jobs. They each inflate cache size and come with a per-job install overhead.
+          # Add individual package requirements to the matrix `install:` entry instead.
           install: >-
+            perl diffutils
             mingw-w64-${{ matrix.env }}-cc
-            mingw-w64-${{ matrix.env }}-${{ matrix.build }} ${{ matrix.build == 'autotools' && 'make' || '' }}
-            ${{ matrix.sys != 'mingw32' && format('mingw-w64-{0}-diffutils', matrix.env) || '' }}
             mingw-w64-${{ matrix.env }}-libpsl
-            ${{ matrix.install }}
+            mingw-w64-${{ matrix.env }}-libssh2
+            mingw-w64-${{ matrix.env }}-c-ares
+            mingw-w64-${{ matrix.env }}-nghttp3
+            mingw-w64-${{ matrix.env }}-ngtcp2
+            mingw-w64-${{ matrix.env }}-openssl
+
+      - name: 'install prereqs'
+        env:
+          MATRIX_INSTALL: '${{ matrix.install }}'
+        run: |
+          # Install build tools in a separate step to avoid inflating shared cache size and being installed even if unused.
+          if [ "${MATRIX_SYS}" = 'msys' ]; then
+            if [ "${MATRIX_BUILD}" = 'cmake' ]; then
+              pkgs='cmake ninja'
+            else
+              pkgs='autotools'
+            fi
+          else
+            if [ "${MATRIX_BUILD}" = 'cmake' ]; then
+              pkgs="mingw-w64-${MATRIX_ENV}-cmake"
+            else
+              pkgs="mingw-w64-${MATRIX_ENV}-autotools"
+            fi
+          fi
+          /usr/bin/pacman --noconfirm --noprogressbar --sync --needed ${pkgs} ${MATRIX_INSTALL}
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -378,7 +379,6 @@ jobs:
           CPPFLAGS: '${{ matrix.cppflags }}'
           MATRIX_CHKPREFILL: '${{ matrix.chkprefill }}'
           MATRIX_CONFIG: '${{ matrix.config }}'
-          MATRIX_ENV: '${{ matrix.env }}'
           MATRIX_TYPE: '${{ matrix.type }}'
           TFLAGS: '${{ matrix.tflags }}'
         run: |
@@ -404,7 +404,7 @@ jobs:
               [ "${TFLAGS}" = 'skiprun' ] && options+=' -D_CURL_SKIP_BUILD_CERTS=ON'
               [ "${_chkprefill}" = '_chkprefill' ] && options+=' -D_CURL_PREFILL=OFF'
               cmake -B "bld${_chkprefill}" -G Ninja ${options} \
-                -DCMAKE_INSTALL_PREFIX="${HOME}"/curl-install \
+                -DCMAKE_INSTALL_PREFIX="$HOME"/curl-install \
                 -DCMAKE_C_FLAGS="${CFLAGS_CMAKE} ${CPPFLAGS}" \
                 -DCMAKE_BUILD_TYPE="${MATRIX_TYPE}" \
                 -DCMAKE_UNITY_BUILD=ON -DCMAKE_UNITY_BUILD_BATCH_SIZE=30 \
@@ -463,8 +463,8 @@ jobs:
             # avoid libtool's curl.exe wrapper for shared builds
             mv bld/src/.libs/curl.exe bld/src/curl.exe || true
           fi
-          find . \( -name '*.exe' -o -name '*.dll' -o -name '*.a' \) -print0 | grep -z curl | xargs -0 file --
-          find . \( -name '*.exe' -o -name '*.dll' -o -name '*.a' \) -print0 | grep -z curl | xargs -0 stat -c '%10s bytes: %n' --
+          find . \( -name '*.exe' -o -name '*.dll' -o -name '*.a' \) -print0 | grep -z curl | sort -z | xargs -0 file --
+          find . \( -name '*.exe' -o -name '*.dll' -o -name '*.a' \) -print0 | grep -z curl | sort -z | xargs -0 stat -c '%10s bytes: %n' --
           if [ "${MATRIX_TEST}" != 'uwp' ]; then  # curl: error initializing curl library
             bld/src/curl.exe --disable --version
           fi
@@ -524,7 +524,7 @@ jobs:
         if: ${{ matrix.tflags != 'skipall' && matrix.tflags != 'skiprun' }}
         timeout-minutes: ${{ contains(matrix.tflags, '-t') && 15 || 10 }}
         env:
-          MATRIX_ENV: '${{ matrix.env }}'
+          MATRIX_CONFIG: '${{ matrix.config }}'
           MATRIX_INSTALL: '${{ matrix.install }}'
           TFLAGS: '${{ matrix.tflags }}'
         run: |
@@ -535,16 +535,16 @@ jobs:
             if [[ "${MATRIX_INSTALL}" = *'libssh2-wincng'* ]]; then
               TFLAGS+=' ~SCP ~SFTP'  # Flaky: `-8, Unable to exchange encryption keys`. https://github.com/libssh2/libssh2/issues/804
               unset CURL_TEST_SSH_KEYALGO  # libssh2 built with WinCNG does not support ssh-ed25519 hostkeys
-              export CURL_TEST_SSH_ENABLE_KEX=diffie-hellman-group-exchange-sha256
+              export CURL_TEST_SSH_ENABLE_KEX=diffie-hellman-group16-sha512
             fi
-            if [[ "${MATRIX_INSTALL} " = *'-libssh '* && \
+            if [[ "${MATRIX_CONFIG} " = *'-DCURL_USE_LIBSSH=ON'* && \
                   "${MATRIX_ENV}" = *'x86_64'* ]]; then
               export CURL_TEST_SSH_DISABLE_KEX=mlkem768x25519-sha256  # broken with libssh 0.12.0 Windows x64
             fi
           fi
           if [ -n "${MATRIX_OPENSSH}" ]; then  # OpenSSH-Windows
             TFLAGS+=' ~601 ~603 ~617 ~619 ~621 ~641 ~665 ~2004 ~3022'  # SCP
-            if [[ "${MATRIX_INSTALL} " = *'libssh '* ]]; then
+            if [[ "${MATRIX_CONFIG} " = *'-DCURL_USE_LIBSSH=ON'* ]]; then
               TFLAGS+=' ~614'  # 'SFTP pre-quote chmod' SFTP, pre-quote, directory
             fi
           fi
@@ -554,9 +554,6 @@ jobs:
             else
               PATH="/c/OpenSSH-Win64:$PATH"
             fi
-          fi
-          if [ -x "$(cygpath "${SYSTEMROOT}/System32/curl.exe")" ]; then
-            TFLAGS+=" -ac $(cygpath "${SYSTEMROOT}/System32/curl.exe")"
           fi
           PATH="$PATH:/c/my-stunnel/bin"
           if [ "${MATRIX_BUILD}" = 'cmake' ]; then
@@ -589,7 +586,7 @@ jobs:
       run:
         shell: msys2 {0}  # zizmor: ignore[misfeature]
     env:
-      CURL_TEST_MIN: 1630
+      CURL_TEST_MIN: 1780
       LDFLAGS: -s
       MAKEFLAGS: -j 5
       MATRIX_DIR: '${{ matrix.dir }}'
@@ -600,9 +597,9 @@ jobs:
             sys: 'mingw64'
             dir: 'w64devkit'
             env: 'x86_64'
-            ver: '16.1.0'
-            url: 'https://github.com/skeeto/w64devkit/releases/download/v2.8.0/w64devkit-x64-2.8.0.7z.exe'
-            SHA256: 6252bf34fe2231a55ac7f03d482b36d2c7c58697990551bba508102cfb3f342e
+            ver: '16.2.0'
+            url: 'https://github.com/skeeto/w64devkit/releases/download/v2.10.0/w64devkit-x64-2.10.0.7z.exe'  # manually bumped
+            SHA256: 18d0a4c71a166f8401ab6305781bec5882b40b5e06ba9807c61cb5f3b3c6325e
             config: '-DENABLE_DEBUG=ON -DBUILD_SHARED_LIBS=OFF -DCURL_USE_SCHANNEL=ON -DCURL_USE_LIBSSH=ON -DENABLE_UNICODE=OFF -DENABLE_UNIX_SOCKETS=OFF -DCURL_GCC_ANALYZER=ON -DCMAKE_C_FLAGS=-DCURL_DEBUG_NO_WIN32_WND'
             install: perl mingw-w64-x86_64-libssh
             type: 'Debug'
@@ -611,7 +608,7 @@ jobs:
             dir: 'mingw64'
             env: 'x86_64'
             ver: '9.5.0'
-            url: 'https://github.com/brechtsanders/winlibs_mingw/releases/download/9.5.0-10.0.0-msvcrt-r1/winlibs-x86_64-posix-seh-gcc-9.5.0-mingw-w64msvcrt-10.0.0-r1.7z'
+            url: 'https://github.com/brechtsanders/winlibs_mingw/releases/download/9.5.0-10.0.0-msvcrt-r1/winlibs-x86_64-posix-seh-gcc-9.5.0-mingw-w64msvcrt-10.0.0-r1.7z'  # manually bumped
             SHA256: 41637132ea7dc36a7f86a1961eaa334c380b5a3423d36aecb481cabcd006e3fe
             config: '-DBUILD_SHARED_LIBS=OFF -DCURL_USE_SCHANNEL=ON -DENABLE_UNICODE=OFF -DCURL_DISABLE_VERBOSE_STRINGS=ON -DCMAKE_C_FLAGS=-DCURL_DEBUG_NO_WIN32_WND'
             type: 'Release'
@@ -621,43 +618,43 @@ jobs:
             dir: 'mingw64'
             env: 'x86_64'
             ver: '7.3.0'
-            url: 'https://downloads.sourceforge.net/mingw-w64/Toolchains%20targetting%20Win64/Personal%20Builds/mingw-builds/7.3.0/threads-win32/seh/x86_64-7.3.0-release-win32-seh-rt_v5-rev0.7z'
+            url: 'https://downloads.sourceforge.net/mingw-w64/Toolchains%20targetting%20Win64/Personal%20Builds/mingw-builds/7.3.0/threads-win32/seh/x86_64-7.3.0-release-win32-seh-rt_v5-rev0.7z'  # manually bumped
             SHA256: 9dc08c9c2bdd5d8173f87791bed644f6e290624f739de474f117b590dfd8a721
             config: '-DENABLE_DEBUG=ON -DBUILD_SHARED_LIBS=OFF -DCURL_USE_SCHANNEL=ON -DENABLE_UNICODE=ON -DCURL_USE_MBEDTLS=ON -DCURL_TARGET_WINDOWS_VERSION=0x0600'
             install: mingw-w64-x86_64-mbedtls
             type: 'Debug'
             tflags: 'skiprun'
-          - name: 'schannel !unity'  # mingw-w64 5.0
+          - name: 'MultiSSL !unity'  # mingw-w64 5.0
             sys: 'mingw32'
             dir: 'mingw32'
             env: 'i686'
             ver: '6.4.0'
-            url: 'https://downloads.sourceforge.net/mingw-w64/Toolchains%20targetting%20Win32/Personal%20Builds/mingw-builds/6.4.0/threads-win32/dwarf/i686-6.4.0-release-win32-dwarf-rt_v5-rev0.7z'
+            url: 'https://downloads.sourceforge.net/mingw-w64/Toolchains%20targetting%20Win32/Personal%20Builds/mingw-builds/6.4.0/threads-win32/dwarf/i686-6.4.0-release-win32-dwarf-rt_v5-rev0.7z'  # manually bumped
             SHA256: 12d2c62ad4527ec8a52275ea8485678dcbe20bec4716a3c7ba274f225d696085
-            config: '-DCURL_USE_SCHANNEL=ON -DENABLE_UNICODE=OFF -DCMAKE_UNITY_BUILD=OFF -DCURL_TARGET_WINDOWS_VERSION=0x0600'
-            install: perl mingw-w64-i686-libssh2
-            type: 'Debug'
+            config: '-DCURL_USE_GNUTLS=ON -DCURL_USE_OPENSSL=ON -DCURL_USE_SCHANNEL=ON -DENABLE_ARES=ON -DENABLE_UNICODE=OFF -DCMAKE_UNITY_BUILD=OFF -DCURL_TARGET_WINDOWS_VERSION=0x0600'
+            install: perl mingw-w64-i686-c-ares mingw-w64-i686-gnutls mingw-w64-i686-libssh2 mingw-w64-i686-openssl
+            type: 'Release'
             tflags: 'skiprun'
           - name: 'schannel !examples'  # mingw-w64 3.0
             sys: 'mingw64'
             dir: 'mingw64'
             env: 'x86_64'
             ver: '4.8.1'
-            url: 'https://downloads.sourceforge.net/mingw-w64/Toolchains%20targetting%20Win64/Personal%20Builds/mingw-builds/4.8.1/threads-win32/seh/x86_64-4.8.1-release-win32-seh-rt_v3-rev2.7z'
+            url: 'https://downloads.sourceforge.net/mingw-w64/Toolchains%20targetting%20Win64/Personal%20Builds/mingw-builds/4.8.1/threads-win32/seh/x86_64-4.8.1-release-win32-seh-rt_v3-rev2.7z'  # manually bumped (lowest supported mingw-w64 version)
             SHA256: 1353d997e85bb4494ebbebb432d824848d66b32c6045900da9a38a767b3c4ab4
             config: '-DENABLE_DEBUG=ON -DBUILD_SHARED_LIBS=OFF -DCURL_USE_SCHANNEL=ON -DCURL_TARGET_WINDOWS_VERSION=0x0600'
             type: 'Debug'
             tflags: 'skipall'
-            chkprefill: ''  # Set it once to silence actionlint
       fail-fast: false
     steps:
       - name: 'preinstalled tools'
         shell: bash
         run: echo '::group::MSYS2 packages'; /c/msys64/usr/bin/pacman.exe -Q || true; echo '::endgroup::'
 
-      - uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2.32.0
+      - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2.33.0
         with:
           msystem: ${{ matrix.sys }}
+          suppress-deprecation-warnings: 'msystem-mingw64 msystem-mingw32'
           release: false
           update: false
           cache: false
@@ -744,8 +741,8 @@ jobs:
       - name: 'curl -V'
         timeout-minutes: 1
         run: |
-          /usr/bin/find . \( -name '*.exe' -o -name '*.dll' -o -name '*.a' \) -print0 | grep -z curl | xargs -0 file --
-          /usr/bin/find . \( -name '*.exe' -o -name '*.dll' -o -name '*.a' \) -print0 | grep -z curl | xargs -0 stat -c '%10s bytes: %n' --
+          /usr/bin/find . \( -name '*.exe' -o -name '*.dll' -o -name '*.a' \) -print0 | grep -z curl | sort -z | xargs -0 file --
+          /usr/bin/find . \( -name '*.exe' -o -name '*.dll' -o -name '*.a' \) -print0 | grep -z curl | sort -z | xargs -0 stat -c '%10s bytes: %n' --
           PATH="$PWD/bld/lib:$PATH"
           bld/src/curl.exe --disable --version
 
@@ -765,14 +762,6 @@ jobs:
           key: ${{ runner.os }}-stunnel-${{ env.STUNNEL_VERSION }}-amd64
           fail-on-cache-miss: true
 
-      - name: 'install test prereqs'
-        if: ${{ matrix.tflags != 'skipall' && matrix.tflags != 'skiprun' }}
-        timeout-minutes: 2
-        run: |
-          if bld/src/curl.exe --disable -V 2>/dev/null | grep smb; then
-            python3 -m pip --disable-pip-version-check --no-input --no-cache-dir install --progress-bar off --prefer-binary -r tests/requirements.txt
-          fi
-
       - name: 'run tests'
         if: ${{ matrix.tflags != 'skipall' && matrix.tflags != 'skiprun' }}
         timeout-minutes: 10
@@ -783,9 +772,6 @@ jobs:
           TFLAGS="-j8 ${TFLAGS}"
           TFLAGS+=' !498'  # 'Reject too large HTTP response headers on endless redirects' HTTP, HTTP GET (runtests detecting result code 2009 instead of 56 returned by curl)
           TFLAGS+=' ~3000 ~3001 ~3023 ~3024'  # 'HTTPS localhost, last subject alt name matches, CN does not match' HTTPS, HTTP GET, PEM certificate (returning 56)
-          if [ -x "$(cygpath "${SYSTEMROOT}/System32/curl.exe")" ]; then
-            TFLAGS+=" -ac $(cygpath "${SYSTEMROOT}/System32/curl.exe")"
-          fi
           PATH="$PWD/bld/lib:$PATH:/c/my-stunnel/bin"
           cmake --build bld --target test-ci
 
@@ -801,8 +787,9 @@ jobs:
 
   linux-cross-mingw-w64:
     name: "linux-mingw, ${{ matrix.build == 'cmake' && 'CM' || 'AM' }} ${{ matrix.compiler }}"
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 10
+    cache-mode: none
     env:
       LDFLAGS: -s
       MAKEFLAGS: -j 5
@@ -817,16 +804,11 @@ jobs:
           - { build: 'cmake'    , compiler: 'gcc' }
           - { build: 'cmake'    , compiler: 'clang-tidy', install_packages: 'clang-22 clang-tidy-22', CFLAGS: '-Wunused-macros' }
     steps:
-      - name: 'install packages'
+      - name: 'install prereqs'
         timeout-minutes: 2
-        env:
-          MATRIX_INSTALL_PACKAGES: '${{ matrix.install_packages }}'
-        run: |
-          ls -l /etc/apt/sources.list.d
-          sudo find /etc/apt/sources.list.d -type f -not -name 'ubuntu.sources' -delete -print
-          sudo sed -i 's/priority:1/priority:9/' /etc/apt/apt-mirrors.txt; cat /etc/apt/apt-mirrors.txt
-          sudo apt-get -o Dpkg::Use-Pty=0 update
-          sudo apt-get -o Dpkg::Use-Pty=0 install gcc-mingw-w64-x86-64-win32 ${MATRIX_INSTALL_PACKAGES}
+        uses: $/.github/actions/pkg-install
+        with:
+          apt: gcc-mingw-w64-x86-64-win32 ${{ matrix.install_packages }}
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -846,6 +828,7 @@ jobs:
               options+=' -DENABLE_UNICODE=ON -DUSE_SSLS_EXPORT=ON'
               options+=' -DCMAKE_C_COMPILER=clang-22'
               options+=" -DCMAKE_RC_COMPILER=llvm-windres-$(clang-22 -dumpversion | cut -d '.' -f 1)"
+              options+=' -DCMAKE_RC_FLAGS=--target=pe-x86-64'  # Required for non-x86-64 runners
             else
               options+=" -DCMAKE_C_COMPILER=${TRIPLET}-gcc"
             fi
@@ -892,8 +875,8 @@ jobs:
 
       - name: 'curl info'
         run: |
-          find . \( -name '*.exe' -o -name '*.dll' -o -name '*.a' \) -print0 | grep -z curl | xargs -0 file --
-          find . \( -name '*.exe' -o -name '*.dll' -o -name '*.a' \) -print0 | grep -z curl | xargs -0 stat -c '%10s bytes: %n' --
+          find . \( -name '*.exe' -o -name '*.dll' -o -name '*.a' \) -print0 | grep -z curl | sort -z | xargs -0 file --
+          find . \( -name '*.exe' -o -name '*.dll' -o -name '*.a' \) -print0 | grep -z curl | sort -z | xargs -0 stat -c '%10s bytes: %n' --
 
       - name: 'build tests'
         if: ${{ matrix.build == 'cmake' }}  # Save time by skipping this for autotools and clang-tidy
@@ -967,7 +950,7 @@ jobs:
             type: 'Debug'
             image: 'windows-2025'
             chkprefill: '_chkprefill'
-            tflags: '--min=1850'
+            tflags: '--min=1980'
             config: >-
               -DENABLE_DEBUG=ON
               -DCURL_USE_OPENSSL=ON -DUSE_NGTCP2=ON
@@ -997,6 +980,7 @@ jobs:
               -DCURL_ENABLE_NTLM=ON -DUSE_PROXY_HTTP3=ON
 
           - name: 'schannel U'
+            install-msys2: 'perl'
             install-vcpkg: 'zlib libssh2[core,zlib]'
             arch: 'arm64'
             env: 'clang-aarch64'
@@ -1004,9 +988,7 @@ jobs:
             type: 'Debug'
             image: 'windows-11-arm'
             openssh: 'OpenSSH-Windows'
-            tflags: '--min=1720'
-            # leave SMB disabled to save 30-60 seconds by omitting prereqs,
-            # to counteract the slower test run step
+            tflags: '--min=1850'
             config: >-
               -DENABLE_DEBUG=ON
               -DCURL_USE_SCHANNEL=ON
@@ -1018,11 +1000,11 @@ jobs:
         shell: bash
         run: echo '::group::MSYS2 packages'; /c/msys64/usr/bin/pacman.exe -Q || true; echo '::endgroup::'
 
-      - uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2.32.0
+      - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2.33.0
         with:
           msystem: ${{ matrix.arch == 'arm64' && 'clangarm64' || 'ucrt64' }}
-          release: ${{ contains(matrix.image, 'arm') }}
-          cache: ${{ contains(matrix.image, 'arm') }}
+          release: false
+          cache: ${{ matrix.tflags != 'skiprun' }}
           path-type: inherit
           install: >-
             mingw-w64-${{ matrix.env }}-libpsl
@@ -1080,16 +1062,21 @@ jobs:
               # The option to disable the MSBuild heuristics is likely called:
               # IgnoreStandardErrorWarningFormat=true, but there seems to be no
               # facility to pass it via CMake or CLI.
-              MSVC_EDITION='2022/Enterprise/vc/tools/msvc'
-              [[ "${MATRIX_IMAGE}" = *'windows-2025'* ]] && MSVC_EDITION='18/Enterprise/vc/tools/msvc'
               [[ "$(uname -s)" = *'ARM64'* ]] && MSVC_HOST='arm64' || MSVC_HOST='x64'  # x86
               MSVC_ROOTD="$(cygpath --mixed --short-name "$PROGRAMFILES/Microsoft Visual Studio")"  # to avoid spaces in directory names
+              echo 'Installed MSVC versions:'
+              /usr/bin/find "$(cygpath --unix "$MSVC_ROOTD")" -mindepth 2 -maxdepth 2 -type d -name '*' || true
+              MSVC_EDITION='18/Enterprise/vc/tools/msvc'
+              echo 'Installed MSVC roots:'
+              /usr/bin/find "$(cygpath --unix "$MSVC_ROOTD/$MSVC_EDITION")" -mindepth 1 -maxdepth 1 -type d -name '*.*'
               MSVC_ROOTU="$(/usr/bin/find "$(cygpath --unix "$MSVC_ROOTD/$MSVC_EDITION")" -mindepth 1 -maxdepth 1 -type d -name '*.*' | sort | tail -n 1)"
               MSVC_ROOTW="$(cygpath --mixed "$MSVC_ROOTU")"
               MSVC_ROOTU="$(cygpath --unix "$MSVC_ROOTW")"
               MSVC_BINU="$MSVC_ROOTU/bin/Host$MSVC_HOST/$MATRIX_ARCH"
               MSDK_ROOTW="$(cygpath --mixed --short-name "$(printenv 'ProgramFiles(x86)')/Windows Kits")/10"
               MSDK_ROOTU="$(cygpath --unix "$MSDK_ROOTW")"
+              echo 'Installed Windows Kits:'
+              /usr/bin/find "$MSDK_ROOTU/lib" -mindepth 1 -maxdepth 1 -type d -name '*.*'
               MSDK_VER="$(basename "$(/usr/bin/find "$MSDK_ROOTU/lib" -mindepth 1 -maxdepth 1 -type d -name '*.*' | sort | tail -n 1)")"
               MSDK_LIBW="$MSDK_ROOTW/lib/$MSDK_VER"
               MSDK_INCW="$MSDK_ROOTW/include/$MSDK_VER"
@@ -1158,17 +1145,11 @@ jobs:
         timeout-minutes: 5
         run: cmake --build bld --config "${MATRIX_TYPE}" --parallel 5
 
-      - name: 'libcurl.pc, curl-config'
-        run: |
-          for f in libcurl.pc curl-config; do
-            echo "::group::${f}"; grep -v '^#' bld/"${f}" || true; echo '::endgroup::'
-          done
-
       - name: 'curl -V'
         timeout-minutes: 1
         run: |
-          /usr/bin/find . \( -name '*.exe' -o -name '*.dll' -o -name '*.lib' -o -name '*.pdb' \) -print0 | grep -z curl | xargs -0 file --
-          /usr/bin/find . \( -name '*.exe' -o -name '*.dll' -o -name '*.lib' -o -name '*.pdb' \) -print0 | grep -z curl | xargs -0 stat -c '%10s bytes: %n' --
+          /usr/bin/find . \( -name '*.exe' -o -name '*.dll' -o -name '*.lib' -o -name '*.pdb' \) -print0 | grep -z curl | sort -z | xargs -0 file --
+          /usr/bin/find . \( -name '*.exe' -o -name '*.dll' -o -name '*.lib' -o -name '*.pdb' \) -print0 | grep -z curl | sort -z | xargs -0 stat -c '%10s bytes: %n' --
           if [ "${MATRIX_PLAT}" != 'uwp' ]; then  # Missing: ucrtbased.dll, VCRUNTIME140D.dll, VCRUNTIME140D_APP.dll
             PATH="$PWD/bld/lib/${MATRIX_TYPE}:$(cygpath --unix "${VCPKG_INSTALLATION_ROOT}")/installed/${MATRIX_ARCH}-${MATRIX_PLAT}/${MATRIX_TYPE}/bin:$PATH"
             "bld/src/${MATRIX_TYPE}/curl.exe" --disable --version
@@ -1212,9 +1193,6 @@ jobs:
               sha256sum pkg.bin && sha256sum pkg.bin | grep -qwF -- "${OPENSSH_WINDOWS_SHA256_WIN64}" && unzip pkg.bin && rm -f pkg.bin
             fi
           fi
-          if "bld/src/${MATRIX_TYPE}/curl.exe" --disable -V 2>/dev/null | grep smb; then
-            python3 -m pip --disable-pip-version-check --no-input --no-cache-dir install --progress-bar off --prefer-binary -r tests/requirements.txt
-          fi
 
       - name: 'run tests'
         if: ${{ matrix.tflags != 'skipall' && matrix.tflags != 'skiprun' }}
@@ -1229,7 +1207,7 @@ jobs:
                 "${MATRIX_INSTALL_VCPKG}" = *'libssh2[core,zlib]'* ]]; then
             TFLAGS+=' ~SCP ~SFTP'  # Flaky: `-8, Unable to exchange encryption keys`. https://github.com/libssh2/libssh2/issues/804
             unset CURL_TEST_SSH_KEYALGO  # libssh2 built with WinCNG does not support ssh-ed25519 hostkeys
-            export CURL_TEST_SSH_ENABLE_KEX=diffie-hellman-group-exchange-sha256
+            export CURL_TEST_SSH_ENABLE_KEX=diffie-hellman-group16-sha512
           fi
           if [ -n "${MATRIX_OPENSSH}" ]; then  # OpenSSH-Windows
             TFLAGS+=' ~601 ~603 ~617 ~619 ~621 ~641 ~665 ~2004'  # SCP
