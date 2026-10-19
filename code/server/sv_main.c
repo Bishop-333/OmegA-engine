@@ -1469,6 +1469,9 @@ int SV_SendQueuedPackets( void )
 	if(delayT >= 0)
 		timeVal = delayT;
 
+	if( SV_SendDownloadMessages( qtrue ) )
+		timeVal = 0;
+
 	if(sv_dlRate->integer)
 	{
 		// Rate limiting. This is very imprecise for high
@@ -1483,7 +1486,7 @@ int SV_SendQueuedPackets( void )
 		}
 		else
 		{
-			numBlocks = SV_SendDownloadMessages();
+			numBlocks = SV_SendDownloadMessages( qfalse );
 
 			if(numBlocks)
 			{
@@ -1520,7 +1523,7 @@ int SV_SendQueuedPackets( void )
 	}
 	else
 	{
-		if(SV_SendDownloadMessages())
+		if(SV_SendDownloadMessages( qfalse ))
 			timeVal = 0;
 	}
 
