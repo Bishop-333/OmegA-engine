@@ -1594,6 +1594,9 @@ int SV_SendDownloadMessages( qboolean lan )
 		cl = &svs.clients[ i ];
 		if ( cl->state >= CS_CONNECTED && *cl->downloadName && cl->netchan.isLANAddress == lan )
 		{
+			if ( cl->netchan.unsentFragments || cl->netchan_start_queue )
+				continue;
+
 			numDLs += SV_WriteDownloadToClient( cl );
 		}
 	}
