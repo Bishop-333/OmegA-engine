@@ -700,6 +700,7 @@ static void CL_ParseDownload( msg_t *msg ) {
 		clc.downloadSize = MSG_ReadLong ( msg );
 
 		Cvar_SetIntegerValue( "cl_downloadSize", clc.downloadSize );
+		Cvar_SetIntegerValue( "cl_downloadTime", cls.realtime );
 
 		if (clc.downloadSize < 0)
 		{
