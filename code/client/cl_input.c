@@ -676,8 +676,8 @@ static qboolean CL_ReadyToSendPacket( void ) {
 		return qfalse;
 	}
 
-	// If we are downloading, we send no less than 5ms between packets
-	if ( *clc.downloadTempName && cls.realtime - clc.lastPacketSentTime < 5 ) {
+	// If we are downloading, we send no less than 50ms between packets
+	if ( *clc.downloadTempName && !clc.netchan.isLANAddress && cls.realtime - clc.lastPacketSentTime < 50 ) {
 		return qfalse;
 	}
 
