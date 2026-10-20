@@ -751,6 +751,10 @@ static void CL_ParseDownload( msg_t *msg ) {
 	CL_AddReliableCommand( va("nextdl %d", clc.downloadBlock), qfalse );
 	clc.downloadBlock++;
 
+	if ( cl_lanForcePackets->integer && clc.netchan.isLANAddress ) {
+		CL_WritePacket( 0 );
+	}
+
 	clc.downloadCount += size;
 
 	// So UI gets access to it
