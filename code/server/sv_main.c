@@ -1463,11 +1463,15 @@ int SV_SendQueuedPackets( void )
 	int dlStart, deltaT, delayT;
 	static int dlNextRound = 0;
 	int timeVal = INT_MAX;
+	int timeValLAN = INT_MAX;
 
 	// Send out fragmented packets now that we're idle
 	delayT = SV_SendQueuedMessages();
 	if(delayT >= 0)
 		timeVal = delayT;
+
+	if( SV_SendDownloadMessages( qtrue ) )
+		timeValLAN = 0;
 
 	if(sv_dlRate->integer)
 	{
@@ -1483,7 +1487,7 @@ int SV_SendQueuedPackets( void )
 		}
 		else
 		{
-			numBlocks = SV_SendDownloadMessages();
+			numBlocks = SV_SendDownloadMessages( qfalse );
 
 			if(numBlocks)
 			{
@@ -1520,9 +1524,12 @@ int SV_SendQueuedPackets( void )
 	}
 	else
 	{
-		if(SV_SendDownloadMessages())
+		if(SV_SendDownloadMessages( qfalse ))
 			timeVal = 0;
 	}
+
+	if(timeValLAN < timeVal)
+		timeVal = timeValLAN;
 
 	return timeVal;
 }

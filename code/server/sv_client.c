@@ -1584,7 +1584,7 @@ SV_SendDownloadMessages
 Send one round of download messages to all clients
 ==================
 */
-int SV_SendDownloadMessages( void )
+int SV_SendDownloadMessages( qboolean lan )
 {
 	int i, numDLs = 0;
 	client_t *cl;
@@ -1592,8 +1592,11 @@ int SV_SendDownloadMessages( void )
 	for( i = 0; i < sv.maxclients; i++ )
 	{
 		cl = &svs.clients[ i ];
-		if ( cl->state >= CS_CONNECTED && *cl->downloadName )
+		if ( cl->state >= CS_CONNECTED && *cl->downloadName && cl->netchan.isLANAddress == lan )
 		{
+			if ( cl->netchan.unsentFragments || cl->netchan_start_queue )
+				continue;
+
 			numDLs += SV_WriteDownloadToClient( cl );
 		}
 	}
