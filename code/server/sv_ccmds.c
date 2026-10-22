@@ -1283,7 +1283,11 @@ static void SV_Status_f( void ) {
 		if ( cl->state == CS_PRIMED )
 			Com_Printf( " PRM " );
 		else if ( cl->state == CS_CONNECTED )
+#ifdef URBAN_TERROR
+			Com_Printf( " CNCT " );
+#else
 			Com_Printf( " CON " );
+#endif
 		else if ( cl->state == CS_ZOMBIE )
 			Com_Printf( " ZMB " );
 		else

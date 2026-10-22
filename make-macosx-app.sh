@@ -146,36 +146,42 @@ AVAILABLE_ARCHS=""
 OMG_VERSION=`grep "define.*Q3_VERSION.*\"" code/qcommon/q_shared.h | sed -e 's/.*".* \([^ ]*\)"/\1/'`
 OMG_CLIENT_ARCHS=""
 OMG_SERVER_ARCHS=""
+OMG_RENDERER_GL1_ARCHS=""
 OMG_RENDERER_VK_ARCHS=""
-
-BASEDIR="baseoa"
-MODDIR="omega"
-
 RENDERER_OPENGL="renderer_opengl"
 RENDERER_VULKAN="renderer_vulkan"
-
-if [ "$QUAKE3" == "1" ]; then
-	DEDICATED_NAME="q3-omgded"
-else
-	DEDICATED_NAME="omgded"
-fi
-
 RENDERER_OPENGL1_NAME="${RENDERER_OPENGL}.dylib"
 RENDERER_VULKAN_NAME="${RENDERER_VULKAN}.dylib"
 
 ICNSDIR="code/mac"
-ICNS="quake3_flat.icns"
 PKGINFO="APPLOMG"
 
 OBJROOT="build"
-#BUILT_PRODUCTS_DIR="${OBJROOT}/${TARGET_NAME}-darwin-${CURRENT_ARCH}"
-if [ "$QUAKE3" == "1" ]; then
-	PRODUCT_NAME="q3-omega-osx"
-else
-	PRODUCT_NAME="omega-osx"
-fi
 WRAPPER_EXTENSION="app"
-WRAPPER_NAME="OmegA.${WRAPPER_EXTENSION}"
+
+if [ "$URBAN_TERROR" == "1" ]; then
+	BASEDIR="q3ut4"
+	MODDIR=""
+	DEDICATED_NAME="ut4-omgded"
+	PRODUCT_NAME="ut4-omega-osx"
+	WRAPPER_NAME="Urban Terror.${WRAPPER_EXTENSION}"
+	ICNS="quake3-urt.icns"
+elif [ "$QUAKE3" == "1" ]; then
+	BASEDIR="baseq3"
+	MODDIR="missionpack"
+	DEDICATED_NAME="q3-omgded"
+	PRODUCT_NAME="q3-omega-osx"
+	WRAPPER_NAME="Quake3.${WRAPPER_EXTENSION}"
+	ICNS="quake3_flat.icns"
+else
+	BASEDIR="baseoa"
+	MODDIR="omega"
+	DEDICATED_NAME="omgded"
+	PRODUCT_NAME="omega-osx"
+	WRAPPER_NAME="OmegA.${WRAPPER_EXTENSION}"
+	ICNS="quake3-omg.icns"
+fi
+
 CONTENTS_FOLDER_PATH="${WRAPPER_NAME}/Contents"
 UNLOCALIZED_RESOURCES_FOLDER_PATH="${CONTENTS_FOLDER_PATH}/Resources"
 LICENSES_FOLDER_PATH="${UNLOCALIZED_RESOURCES_FOLDER_PATH}/LICENSES"
@@ -302,7 +308,7 @@ PLIST="<?xml version=\"1.0\" encoding=\"UTF-8\"?>
     <key>CFBundleExecutable</key>
     <string>${EXECUTABLE_NAME}</string>
     <key>CFBundleIconFile</key>
-    <string>quake3_flat</string>
+    <string>${ICNS%.icns}</string>
     <key>CFBundleIdentifier</key>
     <string>org.omega.${PRODUCT_NAME}</string>
     <key>CFBundleInfoDictionaryVersion</key>

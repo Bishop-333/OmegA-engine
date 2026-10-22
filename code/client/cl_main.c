@@ -1114,6 +1114,9 @@ qboolean CL_MapLoading( void ) {
 		cls.framecount++;
 		SCR_UpdateScreen();
 		clc.connectTime = cls.realtime - RECONNECT_TIMEOUT; // send packet immediately
+#ifdef URBAN_TERROR
+		clc.compat = qtrue;
+#endif
 		NET_StringToAdr( cls.servername, &clc.serverAddress, NA_UNSPEC );
 		// we don't need a challenge on the localhost
 		CL_CheckForResend();

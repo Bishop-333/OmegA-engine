@@ -66,10 +66,19 @@ USE_RENDERER_DLOPEN = 1
 # valid options: opengl, vulkan
 RENDERER_DEFAULT = vulkan
 
-QUAKE3           = 0
+ifndef QUAKE3
+  QUAKE3         = 0
+endif
+ifndef URBAN_TERROR
+  URBAN_TERROR   = 0
+endif
 
-# valid options: omega, rat, aftershock, etc... or 0 (no mod)
-ifneq ($(QUAKE3),1)
+# valid options: omega, rat, aftershock, etc... or empty (no mod)
+ifeq ($(URBAN_TERROR),1)
+  MOD_DEFAULT    =
+else ifeq ($(QUAKE3),1)
+  MOD_DEFAULT    =
+else
   MOD_DEFAULT    = omega
 endif
 
@@ -79,7 +88,10 @@ else
   RENDERER_SUFFIX = -$(RENDERER_DEFAULT)
 endif
 
-ifeq ($(QUAKE3),1)
+ifeq ($(URBAN_TERROR),1)
+  CNAME          = ut4-omega$(RENDERER_SUFFIX)
+  DNAME          = ut4-omgded
+else ifeq ($(QUAKE3),1)
   CNAME          = q3-omega$(RENDERER_SUFFIX)
   DNAME          = q3-omgded
 else
@@ -167,10 +179,14 @@ endif
 export CROSS_COMPILING
 
 ifndef DESTDIR
+  ifeq ($(URBAN_TERROR),1)
+    DESTDIR=/usr/local/games/quake3
+  else
   ifeq ($(QUAKE3),1)
     DESTDIR=/usr/local/games/quake3
   else
     DESTDIR=/usr/local/games/openarena
+  endif
   endif
 endif
 
@@ -554,10 +570,14 @@ ifeq ($(GENERATE_DEPENDENCIES),1)
   BASE_CFLAGS += -MMD
 endif
 
+ifeq ($(URBAN_TERROR),1)
+  BASE_CFLAGS += -DURBAN_TERROR -DUSE_Q3KEY
+else
 ifeq ($(QUAKE3),1)
   BASE_CFLAGS += -DQUAKE3
 else
   BASE_CFLAGS += -DUSE_Q3KEY -DUSE_MD5
+endif
 endif
 
 ifdef MOD_DEFAULT

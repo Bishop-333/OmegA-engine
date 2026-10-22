@@ -155,7 +155,11 @@ NET
 
 #define	PORT_ANY			-1
 
+#ifdef URBAN_TERROR
+#define	MAX_RELIABLE_COMMANDS	128
+#else
 #define	MAX_RELIABLE_COMMANDS	64			// max string commands buffered for restransmit
+#endif
 
 typedef enum {
 	NA_BAD = 0,					// an address lookup failed
@@ -290,7 +294,10 @@ PROTOCOL
 ==============================================================
 */
 
-#ifdef QUAKE3
+#if defined(URBAN_TERROR)
+#define	OLD_PROTOCOL_VERSION	68
+#define	NEW_PROTOCOL_VERSION	68
+#elif defined(QUAKE3)
 #define	OLD_PROTOCOL_VERSION	68
 // new protocol with UDP spoofing protection:
 #define	NEW_PROTOCOL_VERSION	71
@@ -310,7 +317,9 @@ extern const int demo_protocols[];
 #define	UPDATE_SERVER_NAME	"update.quake3arena.com"
 // override on command line, config files etc.
 #ifndef MASTER_SERVER_NAME
-#ifdef QUAKE3
+#if defined(URBAN_TERROR)
+#define MASTER_SERVER_NAME	"master.urbanterror.info"
+#elif defined(QUAKE3)
 #define MASTER_SERVER_NAME	"master.quake3arena.com"
 #else
 #define MASTER_SERVER_NAME	"dpmaster.deathmask.net"
@@ -320,7 +329,11 @@ extern const int demo_protocols[];
 #define	AUTHORIZE_SERVER_NAME	"authorize.quake3arena.com"
 #endif
 
+#ifdef URBAN_TERROR
+#define	PORT_MASTER			27900
+#else
 #define	PORT_MASTER			27950
+#endif
 #define	PORT_UPDATE			27951
 #ifndef PORT_AUTHORIZE
 #define	PORT_AUTHORIZE		27952
