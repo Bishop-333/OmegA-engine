@@ -146,10 +146,8 @@ AVAILABLE_ARCHS=""
 OMG_VERSION=`grep "define.*Q3_VERSION.*\"" code/qcommon/q_shared.h | sed -e 's/.*".* \([^ ]*\)"/\1/'`
 OMG_CLIENT_ARCHS=""
 OMG_SERVER_ARCHS=""
+OMG_RENDERER_GL1_ARCHS=""
 OMG_RENDERER_VK_ARCHS=""
-
-BASEDIR="baseoa"
-MODDIR="omega"
 
 RENDERER_OPENGL="renderer_opengl"
 RENDERER_VULKAN="renderer_vulkan"
@@ -168,14 +166,22 @@ ICNS="quake3_flat.icns"
 PKGINFO="APPLOMG"
 
 OBJROOT="build"
-#BUILT_PRODUCTS_DIR="${OBJROOT}/${TARGET_NAME}-darwin-${CURRENT_ARCH}"
-if [ "$QUAKE3" == "1" ]; then
-	PRODUCT_NAME="q3-omega-osx"
-else
-	PRODUCT_NAME="omega-osx"
-fi
 WRAPPER_EXTENSION="app"
-WRAPPER_NAME="OmegA.${WRAPPER_EXTENSION}"
+
+if [ "$QUAKE3" == "1" ]; then
+	BASEDIR="baseq3"
+	MODDIR="missionpack"
+	DEDICATED_NAME="q3-omgded"
+	PRODUCT_NAME="q3-omega-osx"
+	WRAPPER_NAME="Quake3.${WRAPPER_EXTENSION}"
+else
+	BASEDIR="baseoa"
+	MODDIR="omega"
+	DEDICATED_NAME="omgded"
+	PRODUCT_NAME="omega-osx"
+	WRAPPER_NAME="OmegA.${WRAPPER_EXTENSION}"
+fi
+
 CONTENTS_FOLDER_PATH="${WRAPPER_NAME}/Contents"
 UNLOCALIZED_RESOURCES_FOLDER_PATH="${CONTENTS_FOLDER_PATH}/Resources"
 LICENSES_FOLDER_PATH="${UNLOCALIZED_RESOURCES_FOLDER_PATH}/LICENSES"
@@ -302,7 +308,7 @@ PLIST="<?xml version=\"1.0\" encoding=\"UTF-8\"?>
     <key>CFBundleExecutable</key>
     <string>${EXECUTABLE_NAME}</string>
     <key>CFBundleIconFile</key>
-    <string>quake3_flat</string>
+    <string>${ICNS%.icns}</string>
     <key>CFBundleIdentifier</key>
     <string>org.omega.${PRODUCT_NAME}</string>
     <key>CFBundleInfoDictionaryVersion</key>

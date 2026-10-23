@@ -30,22 +30,23 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef SVN_VERSION
   #define SVN_VERSION Q3_VERSION
 #endif
-#define CLIENT_WINDOW_TITLE   "OmegA"
-#define CONSOLE_WINDOW_TITLE  "OmegA Console"
-// 1.32 released 7-10-2002
-
-//#define DEFAULT_GAME          omega
 
 #ifdef QUAKE3
+  #define CLIENT_WINDOW_TITLE   "Quake 3: Arena"
+  #define CONSOLE_WINDOW_TITLE  "Quake 3 Console"
   #define BASEGAME				"baseq3"
   #define HOMEPATH_NAME_UNIX        		".q3a"
   #define HOMEPATH_NAME_WIN         		"Quake3"
   #define HOMEPATH_NAME_MACOSX			"Library/Application Support/Quake3"
+  #define HEARTBEAT_FOR_MASTER	"QuakeArena-1"
 #else
+  #define CLIENT_WINDOW_TITLE   "OmegA"
+  #define CONSOLE_WINDOW_TITLE  "OmegA Console"
   #define BASEGAME				"baseoa"
   #define HOMEPATH_NAME_UNIX        		".openarena"
   #define HOMEPATH_NAME_WIN         		"OpenArena"
   #define HOMEPATH_NAME_MACOSX			"Library/Application Support/OpenArena"
+  #define HEARTBEAT_FOR_MASTER	"DarkPlaces"
 #endif
 //#define BASEDEMO				"demoq3"
 #define BASETA					"missionpack"
@@ -56,7 +57,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define MAX_MASTER_SERVERS      5	// number of supported master servers
 
 #define GAMENAME_FOR_MASTER		"Quake3Arena"
-#define HEARTBEAT_FOR_MASTER	"DarkPlaces"
 
 #define DEMOEXT	"dm_"			// standard demo extension
 

@@ -66,11 +66,15 @@ USE_RENDERER_DLOPEN = 1
 # valid options: opengl, vulkan
 RENDERER_DEFAULT = vulkan
 
-QUAKE3           = 0
+ifndef QUAKE3
+  QUAKE3         = 0
+endif
 
-# valid options: omega, rat, aftershock, etc... or 0 (no mod)
-ifneq ($(QUAKE3),1)
-  MOD_DEFAULT    = omega
+# valid options: omega, rat, aftershock, etc... or empty (no mod)
+ifndef MOD_DEFAULT
+  ifneq ($(QUAKE3),1)
+    MOD_DEFAULT  = omega
+  endif
 endif
 
 ifeq ($(USE_RENDERER_DLOPEN),1)
