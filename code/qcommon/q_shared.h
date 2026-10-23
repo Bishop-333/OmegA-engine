@@ -69,9 +69,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 
 #define DEMOEXT	"dm_"			// standard demo extension
-#ifdef URBAN_TERROR
-#define URTDEMOEXT	"urtdemo"
-#endif
 
 #ifdef _MSC_VER
 
