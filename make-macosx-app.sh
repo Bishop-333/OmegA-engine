@@ -162,7 +162,13 @@ RENDERER_OPENGL1_NAME="${RENDERER_OPENGL}.dylib"
 RENDERER_VULKAN_NAME="${RENDERER_VULKAN}.dylib"
 
 ICNSDIR="code/mac"
-ICNS="quake3_flat.icns"
+if [ "$QUAKE3" == "1" ]; then
+	ICNS="quake3.icns"
+elif [ "$MOD_DEFAULT" == "rat" ]; then
+	ICNS="rat.icns"
+else
+	ICNS="quake3_flat.icns"
+fi
 PKGINFO="APPLOMG"
 
 OBJROOT="build"

@@ -558,14 +558,20 @@ ifeq ($(GENERATE_DEPENDENCIES),1)
   BASE_CFLAGS += -MMD
 endif
 
+WINDRES_FLAGS =
+
 ifeq ($(QUAKE3),1)
   BASE_CFLAGS += -DQUAKE3
+  WINDRES_FLAGS += -DQUAKE3
 else
   BASE_CFLAGS += -DUSE_Q3KEY -DUSE_MD5
 endif
 
 ifdef MOD_DEFAULT
   BASE_CFLAGS += -DDEFAULT_GAME=\\\"$(MOD_DEFAULT)\\\"
+  ifeq ($(MOD_DEFAULT),rat)
+    WINDRES_FLAGS += -DRAT
+  endif
 endif
 
 ARCHEXT=
@@ -1080,7 +1086,7 @@ endef
 
 define DO_WINDRES
 $(echo_cmd) "WINDRES $<"
-$(Q)$(WINDRES) -i $< -o $@
+$(Q)$(WINDRES) $(WINDRES_FLAGS) -i $< -o $@
 endef
 
 ifndef SHLIBNAME

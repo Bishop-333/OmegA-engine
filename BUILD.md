@@ -119,7 +119,7 @@ Several Makefile options are available for linux/mingw/macos builds:
 
 `USE_SYSTEM_JPEG=0` - use current system JPEG library, disabled by default
 
-`MOD_DEFAULT=omega` start a mod at launch, valid options are `omega`, `ratmod`, `aftershock` or `null` (no mod)
+`MOD_DEFAULT=omega` start a mod at launch, valid options are `omega`, `rat`, `aftershock` or `null` (no mod)
 
 `QUAKE3=0` - change the basegame to Quake3 instead of OpenArena, disabled by default
 
