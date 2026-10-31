@@ -1893,6 +1893,7 @@ static void VM_FreeBuffers( void )
 }
 
 
+#ifdef USE_X87
 static const ID_INLINE qboolean HasFCOM( void )
 {
 #if id386
@@ -1901,6 +1902,7 @@ static const ID_INLINE qboolean HasFCOM( void )
 	return qtrue; // assume idx64
 #endif
 }
+#endif
 
 
 static const ID_INLINE qboolean HasSSEFP( void )
