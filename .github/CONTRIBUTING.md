@@ -104,6 +104,13 @@ warranted, then you will be given access to the pull request system.
 Use of AI
 ---------
 
-All code and other content in the libjpeg-turbo source tree is 100%
-human-generated, and all contributions to this project intended for inclusion
-in that source tree must also be 100% human-generated.
+No code or other content in the libjpeg-turbo source tree was generated, in
+whole or in part, using AI tools.
+
+Because it is impossible to know what source material was used to train a
+particular AI model, it is impossible to know whether placing AI-generated code
+and other content under libjpeg-turbo's open source licenses would violate
+someone else's copyright.  At best, it is a legal gray area.  For that reason
+and others, this project does not accept any contributions intended for
+inclusion in the libjpeg-turbo source tree that were generated, in whole or in
+part, using AI tools.
