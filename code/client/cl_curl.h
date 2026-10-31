@@ -116,7 +116,7 @@ typedef struct download_s {
 	struct func_s {
 		char*		(*version)(void);
 		char *		(*easy_escape)(CURL *curl, const char *string, int length);
-		void		(*free)(char *ptr);
+		void		(*curl_free)(char *ptr);
 
 		CURL*		(*easy_init)(void);
 		CURLcode	(*easy_setopt)(CURL *curl, CURLoption option, ...);

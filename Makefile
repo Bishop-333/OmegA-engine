@@ -267,6 +267,14 @@ ifndef USE_SYSTEM_ZLIB
   USE_SYSTEM_ZLIB=1
 endif
 
+ifndef USE_MIMALLOC
+  ifdef MINGW
+    USE_MIMALLOC=1
+  else
+    USE_MIMALLOC=0
+  endif
+endif
+
 ifeq ($(USE_RENDERER_DLOPEN),0)
   ifeq ($(RENDERER_DEFAULT),opengl)
     USE_OPENGL=1
@@ -316,6 +324,8 @@ FLACDIR=$(MOUNT_DIR)/thirdparty/libflac
 OPENALDIR=$(MOUNT_DIR)/thirdparty/libopenal
 ZNGDIR=$(MOUNT_DIR)/thirdparty/libz-ng
 VULKANDIR=$(MOUNT_DIR)/thirdparty/libvulkan
+MIMALLOCDIR=$(MOUNT_DIR)/thirdparty/mimalloc
+MIMALLOCHDIR=$(MOUNT_DIR)/thirdparty/mimalloc/include/mimalloc-3.6
 
 bin_path=$(shell which $(1) 2> /dev/null)
 
@@ -471,6 +481,11 @@ ifeq ($(USE_SYSTEM_ZLIB),1)
   endif
 endif
 
+# supply some reasonable defaults for mimalloc
+ifeq ($(MIMALLOC_CFLAGS),)
+  MIMALLOC_CFLAGS = -I$(MIMALLOCHDIR)
+endif
+
 # extract version info
 VERSION=$(shell grep "define.*Q3_VERSION.*\"" $(CMDIR)/q_shared.h | \
   sed -e 's/.*".* \([^ ]*\)"/\1/')
@@ -538,12 +553,35 @@ ifeq ($(USE_CURL),1)
   endif
 endif
 
+ifeq ($(USE_OGG_VORBIS),1)
+  BASE_CFLAGS += -DUSE_OGG_VORBIS
+endif
+
+ifeq ($(USE_MP3),1)
+  BASE_CFLAGS += -DUSE_MP3
+endif
+
+ifeq ($(USE_FLAC),1)
+  BASE_CFLAGS += -DUSE_FLAC
+endif
+
+ifeq ($(USE_OPENAL),1)
+  BASE_CFLAGS += -DUSE_OPENAL
+  ifeq ($(USE_OPENAL_DLOPEN),1)
+    BASE_CFLAGS += -DUSE_OPENAL_DLOPEN
+  endif
+endif
+
 ifeq ($(USE_SYSTEM_ZLIB),1)
   BASE_CFLAGS += -DUSE_SYSTEM_ZLIB
 else
 ifeq ($(USE_ZLIB_NG),1)
   BASE_CFLAGS += -DUSE_ZLIB_NG
 endif
+endif
+
+ifeq ($(USE_MIMALLOC),1)
+  BASE_CFLAGS += -DUSE_MIMALLOC
 endif
 
 ifeq ($(USE_VULKAN_API),1)
@@ -696,24 +734,23 @@ ifdef MINGW
   endif
 
   ifeq ($(USE_OGG_VORBIS),1)
-    BASE_CFLAGS += -DUSE_OGG_VORBIS $(OGG_CFLAGS) $(VORBIS_CFLAGS)
+    BASE_CFLAGS += $(OGG_CFLAGS) $(VORBIS_CFLAGS)
     CLIENT_LDFLAGS += $(OGG_LIBS) $(VORBIS_LIBS)
   endif
 
   ifeq ($(USE_MP3),1)
-    BASE_CFLAGS += -DUSE_MP3 $(MAD_CFLAGS)
+    BASE_CFLAGS += $(MAD_CFLAGS)
     CLIENT_LDFLAGS += $(MAD_LIBS)
   endif
 
   ifeq ($(USE_FLAC),1)
-    BASE_CFLAGS += -DUSE_FLAC $(FLAC_CFLAGS)
+    BASE_CFLAGS += $(FLAC_CFLAGS)
     CLIENT_LDFLAGS += $(FLAC_LIBS)
   endif
 
   ifeq ($(USE_OPENAL),1)
-    BASE_CFLAGS += -DUSE_OPENAL $(OPENAL_CFLAGS)
+    BASE_CFLAGS += $(OPENAL_CFLAGS)
     ifeq ($(USE_OPENAL_DLOPEN),1)
-      BASE_CFLAGS += -DUSE_OPENAL_DLOPEN
       ifeq ($(ARCH),x86)
         CLIENT_EXTRA_FILES += $(OPENALDIR)/windows/mingw/lib32/OpenAL32.dll
       else
@@ -729,6 +766,21 @@ ifdef MINGW
     BASE_CFLAGS += -I$(TARGETDIR)/libz-ng/include
     LDFLAGS += -L$(TARGETDIR)/libz-ng/lib
     LDFLAGS += -lz
+  endif
+
+  ifeq ($(USE_MIMALLOC),1)
+    BASE_CFLAGS += $(MIMALLOC_CFLAGS)
+    ifeq ($(ARCH),x86)
+      LDFLAGS += -L$(MIMALLOCDIR)/windows/mingw/lib32
+      LDFLAGS += -lmimalloc
+      CLIENT_EXTRA_FILES += $(MIMALLOCDIR)/windows/mingw/lib32/mimalloc.dll
+      CLIENT_EXTRA_FILES += $(MIMALLOCDIR)/windows/mingw/lib32/mimalloc-redirect32.dll
+    else
+      LDFLAGS += -L$(MIMALLOCDIR)/windows/mingw/lib64
+      LDFLAGS += -lmimalloc
+      CLIENT_EXTRA_FILES += $(MIMALLOCDIR)/windows/mingw/lib64/mimalloc.dll
+      CLIENT_EXTRA_FILES += $(MIMALLOCDIR)/windows/mingw/lib64/mimalloc-redirect.dll
+    endif
   endif
 
   DEBUG_CFLAGS = $(BASE_CFLAGS) -DDEBUG -D_DEBUG -g -O0
@@ -815,24 +867,23 @@ ifeq ($(COMPILE_PLATFORM),darwin)
   endif
 
   ifeq ($(USE_OGG_VORBIS),1)
-    BASE_CFLAGS += -DUSE_OGG_VORBIS $(OGG_CFLAGS) $(VORBIS_CFLAGS)
+    BASE_CFLAGS += $(OGG_CFLAGS) $(VORBIS_CFLAGS)
     CLIENT_LDFLAGS += $(OGG_LIBS) $(VORBIS_LIBS)
   endif
 
   ifeq ($(USE_MP3),1)
-    BASE_CFLAGS += -DUSE_MP3 $(MAD_CFLAGS)
+    BASE_CFLAGS += $(MAD_CFLAGS)
     CLIENT_LDFLAGS += $(MAD_LIBS)
   endif
 
   ifeq ($(USE_FLAC),1)
-    BASE_CFLAGS += -DUSE_FLAC $(FLAC_CFLAGS)
+    BASE_CFLAGS += $(FLAC_CFLAGS)
     CLIENT_LDFLAGS += $(FLAC_LIBS)
   endif
 
   ifeq ($(USE_OPENAL),1)
-    BASE_CFLAGS += -DUSE_OPENAL $(OPENAL_CFLAGS)
+    BASE_CFLAGS += $(OPENAL_CFLAGS)
     ifeq ($(USE_OPENAL_DLOPEN),1)
-      BASE_CFLAGS += -DUSE_OPENAL_DLOPEN
       CLIENT_LDFLAGS += $(OPENALDIR)/macosx/libopenal.dylib
       CLIENT_EXTRA_FILES += $(OPENALDIR)/macosx/libopenal.dylib
     else 
@@ -946,25 +997,23 @@ else
   endif
 
   ifeq ($(USE_OGG_VORBIS),1)
-    BASE_CFLAGS += -DUSE_OGG_VORBIS $(OGG_CFLAGS) $(VORBIS_CFLAGS)
+    BASE_CFLAGS += $(OGG_CFLAGS) $(VORBIS_CFLAGS)
     CLIENT_LDFLAGS += $(OGG_LIBS) $(VORBIS_LIBS)
   endif
 
   ifeq ($(USE_MP3),1)
-    BASE_CFLAGS += -DUSE_MP3 $(MAD_CFLAGS)
+    BASE_CFLAGS += $(MAD_CFLAGS)
     CLIENT_LDFLAGS += $(MAD_LIBS)
   endif
 
   ifeq ($(USE_FLAC),1)
-    BASE_CFLAGS += -DUSE_FLAC $(FLAC_CFLAGS)
+    BASE_CFLAGS += $(FLAC_CFLAGS)
     CLIENT_LDFLAGS += $(FLAC_LIBS)
   endif
 
   ifeq ($(USE_OPENAL),1)
-    BASE_CFLAGS += -DUSE_OPENAL $(OPENAL_CFLAGS)
-    ifeq ($(USE_OPENAL_DLOPEN),1)
-      BASE_CFLAGS += -DUSE_OPENAL_DLOPEN
-    else
+    BASE_CFLAGS += $(OPENAL_CFLAGS)
+    ifeq ($(USE_OPENAL_DLOPEN),0)
       CLIENT_LDFLAGS += $(OPENAL_LIBS)
     endif
   endif

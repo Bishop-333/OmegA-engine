@@ -586,7 +586,7 @@ qboolean Com_DL_Init( download_t *dl )
 
 	dl->func.version = Sys_LoadFunction( dl->func.lib, "curl_version" );
 	dl->func.easy_escape = Sys_LoadFunction( dl->func.lib, "curl_easy_escape" );
-	dl->func.free = Sys_LoadFunction( dl->func.lib, "curl_free" );
+	dl->func.curl_free = Sys_LoadFunction( dl->func.lib, "curl_free" );
 
 	dl->func.easy_init = Sys_LoadFunction( dl->func.lib, "curl_easy_init" );
 	dl->func.easy_setopt = Sys_LoadFunction( dl->func.lib, "curl_easy_setopt" );
@@ -619,7 +619,7 @@ qboolean Com_DL_Init( download_t *dl )
 
 	dl->func.version = curl_version;
 	dl->func.easy_escape = curl_easy_escape;
-	dl->func.free = (void (*)(char *))curl_free; // cast to silence warning
+	dl->func.curl_free = (void (*)(char *))curl_free; // cast to silence warning
 
 	dl->func.easy_init = curl_easy_init;
 	dl->func.easy_setopt = curl_easy_setopt;
@@ -966,7 +966,7 @@ qboolean Com_DL_Begin( download_t *dl, const char *localName, const char *remote
 		{
 			dl->headerCheck = qtrue;
 		}
-		dl->func.free( escapedName );
+		dl->func.curl_free( escapedName );
 	}
 
 	Com_Printf( "URL: %s\n", dl->URL );
