@@ -343,6 +343,7 @@ typedef struct {
 	qhandle_t	charSetShader;
 	qhandle_t	whiteShader;
 	qhandle_t	consoleShader;
+	qhandle_t	consoleBlurShader;
 
 	int			lastVidRestart;
 	int			soundMuted;

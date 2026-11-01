@@ -1502,6 +1502,8 @@ static const void *RB_FinishBloom( const void *data )
 				FBO_Bloom( 0, 0, qfalse );
 			}
 		}
+
+		FBO_CopyScreen();
 	}
 
 	// texture swapping test

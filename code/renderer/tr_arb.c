@@ -6,8 +6,8 @@
 //#define USE_FBO_BLIT
 
 // screenMap texture dimensions
-#define SCR_WIDTH 128
-#define SCR_HEIGHT 64
+#define SCR_WIDTH (glConfig.vidWidth / 5)
+#define SCR_HEIGHT (glConfig.vidHeight / 5)
 
 #define BLOOM_BASE 5
 #define FBO_COUNT (BLOOM_BASE+(MAX_BLUR_PASSES*2))
@@ -1627,7 +1627,7 @@ static void FBO_Blur( const frameBuffer_t *fb1, const frameBuffer_t *fb2,  const
 }
 
 
-static void FBO_Blur2( const frameBuffer_t *fb1, const frameBuffer_t *fb2,  const frameBuffer_t *fb3 )
+static void FBO_Blur2( const frameBuffer_t *fb1, const frameBuffer_t *fb2,  const frameBuffer_t *fb3, float spread )
 {
 	const int w = glConfig.vidWidth;
 	const int h = glConfig.vidHeight;
@@ -1638,13 +1638,13 @@ static void FBO_Blur2( const frameBuffer_t *fb1, const frameBuffer_t *fb2,  cons
 	FBO_Bind( GL_DRAW_FRAMEBUFFER, fb2->fbo );
 	GL_BindTexture( 0, fb1->color );
 	ARB_ProgramEnable( DUMMY_VERTEX, BLUR2_FRAGMENT );
-	ARB_BlurParams( fb1->width, fb1->height, 6, qtrue );
+	ARB_BlurParams( fb1->width / spread, fb1->height / spread, 6, qtrue );
 	RenderQuad( w, h );
 
 	// apply vectical blur - render from FBO2 to FBO3
 	FBO_Bind( GL_DRAW_FRAMEBUFFER, fb3->fbo );
 	GL_BindTexture( 0, fb2->color );
-	ARB_BlurParams( fb1->width, fb1->height, 6, qfalse );
+	ARB_BlurParams( fb1->width / spread, fb1->height / spread, 6, qfalse );
 	RenderQuad( w, h );
 }
 
@@ -1653,7 +1653,6 @@ void FBO_CopyScreen( void )
 {
 	const frameBuffer_t *dst;
 	const frameBuffer_t *src;
-	int yCrop;
 
 	qglViewport( 0, 0, glConfig.vidWidth, glConfig.vidHeight );
 	qglScissor( 0, 0, glConfig.vidWidth, glConfig.vidHeight );
@@ -1668,16 +1667,14 @@ void FBO_CopyScreen( void )
 		qglBlitFramebuffer( 0, 0, src->width, src->height, 0, 0, dst->width, dst->height, GL_COLOR_BUFFER_BIT, GL_NEAREST );
 	}
 
-	src = &frameBuffers[ 0 ];
+	src = &frameBuffers[ fboReadIndex ];
 	dst = &frameBuffers[ 2 ];
 	FBO_Bind( GL_READ_FRAMEBUFFER, src->fbo );
 	FBO_Bind( GL_DRAW_FRAMEBUFFER, dst->fbo );
 
-	yCrop = backEnd.viewParms.viewportHeight / 4;
-
-	qglBlitFramebuffer( backEnd.viewParms.viewportX, backEnd.viewParms.viewportY + yCrop,
-		backEnd.viewParms.viewportWidth + backEnd.viewParms.viewportX,
-		backEnd.viewParms.viewportHeight + backEnd.viewParms.viewportY,
+	qglBlitFramebuffer( 0, 0,
+		glConfig.vidWidth,
+		glConfig.vidHeight,
 		0, 0, dst->width, dst->height, GL_COLOR_BUFFER_BIT, GL_LINEAR );
 
 	//if ( !backEnd.projection2D )
@@ -1692,16 +1689,15 @@ void FBO_CopyScreen( void )
 
 	qglColor4f( 1, 1, 1, 1 );
 	GL_State( GLS_DEPTHTEST_DISABLE | GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO );
-	FBO_Blur2( dst, dst+1, dst );
+	FBO_Blur2( dst, dst+1, dst, 1.0f );
+	FBO_Blur2( dst, dst+1, dst, 2.0f );
 	ARB_ProgramDisable();
 
 	//restore viewport and scissor
-	qglViewport( backEnd.viewParms.viewportX, backEnd.viewParms.viewportY,
-		backEnd.viewParms.viewportWidth, backEnd.viewParms.viewportHeight ); 
-	qglScissor( backEnd.viewParms.scissorX, backEnd.viewParms.scissorY,
-		backEnd.viewParms.scissorWidth, backEnd.viewParms.scissorHeight ); 
+	qglViewport( 0, 0, glConfig.vidWidth, glConfig.vidHeight );
+	qglScissor( 0, 0, glConfig.vidWidth, glConfig.vidHeight );
 
-	FBO_BindMain();
+	FBO_Bind( GL_FRAMEBUFFER, frameBuffers[ fboReadIndex ].fbo );
 }
 
 

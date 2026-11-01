@@ -68,7 +68,7 @@ void R_BindAnimatedImage( const textureBundle_t *bundle ) {
 	}
 
 #ifdef USE_FBO
-	if ( bundle->isScreenMap && backEnd.viewParms.frameSceneNum == 1 ) {
+	if ( bundle->isScreenMap && fboEnabled ) {
 		GL_BindTexNum( FBO_ScreenTexture() );
 		return;
 	}

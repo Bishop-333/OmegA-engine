@@ -120,6 +120,7 @@ cvar_t		*con_autoSuggest;
 cvar_t		*con_drawHelp;
 cvar_t		*con_anim;
 cvar_t		*con_fade;
+cvar_t		*con_blur;
 
 int			g_console_field_width;
 
@@ -595,6 +596,8 @@ void Con_Init( void )
 	Cvar_SetDescription( con_anim, "Console opening/closing scroll animation." );
 	con_fade = Cvar_Get( "con_fade", "1", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( con_fade, "Console opening/closing fade animation." );
+	con_blur = Cvar_Get( "con_blur", "1", CVAR_ARCHIVE );
+	Cvar_SetDescription( con_blur, "Console blur effect. Requires \\r_fbo 1." );
 
 	Field_Clear( &g_consoleField );
 	g_consoleField.widthInChars = g_console_field_width;
@@ -1287,9 +1290,9 @@ Draws the console with the solid background
 static void Con_DrawSolidConsole( float frac ) {
 
 	static float conColorValue[4] = { 0.0, 0.0, 0.0, 0.0 };
-	static float conFade;
 	// for cvar value change tracking
 	static char  conColorString[ MAX_CVAR_VALUE_STRING ] = { '\0' };
+	qboolean conBlur = con_blur->integer && cls.consoleBlurShader && Cvar_VariableIntegerValue( "r_fbo" );
 
 	int				i, x, y;
 	int				rows;
@@ -1328,6 +1331,10 @@ static void Con_DrawSolidConsole( float frac ) {
 	if ( yf < 1.0 ) {
 		yf = 0;
 	} else {
+		if ( conBlur ) {
+			re.SetColor( colorWhite );
+			re.DrawStretchPic( 0, 0, wf, yf, 0, 1, 1, 1 - frac, cls.consoleBlurShader );
+		}
 		// custom console background color
 		if ( cl_conColor->string[0] ) {
 			// track changes
@@ -1345,14 +1352,12 @@ static void Con_DrawSolidConsole( float frac ) {
 					}
 				}
 			}
+			vec4_t color;
+			Vector4Copy( conColorValue, color );
 			if ( con_fade->integer ) {
-				conFade = conColorValue[3];
-				conColorValue[3] *= ( frac / cl_consoleHeight->value ) * ( 2.0f - ( frac / cl_consoleHeight->value ) );
-				re.SetColor( conColorValue );
-				conColorValue[3] = conFade;
-			} else {
-				re.SetColor( conColorValue );
+				color[3] *= ( frac / cl_consoleHeight->value ) * ( 2.0f - ( frac / cl_consoleHeight->value ) );
 			}
+			re.SetColor( color );
 			re.DrawStretchPic( 0, 0, wf, yf, 0, 0, 1, 1, cls.whiteShader );
 		} else {
 			re.SetColor( g_color_table[ ColorIndex( COLOR_WHITE ) ] );
