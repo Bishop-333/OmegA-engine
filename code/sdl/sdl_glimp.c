@@ -91,9 +91,6 @@ void GLimp_Shutdown( qboolean unloadDLL )
 		SDL_DestroyWindow( SDL_window );
 		SDL_window = NULL;
 	}
-
-	if ( unloadDLL )
-		SDL_QuitSubSystem( SDL_INIT_VIDEO );
 }
 
 
@@ -1023,9 +1020,6 @@ void VKimp_Shutdown( qboolean unloadDLL )
 		SDL_DestroyWindow( SDL_window );
 		SDL_window = NULL;
 	}
-
-	if ( unloadDLL )
-		SDL_QuitSubSystem( SDL_INIT_VIDEO );
 }
 #endif // USE_VULKAN_API
 
