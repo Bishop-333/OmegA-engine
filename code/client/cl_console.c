@@ -1372,8 +1372,16 @@ static void Con_DrawSolidConsole( float frac ) {
 	//y = yf;
 
 	// draw the version number
-	SCR_DrawSmallString( cls.glconfig.vidWidth - ( ARRAY_LEN( Q3_VERSION ) ) * smallchar_width,
-		lines - smallchar_height, Q3_VERSION, ARRAY_LEN( Q3_VERSION ) - 1 );
+#if defined(USE_RENDERER_DLOPEN)
+	const char *r = Cvar_VariableString( "cl_renderer" );
+#elif defined(USE_VULKAN_API)
+	const char *r = "vulkan";
+#else
+	const char *r = "opengl";
+#endif
+	const char *s = va( "%s (%s)", Q3_VERSION, r );
+	SCR_DrawSmallString( cls.glconfig.vidWidth - ( strlen( s ) + 1 ) * smallchar_width,
+		lines - smallchar_height, s, strlen( s ) );
 
 	// draw the text
 	activeCon->vislines = lines;
