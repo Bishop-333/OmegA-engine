@@ -1325,7 +1325,7 @@ static void S_OpenBackgroundStream( const char *filename ) {
 	// Open stream
 	s_backgroundStream = S_CodecOpenStream( filename );
 	if( !s_backgroundStream ) {
-		Com_Printf( S_COLOR_YELLOW "WARNING: couldn't open music file %s\n", filename );
+		Com_WPrintf( "WARNING: couldn't open music file %s\n", filename );
 		return;
 	}
 
