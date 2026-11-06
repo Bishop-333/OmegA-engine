@@ -267,14 +267,6 @@ ifndef USE_SYSTEM_ZLIB
   USE_SYSTEM_ZLIB=1
 endif
 
-ifndef USE_MIMALLOC
-  ifdef MINGW
-    USE_MIMALLOC=1
-  else
-    USE_MIMALLOC=0
-  endif
-endif
-
 ifeq ($(USE_RENDERER_DLOPEN),0)
   ifeq ($(RENDERER_DEFAULT),opengl)
     USE_OPENGL=1
@@ -324,8 +316,6 @@ FLACDIR=$(MOUNT_DIR)/thirdparty/libflac
 OPENALDIR=$(MOUNT_DIR)/thirdparty/libopenal
 ZNGDIR=$(MOUNT_DIR)/thirdparty/libz-ng
 VULKANDIR=$(MOUNT_DIR)/thirdparty/libvulkan
-MIMALLOCDIR=$(MOUNT_DIR)/thirdparty/mimalloc
-MIMALLOCHDIR=$(MOUNT_DIR)/thirdparty/mimalloc/include/mimalloc-3.6
 
 bin_path=$(shell which $(1) 2> /dev/null)
 
@@ -481,11 +471,6 @@ ifeq ($(USE_SYSTEM_ZLIB),1)
   endif
 endif
 
-# supply some reasonable defaults for mimalloc
-ifeq ($(MIMALLOC_CFLAGS),)
-  MIMALLOC_CFLAGS = -I$(MIMALLOCHDIR)
-endif
-
 # extract version info
 VERSION=$(shell grep "define.*Q3_VERSION.*\"" $(CMDIR)/q_shared.h | \
   sed -e 's/.*".* \([^ ]*\)"/\1/')
@@ -578,10 +563,6 @@ else
 ifeq ($(USE_ZLIB_NG),1)
   BASE_CFLAGS += -DUSE_ZLIB_NG
 endif
-endif
-
-ifeq ($(USE_MIMALLOC),1)
-  BASE_CFLAGS += -DUSE_MIMALLOC
 endif
 
 ifeq ($(USE_VULKAN_API),1)
@@ -766,21 +747,6 @@ ifdef MINGW
     BASE_CFLAGS += -I$(TARGETDIR)/libz-ng/include
     LDFLAGS += -L$(TARGETDIR)/libz-ng/lib
     LDFLAGS += -lz
-  endif
-
-  ifeq ($(USE_MIMALLOC),1)
-    BASE_CFLAGS += $(MIMALLOC_CFLAGS)
-    ifeq ($(ARCH),x86)
-      LDFLAGS += -L$(MIMALLOCDIR)/windows/mingw/lib32
-      LDFLAGS += -lmimalloc
-      CLIENT_EXTRA_FILES += $(MIMALLOCDIR)/windows/mingw/lib32/mimalloc.dll
-      CLIENT_EXTRA_FILES += $(MIMALLOCDIR)/windows/mingw/lib32/mimalloc-redirect32.dll
-    else
-      LDFLAGS += -L$(MIMALLOCDIR)/windows/mingw/lib64
-      LDFLAGS += -lmimalloc
-      CLIENT_EXTRA_FILES += $(MIMALLOCDIR)/windows/mingw/lib64/mimalloc.dll
-      CLIENT_EXTRA_FILES += $(MIMALLOCDIR)/windows/mingw/lib64/mimalloc-redirect.dll
-    endif
   endif
 
   DEBUG_CFLAGS = $(BASE_CFLAGS) -DDEBUG -D_DEBUG -g -O0
