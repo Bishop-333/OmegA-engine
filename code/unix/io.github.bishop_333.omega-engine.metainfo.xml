@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Copyright 2014 Richard Hughes <richard@hughsie.com> -->
 <component type="desktop-application">
-  <id>io.github.bishop_333.omega</id>
+  <id>io.github.bishop_333.omega-engine</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
   <provides>
@@ -12,7 +12,7 @@
     <name>Bishop-333</name>
   </developer>
   <summary>Free and open source first-person shooter</summary>
-  <launchable type="desktop-id">io.github.bishop_333.omega.desktop</launchable>
+  <launchable type="desktop-id">io.github.bishop_333.omega-engine.desktop</launchable>
   <description>
     <p>
       OpenArena OmegA is a modern and polished version of OpenArena,

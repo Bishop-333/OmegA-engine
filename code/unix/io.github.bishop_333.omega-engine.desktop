@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=OmegA
 Comment=First person shooter
-Icon=io.github.bishop_333.omega
+Icon=io.github.bishop_333.omega-engine
 Exec=openarena-omega
 Terminal=false
 Type=Application
