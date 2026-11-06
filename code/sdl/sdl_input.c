@@ -1364,6 +1364,7 @@ void HandleEvents( void )
 				break;
 
 			case SDL_EVENT_MOUSE_WHEEL:
+#if SDL_VERSION_ATLEAST( 3, 2, 12 )
 				if( e.wheel.integer_y > 0 )
 				{
 					Com_QueueEvent( in_eventTime, SE_KEY, K_MWHEELUP, qtrue, 0, NULL );
@@ -1374,6 +1375,18 @@ void HandleEvents( void )
 					Com_QueueEvent( in_eventTime, SE_KEY, K_MWHEELDOWN, qtrue, 0, NULL );
 					Com_QueueEvent( in_eventTime, SE_KEY, K_MWHEELDOWN, qfalse, 0, NULL );
 				}
+#else
+				if( e.wheel.y > 0 )
+				{
+					Com_QueueEvent( in_eventTime, SE_KEY, K_MWHEELUP, qtrue, 0, NULL );
+					Com_QueueEvent( in_eventTime, SE_KEY, K_MWHEELUP, qfalse, 0, NULL );
+				}
+				else if( e.wheel.y < 0 )
+				{
+					Com_QueueEvent( in_eventTime, SE_KEY, K_MWHEELDOWN, qtrue, 0, NULL );
+					Com_QueueEvent( in_eventTime, SE_KEY, K_MWHEELDOWN, qfalse, 0, NULL );
+				}
+#endif
 				break;
 
 #ifdef USE_JOYSTICK
