@@ -190,6 +190,53 @@ static void CL_ParsePacketEntities( msg_t *msg, const clSnapshot_t *oldframe, cl
 
 
 /*
+==================
+CL_CheckRumble
+==================
+*/
+static void CL_CheckRumble( const playerState_t *oldps, const playerState_t *newps ) {
+	int index, event;
+	int damage, addTime;
+
+	if ( clc.demoplaying || oldps->clientNum != clc.clientNum || newps->clientNum != clc.clientNum ) {
+		return;
+	}
+
+	if ( oldps->pm_type != PM_NORMAL || newps->pm_type != PM_NORMAL ) {
+		return;
+	}
+
+	if ( oldps->persistant[PERS_SPAWN_COUNT] != newps->persistant[PERS_SPAWN_COUNT] ) {
+		return;
+	}
+
+	if ( newps->damageEvent != oldps->damageEvent ) {
+		damage = Com_Clamp( 5, 100, newps->damageCount );
+		IN_Rumble( (unsigned short)( 0xFFFF * damage / 100 ), (unsigned short)( 0x8000 * damage / 100 ), 100 + damage * 2 );
+		return;
+	}
+
+	if ( newps->eventSequence == oldps->eventSequence ) {
+		return;
+	}
+
+	index = ( newps->eventSequence - 1 ) & ( MAX_PS_EVENTS - 1 );
+	event = newps->events[index] & ~EV_EVENT_BITS;
+
+	if ( event == EV_FIRE_WEAPON ) {
+		addTime = Com_Clamp( 50, 1000, newps->weaponTime );
+		IN_Rumble( (unsigned short)( 0x4000 + 0xBFFF * addTime / 1000 ), (unsigned short)( 0x4000 + 0x4000 * addTime / 1000 ), 50 + addTime / 5 );
+	} else if ( event == EV_FALL_FAR ) {
+		IN_Rumble( 0x8000, 0x4000, 200 );
+	} else if ( event == EV_FALL_MEDIUM ) {
+		IN_Rumble( 0x4000, 0x4000, 100 );
+	} else if ( event == EV_FALL_SHORT || event == EV_JUMP_PAD || event == EV_JUMP || event == EV_ITEM_PICKUP ) {
+		IN_Rumble( 0x0000, 0x4000, 50 );
+	}
+}
+
+
+/*
 ================
 CL_ParseSnapshot
 
@@ -298,6 +345,10 @@ static void CL_ParseSnapshot( msg_t *msg ) {
 
 	for ( i = 0, n = newSnap.messageNum - oldMessageNum; i < n; i++ ) {
 		cl.snapshots[ ( oldMessageNum + i ) & PACKET_MASK ].valid = qfalse;
+	}
+
+	if ( cl.snap.valid ) {
+		CL_CheckRumble( &cl.snap.ps, &newSnap.ps );
 	}
 
 	// copy to the current good spot

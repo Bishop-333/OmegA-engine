@@ -628,6 +628,7 @@ void	CL_LoadJPG( const char *filename, unsigned char **pic, int *width, int *hei
 
 // base backend functions
 void	HandleEvents( void );
+void	IN_Rumble( unsigned short low, unsigned short high, int msec );
 
 // platform-specific
 void	GLimp_InitGamma(glconfig_t *config);

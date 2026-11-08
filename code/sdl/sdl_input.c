@@ -47,6 +47,8 @@ static cvar_t *in_joystick;
 static cvar_t *in_joystickThreshold;
 static cvar_t *in_joystickNo;
 static cvar_t *in_joystickUseAnalog;
+static cvar_t *in_rumble;
+static cvar_t *in_rumbleForce;
 
 static cvar_t *j_pitch;
 static cvar_t *j_yaw;
@@ -1154,6 +1156,22 @@ static void IN_JoyMove( void )
 	/* Save for future generations. */
 	stick_state.oldaxes = axes;
 }
+
+
+/*
+===============
+IN_Rumble
+===============
+*/
+void IN_Rumble( unsigned short low, unsigned short high, int msec )
+{
+	if ( gamepad && in_rumble->integer )
+	{
+		low  = (unsigned short)( low  * in_rumbleForce->value );
+		high = (unsigned short)( high * in_rumbleForce->value );
+		SDL_RumbleGamepad( gamepad, low, high, msec );
+	}
+}
 #endif  // USE_JOYSTICK
 
 
@@ -1583,6 +1601,11 @@ void IN_Init( void )
 	Cvar_SetDescription( in_joystick, "Whether or not joystick support is on." );
 	in_joystickThreshold = Cvar_Get( "joy_threshold", "0.15", CVAR_ARCHIVE );
 	Cvar_SetDescription( in_joystickThreshold, "Threshold of joystick moving distance." );
+	in_rumble = Cvar_Get( "in_rumble", "1", CVAR_ARCHIVE );
+	Cvar_SetDescription( in_rumble, "Whether or not rumble effect is on." );
+	in_rumbleForce = Cvar_Get( "in_rumbleForce", "0.5", CVAR_ARCHIVE );
+	Cvar_CheckRange( in_rumbleForce, "0", "1", CV_FLOAT );
+	Cvar_SetDescription( in_rumbleForce, "Rumble intensity." );
 
 	j_pitch =        Cvar_Get( "j_pitch",        "0.022", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( j_pitch, "Joystick pitch rotation speed/direction." );
