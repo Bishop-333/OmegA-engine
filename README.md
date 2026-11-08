@@ -28,7 +28,7 @@ Go to [Releases](../../releases) section to download latest binaries for your pl
 * improved server-side DoS protection, much reduced memory usage
 * raised filesystem limits (up to 20,000 maps can be handled in a single directory)
 * reworked Zone memory allocator, no more out-of-memory errors
-* non-intrusive support for SDL3 backend (video, audio, input), selectable at compile time (based on [timangus](https://github.com/timangus)'s work on [ioquake3](https://github.com/ioquake/ioq3))
+* non-intrusive support for SDL3 backend (video, audio, input with gamepad support), selectable at compile time (based on [timangus](https://github.com/timangus)'s work on [ioquake3](https://github.com/ioquake/ioq3))
 * OpenAL sound API support (multiple speaker support and better sound quality)
 * Optional Ogg Vorbis, MP3 and FLAC support
 * libjpeg-turbo support (JPEG image codec that uses SIMD instructions to accelerate baseline JPEG compression and decompression)
