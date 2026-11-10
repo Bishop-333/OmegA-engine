@@ -1165,12 +1165,19 @@ IN_Rumble
 */
 void IN_Rumble( unsigned short low, unsigned short high, int msec )
 {
+	float force;
+
 	if ( gamepad && in_rumble->integer )
 	{
-		low  = (unsigned short)( low  * in_rumbleForce->value );
-		high = (unsigned short)( high * in_rumbleForce->value );
+		force = in_rumbleForce->value * in_rumbleForce->value;
+		low  = (unsigned short)( low  * force );
+		high = (unsigned short)( high * force );
 		SDL_RumbleGamepad( gamepad, low, high, msec );
 	}
+}
+#else
+void IN_Rumble( unsigned short low, unsigned short high, int msec )
+{
 }
 #endif  // USE_JOYSTICK
 
@@ -1603,7 +1610,7 @@ void IN_Init( void )
 	Cvar_SetDescription( in_joystickThreshold, "Threshold of joystick moving distance." );
 	in_rumble = Cvar_Get( "in_rumble", "1", CVAR_ARCHIVE );
 	Cvar_SetDescription( in_rumble, "Whether or not rumble effect is on." );
-	in_rumbleForce = Cvar_Get( "in_rumbleForce", "0.5", CVAR_ARCHIVE );
+	in_rumbleForce = Cvar_Get( "in_rumbleForce", "1.0", CVAR_ARCHIVE );
 	Cvar_CheckRange( in_rumbleForce, "0", "1", CV_FLOAT );
 	Cvar_SetDescription( in_rumbleForce, "Rumble intensity." );
 
