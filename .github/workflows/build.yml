@@ -9,7 +9,7 @@ on:
       - 'docs/*'
   push:
     branches:
-      - master
+      - main
     paths-ignore:
       - '**.md'
       - '*.txt'
@@ -22,10 +22,19 @@ on:
 
 jobs:
   windows:
-    name: Release Windows x86_64
+    name: Release Windows x86_64 ${{ matrix.suffix }}
     runs-on: ubuntu-26.04
     strategy:
       fail-fast: false
+      matrix:
+        include:
+          - quake3: 0
+            archive: omega-engine-windows-x86_64.zip
+            artifact: release-mingw64-x86_64
+          - suffix: '(Quake 3)'
+            quake3: 1
+            archive: q3-omega-engine-windows-x86_64.zip
+            artifact: release-quake3-mingw64-x86_64
 
     steps:
 
@@ -40,16 +49,16 @@ jobs:
 
     - name: Build
       run: |
-        make install -j$(nproc) PLATFORM=mingw64 DESTDIR=bin
+        make install -j$(nproc) PLATFORM=mingw64 QUAKE3=${{ matrix.quake3 }} DESTDIR=bin
 
     - name: Create archive
       run: |
-        7z a -r build/omega-engine-windows-x86_64.zip ./bin/*
+        7z a -r build/${{ matrix.archive }} ./bin/*
 
     - uses: actions/upload-artifact@v7
       with:
-        name: release-mingw64-x86_64
-        path: build/omega-engine-windows-x86_64.zip
+        name: ${{ matrix.artifact }}
+        path: build/${{ matrix.archive }}
         if-no-files-found: error
         retention-days: 5
         
@@ -171,6 +180,7 @@ jobs:
           cp ./release-linux-arm64/omega-engine-linux-arm64.tar.gz .
           cp ./release-debian-amd64/omega-engine_*.deb .
           cp ./release-mingw64-x86_64/omega-engine-windows-x86_64.zip .
+          cp ./release-quake3-mingw64-x86_64/q3-omega-engine-windows-x86_64.zip .
           cp ./release-darwin-universal2/omega-engine-macos-universal2.dmg .
       - name: Create latest build
         uses: czietz/action-automatic-releases@latest
