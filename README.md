@@ -95,4 +95,4 @@ Performance is usually greater or equal to other opengl1 renderers
 ## Donate
 
 I develop in my free time. If you enjoy my engine or my mod please consider supporting me with a donation!
-* paypal.me/fatsakura
+* https://paypal.me/fatsakura
