@@ -202,17 +202,23 @@ static void CL_CheckRumble( const playerState_t *oldps, const playerState_t *new
 		return;
 	}
 
-	if ( oldps->pm_type != PM_NORMAL || newps->pm_type != PM_NORMAL ) {
+	if ( oldps->persistant[PERS_SPAWN_COUNT] != newps->persistant[PERS_SPAWN_COUNT] ) {
 		return;
 	}
 
-	if ( oldps->persistant[PERS_SPAWN_COUNT] != newps->persistant[PERS_SPAWN_COUNT] ) {
+	if ( oldps->pm_type != PM_NORMAL ) {
 		return;
 	}
 
 	if ( newps->damageEvent != oldps->damageEvent ) {
 		damage = Com_Clamp( 5, 100, newps->damageCount );
 		IN_Rumble( (unsigned short)( 0xFFFF * damage / 100 ), (unsigned short)( 0x8000 * damage / 100 ), 100 + damage * 2 );
+	}
+
+	if ( newps->pm_type != PM_NORMAL ) {
+		if ( newps->pm_type == PM_DEAD ) {
+			IN_Rumble( 0xFFFF, 0xFFFF, 400 );
+		}
 		return;
 	}
 
@@ -220,18 +226,19 @@ static void CL_CheckRumble( const playerState_t *oldps, const playerState_t *new
 		return;
 	}
 
-	index = ( newps->eventSequence - 1 ) & ( MAX_PS_EVENTS - 1 );
-	event = newps->events[index] & ~EV_EVENT_BITS;
+	for ( index = oldps->eventSequence; index < newps->eventSequence; index++ ) {
+		event = newps->events[ index & ( MAX_PS_EVENTS - 1 ) ] & ~EV_EVENT_BITS;
 
-	if ( event == EV_FIRE_WEAPON ) {
-		addTime = Com_Clamp( 50, 1000, newps->weaponTime );
-		IN_Rumble( (unsigned short)( 0x4000 + 0xBFFF * addTime / 1000 ), (unsigned short)( 0x4000 + 0x4000 * addTime / 1000 ), 50 + addTime / 5 );
-	} else if ( event == EV_FALL_FAR ) {
-		IN_Rumble( 0x8000, 0x4000, 200 );
-	} else if ( event == EV_FALL_MEDIUM ) {
-		IN_Rumble( 0x4000, 0x4000, 100 );
-	} else if ( event == EV_FALL_SHORT || event == EV_JUMP_PAD || event == EV_JUMP || event == EV_ITEM_PICKUP ) {
-		IN_Rumble( 0x0000, 0x4000, 50 );
+		if ( event == EV_FIRE_WEAPON ) {
+			addTime = Com_Clamp( 50, 1000, newps->weaponTime );
+			IN_Rumble( (unsigned short)( 0x4000 + 0xBFFF * addTime / 1000 ), (unsigned short)( 0x4000 + 0x4000 * addTime / 1000 ), 50 + addTime / 5 );
+		} else if ( event == EV_FALL_FAR ) {
+			IN_Rumble( 0xC000, 0x4000, 200 );
+		} else if ( event == EV_FALL_MEDIUM || ( event >= EV_USE_ITEM0 && event <= EV_USE_ITEM15 ) ) {
+			IN_Rumble( 0x4000, 0x4000, 100 );
+		} else if ( event == EV_FALL_SHORT || event == EV_JUMP_PAD || event == EV_JUMP || event == EV_ITEM_PICKUP ) {
+			IN_Rumble( 0x0000, 0x4000, 50 );
+		}
 	}
 }
 
