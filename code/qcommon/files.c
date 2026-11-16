@@ -4835,9 +4835,6 @@ static void FS_Startup( void ) {
 		// handle multiple basegames:
 		for ( i = 0; i < basegame_cnt; i++ ) {
 			FS_AddGameDirectory( fs_apppath->string, basegames[i] );
-#ifdef DEFAULT_GAME
-			FS_AddGameDirectory( fs_apppath->string, DEFAULT_GAME );
-#endif
 		}
 	}
 #endif
@@ -4860,6 +4857,11 @@ static void FS_Startup( void ) {
 			FS_AddGameDirectory( fs_basepath->string, fs_addons->string );
 			FS_AddGameDirectory( fs_basepath->string, fs_gamedirvar->string );
 		}
+#ifdef __APPLE__
+		if ( fs_apppath->string[0] != '\0' ) {
+			FS_AddGameDirectory( fs_apppath->string, fs_gamedirvar->string );
+		}
+#endif
 		if ( fs_homepath->string[0] != '\0' && Q_stricmp( fs_homepath->string, fs_basepath->string ) ) {
 			FS_AddGameDirectory( fs_homepath->string, fs_addons->string );
 			FS_AddGameDirectory( fs_homepath->string, fs_gamedirvar->string );
