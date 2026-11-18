@@ -11,7 +11,8 @@
   <developer id="io.github.bishop_333">
     <name>Bishop-333</name>
   </developer>
-  <summary>Free and open source first-person shooter</summary>
+  <summary>Fast-paced arena shooter</summary>
+  <summary xml:lang="fr">Jeu de tir rapide en arène</summary>
   <launchable type="desktop-id">io.github.bishop_333.omega-engine.desktop</launchable>
   <description>
     <p>
@@ -22,12 +23,27 @@
       for different situations.
       Guns include a chaingun, rocket launcher, shotgun, and railgun.
     </p>
+    <p xml:lang="fr">
+      OpenArena OmegA est une version modernisée et peaufinée d'OpenArena,
+      un jeu de tir à la première personne libre et open source largement inspiré
+      du deathmatch à la Quake III Arena.
+      Enchaînez les frags pour remporter la victoire grâce à un arsenal équilibré
+      d'armes conçues pour chaque situation.
+      L'arsenal inclut une sulfateuse, un lance-roquettes, un fusil à pompe et un canon à rail.
+    </p>
     <p>
       OpenArena OmegA's style of play is very fast and requires skill to be played
       successfully online.
       Gameplay modes include Deathmatch, Team Deathmatch, Tournament, Capture
-      the Flag, Elimination, CTF Elimination, Last Man Standing and Double
-      Domination.
+      the Flag, Elimination, CTF Elimination, Last Man Standing, Double
+      Domination and Possession.
+    </p>
+    <p xml:lang="fr">
+      Le style de jeu d'OpenArena OmegA est particulièrement nerveux et exige de la dextérité
+      pour s'imposer en ligne.
+      Les modes de jeu incluent Match à mort, Match à mort par équipe, Tournoi, Capture
+      de drapeau, Élimination, Élimination CTF, Dernier survivant, Double
+      Domination et Possession.
     </p>
   </description>
   <url type="homepage">https://www.moddb.com/mods/openarena-omega/</url>
@@ -48,6 +64,14 @@
     <content_attribute id="violence-bloodshed">mild</content_attribute>
     <content_attribute id="social-chat">intense</content_attribute>
   </content_rating>
+  <requires>
+    <control>keyboard</control>
+    <control>pointing</control>
+    <display_length compare="ge">768</display_length>
+  </requires>
+  <supports>
+    <control>gamepad</control>
+  </supports>
   <releases>
     <release version="3.4.2" date="2026-11-06"/>
   </releases>
