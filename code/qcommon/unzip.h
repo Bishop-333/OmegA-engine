@@ -23,9 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifdef USE_SYSTEM_ZLIB
 #include <zlib.h>
 #else
-#ifdef USE_ZLIB_NG
 #include "zlib.h"
-#endif
 #endif
 
 #if defined(STRICTUNZIP) || defined(STRICTZIPUNZIP)
@@ -89,29 +87,6 @@ typedef void* (*alloc_func) (void* opaque, unsigned int items, unsigned int size
 typedef void   (*free_func) (void* opaque, void* address);
 
 struct internal_state;
-
-#if !defined(USE_ZLIB_NG) && !defined(USE_SYSTEM_ZLIB)
-typedef struct z_stream_s {
-    unsigned char    *next_in;  /* next input unsigned char */
-    unsigned int     avail_in;  /* number of unsigned chars available at next_in */
-    unsigned long    total_in;  /* total nb of input unsigned chars read so */
-
-    unsigned char    *next_out; /* next output unsigned char should be put there */
-    unsigned int     avail_out; /* remaining free space at next_out */
-    unsigned long    total_out; /* total nb of unsigned chars output so */
-
-    char     *msg;      /* last error message, NULL if no error */
-    struct internal_state *state; /* not visible by applications */
-
-    alloc_func zalloc;  /* used to allocate the internal state */
-    free_func  zfree;   /* used to free the internal state */
-    unsigned char*     opaque;  /* private data object passed to zalloc and zfree */
-
-    int     data_type;  /* best guess about the data type: ascii or binary */
-    unsigned long   adler;      /* adler32 value of the uncompressed data */
-    unsigned long   reserved;   /* reserved for future use */
-} z_stream;
-#endif
 
 typedef z_stream *z_streamp;
 

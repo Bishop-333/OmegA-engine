@@ -207,6 +207,10 @@ ifndef USE_JPEG_TURBO
 USE_JPEG_TURBO=1
 endif
 
+ifeq ($(USE_JPEG_TURBO),0)
+USE_SYSTEM_JPEG=1
+endif
+
 ifndef USE_CURL
 USE_CURL=1
 endif
@@ -310,7 +314,6 @@ CMDIR=$(MOUNT_DIR)/qcommon
 UDIR=$(MOUNT_DIR)/unix
 W32DIR=$(MOUNT_DIR)/win32
 BLIBDIR=$(MOUNT_DIR)/botlib
-JPDIR=$(MOUNT_DIR)/thirdparty/libjpeg
 JPTURBODIR=$(MOUNT_DIR)/thirdparty/libjpeg-turbo
 CURLDIR=$(MOUNT_DIR)/thirdparty/libcurl
 OGGDIR=$(MOUNT_DIR)/thirdparty/libogg
@@ -406,32 +409,20 @@ else
   MAD_CFLAGS = -I$(MADDIR)/include
   ifeq ($(ARCH),x86)
     MAD_CFLAGS += -DFPM_INTEL
-  else
-  ifeq ($(ARCH),x86_64)
+  else ifeq ($(ARCH),x86_64)
     MAD_CFLAGS += -DFPM_64BIT
-  else
-  ifeq ($(ARCH),arm64)
+  else ifeq ($(ARCH),arm64)
     MAD_CFLAGS += -DFPM_64BIT
-  else
-  ifeq ($(ARCH),ppc)
+  else ifeq ($(ARCH),ppc)
     MAD_CFLAGS += -DFPM_PPC
-  else
-  ifeq ($(ARCH),arm)
+  else ifeq ($(ARCH),arm)
     MAD_CFLAGS += -DFPM_ARM
-  else
-  ifeq ($(ARCH),mips)
+  else ifeq ($(ARCH),mips)
     MAD_CFLAGS += -DFPM_MIPS
-  else
-  ifeq ($(ARCH),sparc)
+  else ifeq ($(ARCH),sparc)
     MAD_CFLAGS += -DFPM_SPARC
   else
     MAD_CFLAGS += -DFPM_DEFAULT
-  endif
-  endif
-  endif
-  endif
-  endif
-  endif
   endif
 endif
 
@@ -447,14 +438,10 @@ else
   FLAC_CFLAGS += -DHAVE_FSEEKO -DHAVE_LROUND -DHAVE_STDINT_H -DHAVE_INTTYPES_H -DFLAC__NO_DLL -DFLAC__HAS_OGG=0
   ifeq ($(ARCH),x86)
     FLAC_CFLAGS += -DFLAC__CPU_IA32
-  else
-  ifeq ($(ARCH),x86_64)
+  else ifeq ($(ARCH),x86_64)
     FLAC_CFLAGS += -DFLAC__CPU_X86_64
-  else
-  ifeq ($(ARCH),arm64)
+  else ifeq ($(ARCH),arm64)
     FLAC_CFLAGS += -DFLAC__CPU_ARM64
-  endif
-  endif
   endif
 endif
 
@@ -482,12 +469,10 @@ VERSION=$(shell grep "define.*Q3_VERSION.*\"" $(CMDIR)/q_shared.h | \
 # common qvm definition
 ifeq ($(ARCH),x86_64)
   HAVE_VM_COMPILED = true
-else
-ifeq ($(ARCH),x86)
+else ifeq ($(ARCH),x86)
   HAVE_VM_COMPILED = true
 else
   HAVE_VM_COMPILED = false
-endif
 endif
 
 ifeq ($(ARCH),arm)
@@ -525,10 +510,8 @@ endif
 
 ifeq ($(USE_SYSTEM_JPEG),1)
   BASE_CFLAGS += -DUSE_SYSTEM_JPEG
-else
-ifeq ($(USE_JPEG_TURBO),1)
+else ifeq ($(USE_JPEG_TURBO),1)
   BASE_CFLAGS += -DUSE_JPEG_TURBO
-endif
 endif
 
 ifeq ($(USE_CURL),1)
@@ -563,10 +546,8 @@ endif
 
 ifeq ($(USE_SYSTEM_ZLIB),1)
   BASE_CFLAGS += -DUSE_SYSTEM_ZLIB
-else
-ifeq ($(USE_ZLIB_NG),1)
+else ifeq ($(USE_ZLIB_NG),1)
   BASE_CFLAGS += -DUSE_ZLIB_NG
-endif
 endif
 
 ifeq ($(USE_VULKAN_API),1)
@@ -701,12 +682,12 @@ ifdef MINGW
     endif
   endif
 
-  ifeq ($(USE_JPEG_TURBO),1)
+  ifeq ($(USE_SYSTEM_JPEG),1)
+    CLIENT_LDFLAGS += -ljpeg
+  else ifeq ($(USE_JPEG_TURBO),1)
     BASE_CFLAGS += -I$(TARGETDIR)/libjpeg-turbo/include
     CLIENT_LDFLAGS += -L$(TARGETDIR)/libjpeg-turbo/lib
     CLIENT_LDFLAGS += -ljpeg
-  else
-    BASE_CFLAGS += -I$(JPDIR)
   endif
 
   ifeq ($(USE_CURL),1)
@@ -814,26 +795,20 @@ ifeq ($(COMPILE_PLATFORM),darwin)
     BASE_CFLAGS += -I$(SDLHDIR)
     CLIENT_LDFLAGS += $(LIBSDIR)/macosx/libSDL3.0.dylib
     CLIENT_EXTRA_FILES += $(LIBSDIR)/macosx/libSDL3.0.dylib
-  else
-  ifneq ($(SDL_INCLUDE),)
+  else ifneq ($(SDL_INCLUDE),)
     BASE_CFLAGS += $(SDL_INCLUDE)
     CLIENT_LDFLAGS = $(SDL_LIBS)
   else
     BASE_CFLAGS += -I/Library/Frameworks/SDL3.framework/Headers
     CLIENT_LDFLAGS += -F/Library/Frameworks -framework SDL3
   endif
-  endif
 
   ifeq ($(USE_SYSTEM_JPEG),1)
     CLIENT_LDFLAGS += -ljpeg
-  else
-  ifeq ($(USE_JPEG_TURBO),1)
+  else ifeq ($(USE_JPEG_TURBO),1)
     BASE_CFLAGS += -I$(TARGETDIR)/libjpeg-turbo/include
     CLIENT_LDFLAGS += -L$(TARGETDIR)/libjpeg-turbo/lib
     CLIENT_LDFLAGS += -ljpeg
-  else
-    BASE_CFLAGS += -I$(JPDIR)
-  endif
   endif
 
   ifeq ($(USE_OGG_VORBIS),1)
@@ -856,11 +831,9 @@ ifeq ($(COMPILE_PLATFORM),darwin)
     ifeq ($(USE_OPENAL_DLOPEN),1)
       CLIENT_LDFLAGS += $(OPENALDIR)/macosx/libopenal.dylib
       CLIENT_EXTRA_FILES += $(OPENALDIR)/macosx/libopenal.dylib
-    else 
-    ifeq ($(USE_SYSTEM_OPENAL),1)
+    else ifeq ($(USE_SYSTEM_OPENAL),1)
       BASE_CFLAGS += -I/System/Library/Frameworks/OpenAL.framework/Headers
       CLIENT_LDFLAGS += -F/Library/Frameworks -framework OpenAL
-    endif
     endif
   endif
 
@@ -902,10 +875,8 @@ else
   ifeq ($(ARCH),x86_64)
     ARCHEXT = -x64
     OPTIMIZE += -march=x86-64-v2
-  else
-  ifeq ($(ARCH),x86)
+  else ifeq ($(ARCH),x86)
     OPTIMIZE += -march=i586 -mtune=i686
-  endif
   endif
 
   ifeq ($(ARCH),arm)
@@ -950,14 +921,10 @@ else
 
   ifeq ($(USE_SYSTEM_JPEG),1)
     CLIENT_LDFLAGS += -ljpeg
-  else
-  ifeq ($(USE_JPEG_TURBO),1)
+  else ifeq ($(USE_JPEG_TURBO),1)
     BASE_CFLAGS += -I$(TARGETDIR)/libjpeg-turbo/include
     CLIENT_LDFLAGS += -L$(TARGETDIR)/libjpeg-turbo/lib
     CLIENT_LDFLAGS += -ljpeg
-  else
-    BASE_CFLAGS += -I$(JPDIR)
-  endif
   endif
 
   ifeq ($(USE_CURL),1)
@@ -1231,7 +1198,6 @@ makedirs:
 	@if [ ! -d $(BUILD_DIR) ];then $(MKDIR) $(BUILD_DIR);fi
 	@if [ ! -d $(B) ];then $(MKDIR) $(B);fi
 	@if [ ! -d $(B)/client ];then $(MKDIR) $(B)/client/qvm;fi
-	@if [ ! -d $(B)/client/jpeg ];then $(MKDIR) $(B)/client/jpeg;fi
 ifeq ($(USE_SYSTEM_OGG),0)
 	@if [ ! -d $(B)/client/ogg ];then $(MKDIR) $(B)/client/ogg;fi
 endif
@@ -1368,54 +1334,6 @@ ifneq ($(USE_RENDERER_DLOPEN), 0)
     $(B)/rendv/q_shared.o \
     $(B)/rendv/q_math.o
 endif
-
-JPGOBJ = \
-  $(B)/client/jpeg/jaricom.o \
-  $(B)/client/jpeg/jcapimin.o \
-  $(B)/client/jpeg/jcapistd.o \
-  $(B)/client/jpeg/jcarith.o \
-  $(B)/client/jpeg/jccoefct.o  \
-  $(B)/client/jpeg/jccolor.o \
-  $(B)/client/jpeg/jcdctmgr.o \
-  $(B)/client/jpeg/jchuff.o   \
-  $(B)/client/jpeg/jcinit.o \
-  $(B)/client/jpeg/jcmainct.o \
-  $(B)/client/jpeg/jcmarker.o \
-  $(B)/client/jpeg/jcmaster.o \
-  $(B)/client/jpeg/jcomapi.o \
-  $(B)/client/jpeg/jcparam.o \
-  $(B)/client/jpeg/jcprepct.o \
-  $(B)/client/jpeg/jcsample.o \
-  $(B)/client/jpeg/jctrans.o \
-  $(B)/client/jpeg/jdapimin.o \
-  $(B)/client/jpeg/jdapistd.o \
-  $(B)/client/jpeg/jdarith.o \
-  $(B)/client/jpeg/jdatadst.o \
-  $(B)/client/jpeg/jdatasrc.o \
-  $(B)/client/jpeg/jdcoefct.o \
-  $(B)/client/jpeg/jdcolor.o \
-  $(B)/client/jpeg/jddctmgr.o \
-  $(B)/client/jpeg/jdhuff.o \
-  $(B)/client/jpeg/jdinput.o \
-  $(B)/client/jpeg/jdmainct.o \
-  $(B)/client/jpeg/jdmarker.o \
-  $(B)/client/jpeg/jdmaster.o \
-  $(B)/client/jpeg/jdmerge.o \
-  $(B)/client/jpeg/jdpostct.o \
-  $(B)/client/jpeg/jdsample.o \
-  $(B)/client/jpeg/jdtrans.o \
-  $(B)/client/jpeg/jerror.o \
-  $(B)/client/jpeg/jfdctflt.o \
-  $(B)/client/jpeg/jfdctfst.o \
-  $(B)/client/jpeg/jfdctint.o \
-  $(B)/client/jpeg/jidctflt.o \
-  $(B)/client/jpeg/jidctfst.o \
-  $(B)/client/jpeg/jidctint.o \
-  $(B)/client/jpeg/jmemmgr.o \
-  $(B)/client/jpeg/jmemnobs.o \
-  $(B)/client/jpeg/jquant1.o \
-  $(B)/client/jpeg/jquant2.o \
-  $(B)/client/jpeg/jutils.o
 
 ifeq ($(USE_OGG_VORBIS),1)
 ifeq ($(USE_SYSTEM_OGG),0)
@@ -1574,12 +1492,6 @@ Q3OBJ = \
   $(B)/client/l_precomp.o \
   $(B)/client/l_script.o \
   $(B)/client/l_struct.o
-
-ifneq ($(USE_JPEG_TURBO),1)
-  ifneq ($(USE_SYSTEM_JPEG),1)
-    Q3OBJ += $(JPGOBJ)
-  endif
-endif
 
 ifeq ($(USE_OGG_VORBIS),1)
   Q3OBJ += $(OGGOBJ) $(VORBISOBJ) \
@@ -1866,9 +1778,6 @@ $(B)/client/qvm/%.o: $(CMDIR)/%.c
 
 $(B)/client/%.o: $(BLIBDIR)/%.c
 	$(DO_BOT_CC)
-
-$(B)/client/jpeg/%.o: $(JPDIR)/%.c
-	$(DO_CC)
 
 $(B)/client/ogg/%.o: $(OGGDIR)/src/%.c
 	$(DO_CC)
