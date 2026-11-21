@@ -240,7 +240,7 @@ void VM_CheckBounds( const vm_t *vm, unsigned int address, unsigned int length )
 	{
 		if ( (address | length) > vm->dataMask || (address + length) > vm->dataMask )
 		{
-			//Com_Error( ERR_DROP, "program tried to bypass data segment bounds" );
+			Com_Error( ERR_DROP, "program tried to bypass data segment bounds" );
 		}
 	}
 }
