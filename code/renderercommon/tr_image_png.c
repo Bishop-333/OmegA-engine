@@ -21,7 +21,11 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #include "../qcommon/q_shared.h"
 #include "../renderercommon/tr_public.h"
-#include "../qcommon/puff.h"
+#ifdef USE_SYSTEM_ZLIB
+#include <zlib.h>
+#else
+#include "zlib.h"
+#endif
 
 // we could limit the png size to a lower value here
 #ifndef INT_MAX
@@ -506,7 +510,7 @@ static qboolean FindChunk(struct BufferedFile *BF, uint32_t ChunkType)
  *  Decompress all IDATs
  */
 
-static uint32_t DecompressIDATs(struct BufferedFile *BF, uint8_t **Buffer)
+static uint32_t DecompressIDATs(struct BufferedFile *BF, uint8_t **Buffer, uLongf DestLen)
 {
 	uint8_t  *DecompressedData;
 	uint32_t  DecompressedDataLength;
@@ -522,11 +526,7 @@ static uint32_t DecompressIDATs(struct BufferedFile *BF, uint8_t **Buffer)
 
 	int BytesToRewind;
 
-	int32_t   puffResult;
-	uint8_t  *puffDest;
-	uint32_t  puffDestLen;
-	uint8_t  *puffSrc;
-	uint32_t  puffSrcLen;
+	int32_t   zlibResult;
 
 	/*
 	 *  input verification
@@ -699,36 +699,10 @@ static uint32_t DecompressIDATs(struct BufferedFile *BF, uint8_t **Buffer)
 	}
 
 	/*
-	 *  Let puff() calculate the decompressed data length.
-	 */
-
-	puffDest    = NULL;
-	puffDestLen = 0;
-
-	/*
-	 *  The zlib header and checkvalue don't belong to the compressed data.
-	 */
-
-	puffSrc    = CompressedData + PNG_ZlibHeader_Size;
-	puffSrcLen = CompressedDataLength - PNG_ZlibHeader_Size - PNG_ZlibCheckValue_Size;
-
-	/*
-	 *  first puff() to calculate the size of the uncompressed data
-	 */
-
-	puffResult = puff(puffDest, &puffDestLen, puffSrc, &puffSrcLen);
-	if(!((puffResult == 0) && (puffDestLen > 0)))
-	{
-		ri.Free(CompressedData);
-
-		return((unsigned)-1);
-	}
-
-	/*
 	 *  Allocate the buffer for the uncompressed data.
 	 */
 
-	DecompressedData = ri.Malloc(puffDestLen);
+	DecompressedData = ri.Malloc(DestLen);
 	if(!DecompressedData)
 	{
 		ri.Free(CompressedData);
@@ -737,18 +711,10 @@ static uint32_t DecompressIDATs(struct BufferedFile *BF, uint8_t **Buffer)
 	}
 
 	/*
-	 *  Set the input again in case something was changed by the last puff() .
+	 *  decompression
 	 */
 
-	puffDest   = DecompressedData;
-	puffSrc    = CompressedData + PNG_ZlibHeader_Size;
-	puffSrcLen = CompressedDataLength - PNG_ZlibHeader_Size - PNG_ZlibCheckValue_Size;
-
-	/*
-	 *  decompression puff()
-	 */
-
-	puffResult = puff(puffDest, &puffDestLen, puffSrc, &puffSrcLen);
+	zlibResult = uncompress(DecompressedData, &DestLen, CompressedData, CompressedDataLength);
 
 	/*
 	 *  The compressed data is not needed anymore.
@@ -757,10 +723,10 @@ static uint32_t DecompressIDATs(struct BufferedFile *BF, uint8_t **Buffer)
 	ri.Free(CompressedData);
 
 	/*
-	 *  Check if the last puff() was successful.
+	 *  Check if uncompress() was successful.
 	 */
 
-	if(!((puffResult == 0) && (puffDestLen > 0)))
+	if(!((zlibResult == Z_OK) && (DestLen > 0)))
 	{
 		ri.Free(DecompressedData);
 
@@ -771,7 +737,7 @@ static uint32_t DecompressIDATs(struct BufferedFile *BF, uint8_t **Buffer)
 	 *  Set the output of this function.
 	 */
 
-	DecompressedDataLength = puffDestLen;
+	DecompressedDataLength = DestLen;
 	*Buffer = DecompressedData;
 
 	return(DecompressedDataLength);
@@ -2389,7 +2355,7 @@ void R_LoadPNG(const char *name, byte **pic, int *width, int *height)
 	 *  Decompress all IDAT chunks
 	 */
 
-	DecompressedDataLength = DecompressIDATs(ThePNG, &DecompressedData);
+	DecompressedDataLength = DecompressIDATs(ThePNG, &DecompressedData, (IHDR_Width * 8 + 7) * IHDR_Height);
 	if ( DecompressedDataLength == (unsigned)-1 )
 		DecompressedDataLength = 0;
 

@@ -263,6 +263,10 @@ ifndef USE_ZLIB_NG
   USE_ZLIB_NG=1
 endif
 
+ifeq ($(USE_ZLIB_NG),0)
+  USE_SYSTEM_ZLIB=1
+endif
+
 ifndef USE_SYSTEM_ZLIB
   USE_SYSTEM_ZLIB=1
 endif
@@ -1322,7 +1326,6 @@ Q3REND1OBJ = \
 ifneq ($(USE_RENDERER_DLOPEN), 0)
   Q3REND1OBJ += \
     $(B)/rend1/q_shared.o \
-    $(B)/rend1/puff.o \
     $(B)/rend1/q_math.o
 endif
 
@@ -1363,7 +1366,6 @@ Q3RENDVOBJ = \
 ifneq ($(USE_RENDERER_DLOPEN), 0)
   Q3RENDVOBJ += \
     $(B)/rendv/q_shared.o \
-    $(B)/rendv/puff.o \
     $(B)/rendv/q_math.o
 endif
 
@@ -1543,7 +1545,6 @@ Q3OBJ = \
   $(B)/client/q_shared.o \
   \
   $(B)/client/unzip.o \
-  $(B)/client/puff.o \
   \
   $(B)/client/be_aas_bspq3.o \
   $(B)/client/be_aas_cluster.o \
