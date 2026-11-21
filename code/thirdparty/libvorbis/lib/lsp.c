@@ -283,7 +283,6 @@ void vorbis_lsp_to_curve(float *curve,int *map,int n,int ln,float *lsp,int m,
 #endif
 #endif
 
-#if 0
 static void cheby(float *g, int ord) {
   int i, j;
 
@@ -453,4 +452,3 @@ int vorbis_lpc_to_lsp(float *lpc,float *lsp,int m){
     lsp[i*2+1] = acos(g2r[i]);
   return(0);
 }
-#endif
