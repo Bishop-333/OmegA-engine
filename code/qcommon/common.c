@@ -4731,8 +4731,22 @@ void Field_Clear( field_t *edit ) {
 static const char *completionString;
 static char shortestMatch[MAX_TOKEN_CHARS];
 static int	matchCount;
+static qboolean matchSubstring;
 // field we are working on, passed to Field_AutoComplete(&g_consoleCommand for instance)
 static field_t *completionField;
+
+/*
+===============
+MatchString
+===============
+*/
+static qboolean MatchString( const char *s, const char *find ) {
+	if ( matchSubstring ) {
+		return Q_stristr( s, find ) != NULL;
+	}
+	return !Q_stricmpn( s, find, strlen( find ) );
+}
+
 
 /*
 ===============
@@ -4742,12 +4756,19 @@ FindMatches
 static void FindMatches( const char *s ) {
 	int		i, n;
 
-	if ( Q_stricmpn( s, completionString, strlen( completionString ) ) ) {
+	if ( !MatchString( s, completionString ) ) {
 		return;
 	}
 	matchCount++;
 	if ( matchCount == 1 ) {
 		Q_strncpyz( shortestMatch, s, sizeof( shortestMatch ) );
+		return;
+	}
+
+	if ( matchSubstring ) {
+		if ( matchCount == 2 ) {
+			Q_strncpyz( shortestMatch, completionString, sizeof( shortestMatch ) );
+		}
 		return;
 	}
 
@@ -4772,7 +4793,7 @@ PrintMatches
 ===============
 */
 static void PrintMatches( const char *s ) {
-	if ( !Q_stricmpn( s, shortestMatch, strlen( shortestMatch ) ) ) {
+	if ( MatchString( s, shortestMatch ) ) {
 		Com_Printf( "    %s\n", s );
 	}
 }
@@ -4786,7 +4807,7 @@ PrintCvarMatches
 static void PrintCvarMatches( const char *s ) {
 	char value[ TRUNCATE_LENGTH ];
 
-	if ( !Q_stricmpn( s, shortestMatch, strlen( shortestMatch ) ) ) {
+	if ( MatchString( s, shortestMatch ) ) {
 		Com_TruncateLongString( value, Cvar_VariableString( s ) );
 		Com_Printf( "    %s = \"%s\"\n", s, value );
 	}
@@ -5071,6 +5092,16 @@ void Field_CompleteCommand( const char *cmd, qboolean doCommands, qboolean doCva
 		if ( doCvars )
 			Cvar_CommandCompletion( FindMatches );
 
+		if ( matchCount == 0 )
+		{
+			matchSubstring = qtrue;
+			if ( doCommands )
+				Cmd_CommandCompletion( FindMatches );
+
+			if ( doCvars )
+				Cvar_CommandCompletion( FindMatches );
+		}
+
 		if ( !Field_Complete() )
 		{
 			// run through again, printing matches
@@ -5080,6 +5111,8 @@ void Field_CompleteCommand( const char *cmd, qboolean doCommands, qboolean doCva
 			if ( doCvars )
 				Cvar_CommandCompletion( PrintCvarMatches );
 		}
+
+		matchSubstring = qfalse;
 	}
 }
 
