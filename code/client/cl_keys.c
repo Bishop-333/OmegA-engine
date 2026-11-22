@@ -415,6 +415,12 @@ static void Console_Key( int key ) {
 		return;
 	}
 
+	// ctrl-C copies current input line to clipboard
+	if ( key == 'c' && keys[controlKey].down ) {
+		Sys_SetClipboardData( g_consoleField.buffer );
+		return;
+	}
+
 	// enter finishes the line
 	if ( key == K_ENTER || key == K_KP_ENTER ) {
 		Con_AcceptLine();

@@ -1316,6 +1316,7 @@ char	*Sys_ConsoleInput( void );
 
 void	NORETURN FORMAT_PRINTF(1, 2) QDECL Sys_Error( const char *error, ... );
 void	NORETURN Sys_Quit( void );
+void	Sys_SetClipboardData( const char *text );
 char	*Sys_GetClipboardData( void );	// note that this isn't journaled...
 void	Sys_SetClipboardBitmap( const byte *bitmap, int length );
 

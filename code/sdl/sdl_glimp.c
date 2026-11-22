@@ -1038,6 +1038,21 @@ void GLW_HideFullscreenWindow( void ) {
 
 /*
 ===============
+Sys_SetClipboardData
+===============
+*/
+void Sys_SetClipboardData( const char *text )
+{
+#ifndef DEDICATED
+	if ( text && text[0] ) {
+		SDL_SetClipboardText( text );
+	}
+#endif
+}
+
+
+/*
+===============
 Sys_GetClipboardData
 ===============
 */
