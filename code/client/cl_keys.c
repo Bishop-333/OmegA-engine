@@ -421,6 +421,13 @@ static void Console_Key( int key ) {
 		return;
 	}
 
+	// ctrl-X cuts current input line to clipboard
+	if ( key == 'x' && keys[controlKey].down ) {
+		Sys_SetClipboardData( g_consoleField.buffer );
+		Field_Clear( &g_consoleField );
+		return;
+	}
+
 	// enter finishes the line
 	if ( key == K_ENTER || key == K_KP_ENTER ) {
 		Con_AcceptLine();
