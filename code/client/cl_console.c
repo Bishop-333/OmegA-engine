@@ -65,6 +65,9 @@ typedef struct {
 
 	int		times[NUM_CON_TIMES];	// cls.realtime time the line was generated
 								// for transparent notify lines
+	int		lasttime;		// the time of the last notification
+							// for console tab notify blink
+
 	vec4_t	color;
 
 	int		viswidth;
@@ -73,7 +76,6 @@ typedef struct {
 	qboolean newline;
 
 	char		*name;
-	qboolean	notify;
 	qboolean	active;
 } console_t;
 
@@ -374,10 +376,13 @@ Con_ClearNotify
 ================
 */
 void Con_ClearNotify( void ) {
-	int		i;
-	
-	for ( i = 0 ; i < NUM_CON_TIMES ; i++ ) {
-		activeCon->times[i] = 0;
+	int		i, j;
+
+	for ( i = 0 ; i < MAX_CONSOLES ; i++ ) {
+		for ( j = 0 ; j < NUM_CON_TIMES ; j++ ) {
+			con[i].times[j] = 0;
+		}
+		con[i].lasttime = 0;
 	}
 }
 
@@ -511,7 +516,6 @@ void Con_PrevTab( void ){
 	}
 
 	activeCon = &con[activeConsoleNum];
-	activeCon->notify = qfalse;
 }
 
 
@@ -536,7 +540,6 @@ void Con_NextTab( void ) {
 	}
 
 	activeCon = &con[activeConsoleNum];
-	activeCon->notify = qfalse;
 }
 
 
@@ -552,7 +555,6 @@ void Con_SwitchToTab( int i ) {
 
 	activeConsoleNum = i;
 	activeCon = &con[activeConsoleNum];
-	activeCon->notify = qfalse;
 }
 
 
@@ -692,8 +694,10 @@ static void Con_Linefeed( console_t *con, qboolean skipnotify )
 	if ( con->current >= 0 )	{
 		if ( skipnotify )
 			con->times[ con->current % NUM_CON_TIMES ] = 0;
-		else
+		else {
 			con->times[ con->current % NUM_CON_TIMES ] = cls.realtime;
+			con->lasttime = cls.realtime;
+		}
 	}
 
 	if ( con->newline ) {
@@ -853,7 +857,6 @@ void CL_ConsolePrint( const char *txt ) {
 				con[i].active = qfalse;
 				con[i].name = NULL;
 			}
-			con[i].notify = qfalse;
 		}
 	}
 
@@ -876,10 +879,6 @@ void CL_ConsolePrint( const char *txt ) {
 	}
 
 	lastSrvCmdNum = serverCommandNumber;
-
-	if ( j >= CON_CHAT && con != &con[j] && activeCon != &con[j] ) {
-		con[j].notify = qtrue;
-	}
 
 	char buf[ CON_TEXTSIZE ];
 	int out = 0;
@@ -1422,11 +1421,20 @@ static void Con_DrawSolidConsole( float frac ) {
 			if ( activeCon == &con[j] ) {
 				SCR_DrawSmallStringExt( margin + 10, lines - smallchar_height, con[j].name, g_color_table[conColors[j]], qfalse, qtrue );
 			} else {
-				if ( con[j].notify ) {
-					SCR_DrawSmallStringExt( margin + 10, lines - smallchar_height, con[j].name, g_color_table[3], qfalse, qtrue );
-				} else {
-					SCR_DrawSmallStringExt( margin + 10, lines - smallchar_height, con[j].name, colorDkGrey, qfalse, qtrue );
+				// draw notify blinking
+				vec4_t color;
+				memcpy( color, colorDkGrey, sizeof( color ) );
+
+				if ( activeConsoleNum != CON_ALL && j != CON_ALL && con[j].lasttime ) {
+					color[3] = ((float)NOTIFY_BLINK_TIME - (cls.realtime - con[j].lasttime)) / NOTIFY_BLINK_TIME;
+					if ( color[3] < 0.25f ) {
+						color[3] = colorDkGrey[3];
+					} else {
+						memcpy( color, g_color_table[ conColors[j] ], sizeof( vec3_t ) );
+					}
 				}
+
+				SCR_DrawSmallStringExt( margin + 10, lines - smallchar_height, con[j].name, color, qfalse, qtrue );
 			}
 			margin += strlen( con[j].name ) * smallchar_width + 20;
 		}
