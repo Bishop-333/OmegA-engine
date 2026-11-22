@@ -764,6 +764,12 @@ static rserr_t GLimp_StartDriverAndSetMode( int mode, const char *modeFS, qboole
 		}
 #endif
 
+		SDL_SetAppMetadata( CLIENT_WINDOW_TITLE, Q3_VERSION, "io.github.bishop-333.omega-engine" );
+		SDL_SetAppMetadataProperty( SDL_PROP_APP_METADATA_CREATOR_STRING, "Bishop-333" );
+		SDL_SetAppMetadataProperty( SDL_PROP_APP_METADATA_COPYRIGHT_STRING, "Copyright © 2021-2026 Bishop-333" );
+		SDL_SetAppMetadataProperty( SDL_PROP_APP_METADATA_URL_STRING, "https://github.com/Bishop-333/OmegA-engine" );
+		SDL_SetAppMetadataProperty( SDL_PROP_APP_METADATA_TYPE_STRING, "game" );
+
 		if ( !SDL_Init( SDL_INIT_VIDEO ) )
 		{
 			Com_Printf( "SDL_Init( SDL_INIT_VIDEO ) FAILED (%s)\n", SDL_GetError() );

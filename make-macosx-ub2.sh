@@ -94,7 +94,7 @@ if [ "$1" == "notarize" ]; then
 	# Post-notarized zip file (shipped)
 	POST_NOTARIZED_ZIP="omega_notarized.zip"
 
-	BUNDLE_ID="org.omega.omega"
+	BUNDLE_ID="io.github.bishop-333.omega-engine"
 
 	# allows for unsigned executable memory in hardened runtime
 	# see: https://developer.apple.com/documentation/bundleresources/entitlements/com_apple_security_cs_allow-unsigned-executable-memory

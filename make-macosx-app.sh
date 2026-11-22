@@ -316,7 +316,7 @@ PLIST="<?xml version=\"1.0\" encoding=\"UTF-8\"?>
     <key>CFBundleIconFile</key>
     <string>${ICNS%.icns}</string>
     <key>CFBundleIdentifier</key>
-    <string>org.omega.${PRODUCT_NAME}</string>
+    <string>io.github.bishop-333.omega-engine</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
@@ -355,7 +355,7 @@ fi
 
 PLIST="${PLIST}
     <key>NSHumanReadableCopyright</key>
-    <string>OmegA© 2021-2026 Bishop-333</string>
+    <string>Copyright © 2021-2026 Bishop-333</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
     <key>NSHighResolutionCapable</key>
