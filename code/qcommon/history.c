@@ -5,7 +5,7 @@
 
 static      qboolean historyLoaded = qfalse;
 
-#define     COMMAND_HISTORY 32
+#define     COMMAND_HISTORY 64
 
 static field_t historyEditLines[COMMAND_HISTORY];
 
