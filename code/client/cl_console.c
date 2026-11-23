@@ -29,8 +29,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // time that console tab blinks when it receives a message
 #define NOTIFY_BLINK_TIME 250
 
-#define  DEFAULT_CONSOLE_WIDTH 78
-#define  MAX_CONSOLE_WIDTH 120
+#define  DEFAULT_CONSOLE_WIDTH 120
+#define  MAX_CONSOLE_WIDTH 180
 
 #define  NUM_CON_TIMES 8
 #define  MAX_CONSOLES 5
