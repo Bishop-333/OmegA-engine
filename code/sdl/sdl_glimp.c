@@ -589,7 +589,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 			SDL_GL_SetAttribute( SDL_GL_DOUBLEBUFFER, 1 );
 		}
 
-		if( ( SDL_window = SDL_CreateWindow( CLIENT_WINDOW_TITLE,
+		if( ( SDL_window = SDL_CreateWindow( cl_title,
 				config->vidWidth, config->vidHeight, flags ) ) == NULL )
 		{
 			Com_DPrintf( "SDL_CreateWindow failed: %s\n", SDL_GetError() );
