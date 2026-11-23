@@ -30,7 +30,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define NOTIFY_BLINK_TIME 250
 
 #define  DEFAULT_CONSOLE_WIDTH 120
-#define  MAX_CONSOLE_WIDTH 180
+#define  MIN_CONSOLE_WIDTH (DEFAULT_CONSOLE_WIDTH / 6)
+#define  MAX_CONSOLE_WIDTH (DEFAULT_CONSOLE_WIDTH * 3 / 2)
 
 #define  NUM_CON_TIMES 8
 #define  MAX_CONSOLES 5
@@ -439,6 +440,9 @@ void Con_CheckResize( console_t *con )
 	else
 	{
 		width = ((cls.glconfig.vidWidth / smallchar_width) - 2);
+
+		if ( width < MIN_CONSOLE_WIDTH )
+			width = MIN_CONSOLE_WIDTH;
 
 		g_console_field_width = width;
 		g_consoleField.widthInChars = g_console_field_width;
