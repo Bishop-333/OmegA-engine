@@ -294,6 +294,15 @@ static keyNum_t IN_TranslateSDLToQ3Key( const SDL_KeyboardEvent *keyEvent, qbool
 			case SDLK_F13:          key = K_F13;           break;
 			case SDLK_F14:          key = K_F14;           break;
 			case SDLK_F15:          key = K_F15;           break;
+			case SDLK_F16:          key = K_F16;           break;
+			case SDLK_F17:          key = K_F17;           break;
+			case SDLK_F18:          key = K_F18;           break;
+			case SDLK_F19:          key = K_F19;           break;
+			case SDLK_F20:          key = K_F20;           break;
+			case SDLK_F21:          key = K_F21;           break;
+			case SDLK_F22:          key = K_F22;           break;
+			case SDLK_F23:          key = K_F23;           break;
+			case SDLK_F24:          key = K_F24;           break;
 
 			case SDLK_BACKSPACE:    key = K_BACKSPACE;     break;
 			case SDLK_KP_PERIOD:    key = K_KP_DEL;        break;

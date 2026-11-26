@@ -205,6 +205,16 @@ typedef enum {
 	K_EURO,
 	K_UNDO,
 
+	K_F16,
+	K_F17,
+	K_F18,
+	K_F19,
+	K_F20,
+	K_F21,
+	K_F22,
+	K_F23,
+	K_F24,
+
 	// Gamepad controls
 	// Ordered to match SDL2 game controller buttons and axes
 	// Do not change this order without also changing IN_GamepadMove() in SDL_input.c

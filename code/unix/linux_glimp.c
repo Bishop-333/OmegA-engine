@@ -264,28 +264,29 @@ static char *XLateKey( XKeyEvent *ev, int *key )
   case XK_Tab:    *key = K_TAB;      break;
 
   case XK_F1:    *key = K_F1;       break;
-
   case XK_F2:    *key = K_F2;       break;
-
   case XK_F3:    *key = K_F3;       break;
-
   case XK_F4:    *key = K_F4;       break;
-
   case XK_F5:    *key = K_F5;       break;
-
   case XK_F6:    *key = K_F6;       break;
-
   case XK_F7:    *key = K_F7;       break;
-
   case XK_F8:    *key = K_F8;       break;
-
   case XK_F9:    *key = K_F9;       break;
-
   case XK_F10:    *key = K_F10;      break;
-
   case XK_F11:    *key = K_F11;      break;
-
   case XK_F12:    *key = K_F12;      break;
+  case XK_F13:    *key = K_F13;      break;
+  case XK_F14:    *key = K_F14;      break;
+  case XK_F15:    *key = K_F15;      break;
+  case XK_F16:    *key = K_F16;      break;
+  case XK_F17:    *key = K_F17;      break;
+  case XK_F18:    *key = K_F18;      break;
+  case XK_F19:    *key = K_F19;      break;
+  case XK_F20:    *key = K_F20;      break;
+  case XK_F21:    *key = K_F21;      break;
+  case XK_F22:    *key = K_F22;      break;
+  case XK_F23:    *key = K_F23;      break;
+  case XK_F24:    *key = K_F24;      break;
 
     // bk001206 - from Ryan's Fakk2
     //case XK_BackSpace: *key = 8; break; // ctrl-h
