@@ -609,6 +609,7 @@ static void CL_KeyDownEvent( int key, unsigned time )
 		return;
 	}
 
+#ifdef _WIN32
 	// hardcoded screenshot key
 	if ( key == K_PRINT ) {
 		if ( keys[K_SHIFT].down ) {
@@ -618,6 +619,7 @@ static void CL_KeyDownEvent( int key, unsigned time )
 		}
 		return;
 	}
+#endif
 
 	// keys can still be used for bound actions
 	if ( ( key < 128 || key == K_MOUSE1 ) && cls.state == CA_CINEMATIC && Key_GetCatcher() == 0 ) {
@@ -725,10 +727,12 @@ static void CL_KeyUpEvent( int key, unsigned time )
 		return;
 	}
 
+#ifdef _WIN32
 	// hardcoded screenshot key
 	if ( key == K_PRINT ) {
 		return;
 	}
+#endif
 
 	//
 	// key up events only perform actions if the game key binding is
