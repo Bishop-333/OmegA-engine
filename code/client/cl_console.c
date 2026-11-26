@@ -282,7 +282,7 @@ Con_Clear_f
 static void Con_Clear_f( void ) {
 	int		i;
 
-	for ( i = 0 ; i < activeCon->linewidth ; i++ ) {
+	for ( i = 0 ; i < MAX_CONSOLE_WIDTH ; i++ ) {
 		activeCon->text[i] = ( ColorIndex( COLOR_WHITE ) << 8 ) | ' ';
 	}
 
@@ -342,7 +342,7 @@ static void Con_Dump_f( void )
 		l = 0;
 	}
 
-	bufferlen = activeCon->linewidth + ARRAY_LEN( Q_NEWLINE ) * sizeof( char );
+	bufferlen = MAX_CONSOLE_WIDTH + ARRAY_LEN( Q_NEWLINE ) * sizeof( char );
 	buffer = Hunk_AllocateTempMemory( bufferlen );
 
 	// write the remaining lines
@@ -350,13 +350,13 @@ static void Con_Dump_f( void )
 
 	for ( i = 0; i < n ; i++, l++ ) 
 	{
-		line = activeCon->text + (l % activeCon->totallines) * activeCon->linewidth;
+		line = activeCon->text + (l % activeCon->totallines) * MAX_CONSOLE_WIDTH;
 		// store line
-		for( x = 0; x < activeCon->linewidth; x++ )
+		for( x = 0; x < MAX_CONSOLE_WIDTH; x++ )
 			buffer[ x ] = line[ x ] & 0xff;
-		buffer[ activeCon->linewidth ] = '\0';
+		buffer[ MAX_CONSOLE_WIDTH ] = '\0';
 		// terminate on ending space characters
-		for ( x = activeCon->linewidth - 1 ; x >= 0 ; x-- ) {
+		for ( x = MAX_CONSOLE_WIDTH - 1 ; x >= 0 ; x-- ) {
 			if ( buffer[ x ] == ' ' )
 				buffer[ x ] = '\0';
 			else
@@ -397,10 +397,7 @@ If the line width has changed, reformat the buffer.
 */
 void Con_CheckResize( console_t *con )
 {
-	int		i, j, width, oldwidth, oldtotallines, oldcurrent, numlines, numchars;
-	short	tbuf[CON_TEXTSIZE], *src, *dst;
-	static int old_width, old_vispage;
-	int		vispage;
+	int		width, vispage;
 	float	scale;
 
 	if ( con->viswidth == cls.glconfig.vidWidth && !con_scale->modified ) {
@@ -432,7 +429,7 @@ void Con_CheckResize( console_t *con )
 		g_console_field_width = DEFAULT_CONSOLE_WIDTH;
 		width = DEFAULT_CONSOLE_WIDTH * scale;
 		con->linewidth = width;
-		con->totallines = CON_TEXTSIZE / con->linewidth;
+		con->totallines = CON_TEXTSIZE / MAX_CONSOLE_WIDTH;
 		con->vispage = 4;
 
 		Con_Clear_f();
@@ -452,53 +449,17 @@ void Con_CheckResize( console_t *con )
 
 		vispage = cls.glconfig.vidHeight / ( smallchar_height * 2 ) - 1;
 
-		if ( old_vispage == vispage && old_width == width )
+		if ( con->vispage == vispage && con->linewidth == width )
 			return;
 
-		oldwidth = con->linewidth;
-		oldtotallines = con->totallines;
-		oldcurrent = con->current;
-
 		con->linewidth = width;
-		con->totallines = CON_TEXTSIZE / con->linewidth;
+		con->totallines = CON_TEXTSIZE / MAX_CONSOLE_WIDTH;
 		con->vispage = vispage;
 
-		old_vispage = vispage;
-		old_width = width;
-
-		numchars = oldwidth;
-		if ( numchars > con->linewidth )
-			numchars = con->linewidth;
-
-		if ( oldcurrent > oldtotallines )
-			numlines = oldtotallines;	
-		else
-			numlines = oldcurrent + 1;	
-
-		if ( numlines > con->totallines )
-			numlines = con->totallines;
-
-		Com_Memcpy( tbuf, con->text, CON_TEXTSIZE * sizeof( short ) );
-
-		for ( i = 0; i < CON_TEXTSIZE; i++ ) 
-			con->text[i] = (ColorIndex(COLOR_WHITE)<<8) | ' ';
-
-		for ( i = 0; i < numlines; i++ )
-		{
-			src = &tbuf[ ((oldcurrent - i + oldtotallines) % oldtotallines) * oldwidth ];
-			dst = &con->text[ (numlines - 1 - i) * con->linewidth ];
-			for ( j = 0; j < numchars; j++ )
-				*dst++ = *src++;
-		}
-
 		Con_ClearNotify();
-
-		con->current = numlines - 1;
 	}
 
 	con->display = con->current;
-
-	con_scale->modified = qfalse;
 }
 
 
@@ -679,8 +640,8 @@ static void Con_NewLine( console_t *con )
 		con->display++;
 	con->current++;
 
-	s = &con->text[ ( con->current % con->totallines ) * con->linewidth ];
-	for ( i = 0; i < con->linewidth ; i++ ) 
+	s = &con->text[ ( con->current % con->totallines ) * MAX_CONSOLE_WIDTH ];
+	for ( i = 0; i < MAX_CONSOLE_WIDTH ; i++ ) 
 		*s++ = (ColorIndex(COLOR_WHITE)<<8) | ' ';
 
 	con->x = 0;
@@ -788,7 +749,7 @@ void CL_OutputToConsole( console_t *con, const char *txt, qboolean skipnotify ) 
 			}
 			// display character and advance
 			y = con->current % con->totallines;
-			con->text[y * con->linewidth + con->x ] = (colorIndex << 8) | (c & 255);
+			con->text[y * MAX_CONSOLE_WIDTH + con->x ] = (colorIndex << 8) | (c & 255);
 			con->x++;
 			if ( con->x >= con->linewidth ) {
 				Con_Linefeed( con, skipnotify );
@@ -1071,7 +1032,7 @@ static void Con_DrawNotify( void )
 			v += fade * smallchar_height;
 		}
 
-		text = activeCon->text + (i % activeCon->totallines)*activeCon->linewidth;
+		text = activeCon->text + (i % activeCon->totallines)*MAX_CONSOLE_WIDTH;
 
 		if (cl.snap.ps.pm_type != PM_INTERMISSION && Key_GetCatcher( ) & (KEYCATCH_UI | KEYCATCH_CGAME) ) {
 			continue;
@@ -1472,7 +1433,7 @@ static void Con_DrawSolidConsole( float frac ) {
 			continue;
 		}
 
-		text = activeCon->text + (row % activeCon->totallines) * activeCon->linewidth;
+		text = activeCon->text + (row % activeCon->totallines) * MAX_CONSOLE_WIDTH;
 
 		for ( x = 0 ; x < activeCon->linewidth ; x++ ) {
 			// skip rendering whitespace
@@ -1509,9 +1470,13 @@ Con_DrawConsole
 ==================
 */
 void Con_DrawConsole( void ) {
+	int i;
 
 	// check for console width changes from a vid mode change
-	Con_CheckResize( activeCon );
+	for ( i = 0; i < MAX_CONSOLES; i++ ) {
+		Con_CheckResize( &con[i] );
+	}
+	con_scale->modified = qfalse;
 
 	// if disconnected, render console full screen
 	if ( cls.state == CA_DISCONNECTED ) {
